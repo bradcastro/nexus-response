@@ -48,7 +48,7 @@ async function poll() {
     const params = new URLSearchParams({
       per_page: 25,
       start_date: startDate,
-      event_types: 'hard_brake,hard_accel,hard_corner'
+      event_types: ["hard_brake", "hard_accel", "hard_corner"]
     });
 
     const url = `${MOTIVE_BASE}/v1/driver_performance_events?${params}`;
