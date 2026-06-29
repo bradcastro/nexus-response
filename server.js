@@ -5,12 +5,18 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { saveIncident, getIncidents, updateIncidentStatus } = require('./db');
 
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard.html'));
+});
 
 // Raw body needed for signature verification — MUST come before json parser
 app.use('/webhook/motive', express.raw({ type: 'application/json' }));
