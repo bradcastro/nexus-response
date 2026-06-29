@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexus Response — Ops Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0a0c10;
+      --surface:     #111318;
+      --surface2:    #181c24;
+      --border:      #1e2330;
+      --border2:     #252c3a;
+      --text:        #e8eaf0;
+      --text-muted:  #6b7280;
+      --text-dim:    #9ca3af;
+      --accent:      #f97316;
+      --accent-dim:  rgba(249,115,22,0.12);
+      --accent-glow: rgba(249,115,22,0.25);
+      --green:       #22c55e;
+      --green-dim:   rgba(34,197,94,0.12);
+      --red:         #ef4444;
+      --red-dim:     rgba(239,68,68,0.12);
+      --yellow:      #eab308;
+      --yellow-dim:  rgba(234,179,8,0.12);
+      --blue:        #3b82f6;
+      --blue-dim:    rgba(59,130,246,0.12);
+      --mono:        'JetBrains Mono', monospace;
+      --sans:        'Inter', sans-serif;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; }
+
+    /* ── Layout ── */
+    .shell { display: grid; grid-template-rows: 56px 1fr; height: 100vh; overflow: hidden; }
+    .main  { display: grid; grid-template-columns: 380px 1fr; overflow: hidden; }
+
+    /* ── Header ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-mark {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: var(--accent); display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px; color: #000; letter-spacing: -0.5px;
+    }
+    .logo-name { font-weight: 600; font-size: 15px; letter-spacing: -0.3px; }
+    .logo-sub  { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--green-dim); border: 1px solid rgba(34,197,94,0.2);
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; color: var(--green); font-weight: 500;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .refresh-btn {
+      background: transparent; border: 1px solid var(--border2); color: var(--text-dim);
+      padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: var(--sans);
+      transition: all 0.15s;
+    }
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sidebar-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sidebar-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .incident-count {
+      background: var(--accent); color: #000; font-size: 11px; font-weight: 700;
+      padding: 2px 7px; border-radius: 10px; min-width: 20px; text-align: center;
+    }
+    .incident-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .incident-list::-webkit-scrollbar { width: 4px; }
+    .incident-list::-webkit-scrollbar-track { background: transparent; }
+    .incident-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ── Incident Card ── */
+    .incident-card {
+      padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border);
+      margin-bottom: 6px; cursor: pointer; transition: all 0.15s; position: relative;
+      background: var(--surface2);
+    }
+    .incident-card:hover { border-color: var(--border2); background: #1e2330; }
+    .incident-card.active { border-color: var(--accent); background: var(--accent-dim); }
+    .incident-card.dispatched { opacity: 0.5; }
+    .incident-card.dismissed { opacity: 0.35; }
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+    .card-id { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+    .severity-badge {
+      font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .sev-critical { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+    .sev-high     { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(249,115,22,0.2); }
+    .sev-medium   { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(234,179,8,0.2); }
+    .sev-low      { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(59,130,246,0.2); }
+    .sev-unknown  { background: rgba(107,114,128,0.12); color: var(--text-muted); border: 1px solid rgba(107,114,128,0.2); }
+    .card-event { font-weight: 500; font-size: 13px; margin-bottom: 4px; }
+    .card-meta  { font-size: 11px; color: var(--text-muted); display: flex; gap: 10px; }
+    .card-time  { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 8px; }
+    .card-status-bar {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 8px 0 0 8px;
+    }
+    .status-pending   .card-status-bar { background: var(--accent); }
+    .status-dispatched .card-status-bar { background: var(--green); }
+    .status-dismissed  .card-status-bar { background: var(--border2); }
+
+    /* ── Empty State ── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 48px 24px; text-align: center; color: var(--text-muted);
+    }
+    .empty-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+    .empty-title { font-size: 13px; font-weight: 500; color: var(--text-dim); margin-bottom: 6px; }
+    .empty-sub { font-size: 12px; line-height: 1.6; }
+
+    /* ── Detail Panel ── */
+    .detail { display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+    .detail-empty {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--text-muted); text-align: center; padding: 48px;
+    }
+    .detail-empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.2; }
+    .detail-empty-text { font-size: 14px; color: var(--text-muted); }
+
+    .detail-content { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .detail-content::-webkit-scrollbar { width: 4px; }
+    .detail-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .detail-header { display: flex; align-items: flex-start; justify-content: space-between; }
+    .detail-title  { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .detail-id     { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+
+    /* ── Info Sections ── */
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .info-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px;
+    }
+    .info-card.full { grid-column: 1 / -1; }
+    .info-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .info-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .info-key { font-size: 12px; color: var(--text-muted); }
+    .info-val { font-size: 12px; font-weight: 500; text-align: right; max-width: 60%; word-break: break-all; }
+    .info-val.mono { font-family: var(--mono); font-size: 11px; }
+    .info-val.null-val { color: var(--text-muted); font-style: italic; }
+
+    /* ── Map ── */
+    .map-container {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      overflow: hidden; position: relative;
+    }
+    .map-inner { width: 100%; height: 240px; position: relative; background: #0d1117; }
+    .map-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(30,35,48,0.8) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30,35,48,0.8) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .map-roads {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(37,44,58,0.6) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(37,44,58,0.6) 2px, transparent 2px);
+      background-size: 120px 80px;
+      background-position: 30px 20px;
+    }
+    .map-pin {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .pin-ring {
+      width: 60px; height: 60px; border-radius: 50%;
+      border: 2px solid var(--accent); background: var(--accent-dim);
+      display: flex; align-items: center; justify-content: center;
+      animation: ring-pulse 2s infinite;
+    }
+    @keyframes ring-pulse {
+      0%,100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+      50%      { box-shadow: 0 0 0 16px transparent; }
+    }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }
+    .pin-label {
+      margin-top: 8px; background: var(--surface); border: 1px solid var(--border2);
+      padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 500;
+      white-space: nowrap; color: var(--text);
+    }
+    .map-coords {
+      position: absolute; bottom: 10px; right: 12px;
+      font-family: var(--mono); font-size: 10px; color: var(--text-muted);
+      background: rgba(10,12,16,0.8); padding: 3px 7px; border-radius: 4px;
+    }
+    .map-badge {
+      position: absolute; top: 10px; left: 12px;
+      font-size: 10px; font-weight: 600; color: var(--accent);
+      background: var(--accent-dim); border: 1px solid rgba(249,115,22,0.2);
+      padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* ── Dispatch Panel ── */
+    .dispatch-panel {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px;
+    }
+    .dispatch-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 14px; }
+    .dispatch-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn {
+      padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; font-family: var(--sans); transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-dispatch {
+      background: var(--accent); color: #000;
+    }
+    .btn-dispatch:hover { background: #fb923c; transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+    .btn-dispatch:active { transform: translateY(0); }
+    .btn-dismiss {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border2);
+    }
+    .btn-dismiss:hover { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+    /* ── Toast ── */
+    .toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+    .toast {
+      background: var(--surface2); border: 1px solid var(--border2);
+      padding: 12px 16px; border-radius: 8px; font-size: 13px;
+      display: flex; align-items: center; gap: 10px;
+      animation: slide-in 0.2s ease; min-width: 280px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--red); }
+    .toast.info    { border-left: 3px solid var(--accent); }
+    @keyframes slide-in { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: translateX(0); } }
+
+    /* ── Resolved Banner ── */
+    .resolved-banner {
+      padding: 12px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .resolved-banner.dispatched { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+    .resolved-banner.dismissed  { background: rgba(107,114,128,0.1); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Scrollbar ── */
+    * { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-mark">NX</div>
+      <span class="logo-name">Nexus Response</span>
+      <span class="logo-sub">Ops Center</span>
+    </div>
+    <div class="header-right">
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        <span id="connection-status">Connected</span>
+      </div>
+      <button class="refresh-btn" onclick="loadIncidents()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Active Incidents</span>
+        <span class="incident-count" id="incident-count">0</span>
+      </div>
+      <div class="incident-list" id="incident-list">
+        <div class="empty-state">
+          <div class="empty-icon">📡</div>
+          <div class="empty-title">Monitoring for events</div>
+          <div class="empty-sub">Incidents appear here when Motive detects a safety event on your fleet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail -->
+    <div class="detail" id="detail-panel">
+      <div class="detail-empty">
+        <div class="detail-empty-icon">🛰</div>
+        <div class="detail-empty-text">Select an incident to review and dispatch</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+  // ── Config ────────────────────────────────────────────────────────────────
+  const API = '';  // same origin — no need for full URL when served from Render
+  let incidents = [];
+  let selectedId = null;
+  let pollTimer = null;
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  loadIncidents();
+  pollTimer = setInterval(loadIncidents, 10000); // poll every 10 seconds
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  async function loadIncidents() {
+    try {
+      const res = await fetch(`${API}/api/incidents`);
+      if (!res.ok) throw new Error('API error');
+      const data = await res.json();
+      incidents = data.incidents || [];
+      renderList();
+      if (selectedId) {
+        const current = incidents.find(i => i.id === selectedId);
+        if (current) renderDetail(current);
+      }
+      document.getElementById('connection-status').textContent = 'Connected';
+    } catch (err) {
+      console.error('Load error:', err);
+      document.getElementById('connection-status').textContent = 'Reconnecting…';
+    }
+  }
+
+  async function dispatch(id) {
+    try {
+      const res = await fetch(`${API}/api/incidents/${id}/dispatch`, { method: 'POST' });
+      if (!res.ok) throw new Error('Dispatch failed');
+      await loadIncidents();
+      toast('Incident dispatched. Provider notified.', 'success');
+    } catch (err) {
+      toast('Dispatch failed — try again.', 'error');
+    }
+  }
+
+  async function dismiss(id) {
+    try {
+      const res = await fetch(`${API}/api/incidents/${id}/dismiss`, { method: 'POST' });
+      if (!res.ok) throw new Error('Dismiss failed');
+      await loadIncidents();
+      toast('Incident dismissed.', 'info');
+    } catch (err) {
+      toast('Dismiss failed — try again.', 'error');
+    }
+  }
+
+  // ── Render List ───────────────────────────────────────────────────────────
+  function renderList() {
+    const list = document.getElementById('incident-list');
+    const count = document.getElementById('incident-count');
+    const pending = incidents.filter(i => i.status === 'pending').length;
+    count.textContent = pending;
+
+    if (!incidents.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📡</div>
+          <div class="empty-title">Monitoring for events</div>
+          <div class="empty-sub">Incidents appear here when Motive detects a safety event on your fleet.</div>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = incidents.map(inc => {
+      const eventLabel = formatEventType(inc.eventType);
+      const vehicle = inc.vehicle?.make ? `${inc.vehicle.make} ${inc.vehicle.model}` : 'Unknown Vehicle';
+      const location = inc.location?.address || formatCoords(inc.location) || 'Location unavailable';
+      const time = formatTime(inc.receivedAt);
+      const isActive = inc.id === selectedId;
+
+      return `
+        <div class="incident-card status-${inc.status} ${isActive ? 'active' : ''} ${inc.status !== 'pending' ? inc.status : ''}"
+             onclick="selectIncident('${inc.id}')">
+          <div class="card-status-bar"></div>
+          <div class="card-top">
+            <span class="card-id">${inc.id?.substring(0,18) || 'NX-000000'}</span>
+            <span class="severity-badge sev-${inc.severity || 'unknown'}">${inc.severity || 'unknown'}</span>
+          </div>
+          <div class="card-event">${eventLabel}</div>
+          <div class="card-meta">
+            <span>${vehicle}</span>
+          </div>
+          <div class="card-meta" style="margin-top:3px">
+            <span>${truncate(location, 42)}</span>
+          </div>
+          <div class="card-time">${time}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Render Detail ─────────────────────────────────────────────────────────
+  function selectIncident(id) {
+    selectedId = id;
+    renderList();
+    const inc = incidents.find(i => i.id === id);
+    if (inc) renderDetail(inc);
+  }
+
+  function renderDetail(inc) {
+    const panel = document.getElementById('detail-panel');
+    const eventLabel = formatEventType(inc.eventType);
+    const isPending = inc.status === 'pending';
+    const lat = inc.location?.lat;
+    const lng = inc.location?.lng;
+    const hasCoords = lat && lng;
+    const address = inc.location?.address || (hasCoords ? `${lat}, ${lng}` : 'Location unavailable');
+
+    const resolvedBanner = !isPending ? `
+      <div class="resolved-banner ${inc.status}">
+        ${inc.status === 'dispatched' ? '✓ Dispatched — provider has been notified' : '✗ Dismissed — no action taken'}
+      </div>` : '';
+
+    const actionButtons = isPending ? `
+      <div class="dispatch-actions">
+        <button class="btn btn-dispatch" onclick="dispatch('${inc.id}')">
+          ⚡ Dispatch Provider
+        </button>
+        <button class="btn btn-dismiss" onclick="dismiss('${inc.id}')">
+          Dismiss
+        </button>
+      </div>` : `
+      <div class="dispatch-actions">
+        <button class="btn btn-dispatch" disabled>⚡ Dispatch Provider</button>
+        <button class="btn btn-dismiss" disabled>Dismiss</button>
+      </div>`;
+
+    panel.innerHTML = `
+      <div class="detail-content">
+
+        <div class="detail-header">
+          <div>
+            <div class="detail-title">${eventLabel}</div>
+            <div class="detail-id">${inc.id || 'NX-000000'}</div>
+          </div>
+          <span class="severity-badge sev-${inc.severity || 'unknown'}" style="font-size:12px;padding:4px 10px">${inc.severity || 'unknown'}</span>
+        </div>
+
+        ${resolvedBanner}
+
+        <!-- Map -->
+        <div class="info-card full map-container">
+          <div class="map-inner">
+            <div class="map-grid"></div>
+            <div class="map-roads"></div>
+            ${hasCoords ? `
+              <div class="map-badge">📍 Live Location</div>
+              <div class="map-pin">
+                <div class="pin-ring"><div class="pin-dot"></div></div>
+                <div class="pin-label">${truncate(address, 40)}</div>
+              </div>
+              <div class="map-coords">${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
+            ` : `
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;">
+                Location data unavailable
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- Info Grid -->
+        <div class="info-grid">
+
+          <!-- Vehicle -->
+          <div class="info-card">
+            <div class="info-label">Vehicle</div>
+            ${infoRow('VIN', inc.vehicle?.vin)}
+            ${infoRow('Make / Model', inc.vehicle?.make ? `${inc.vehicle.make} ${inc.vehicle.model}` : null)}
+            ${infoRow('Year', inc.vehicle?.year)}
+            ${infoRow('Plate', inc.vehicle?.licensePlate)}
+          </div>
+
+          <!-- Driver -->
+          <div class="info-card">
+            <div class="info-label">Driver</div>
+            ${infoRow('Name', inc.driver?.name)}
+            ${infoRow('ID', inc.driver?.id, true)}
+            ${infoRow('Phone', inc.driver?.phone)}
+          </div>
+
+          <!-- Location -->
+          <div class="info-card">
+            <div class="info-label">Location</div>
+            ${infoRow('Address', address)}
+            ${infoRow('Speed', inc.location?.speed_mph ? `${inc.location.speed_mph} mph` : null)}
+            ${infoRow('Coordinates', hasCoords ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : null, true)}
+          </div>
+
+          <!-- Incident -->
+          <div class="info-card">
+            <div class="info-label">Incident</div>
+            ${infoRow('Source', inc.source || 'motive')}
+            ${infoRow('Event', inc.eventType, true)}
+            ${infoRow('Fleet', inc.fleetId)}
+            ${infoRow('Received', formatTime(inc.receivedAt))}
+          </div>
+
+        </div>
+
+        <!-- Dispatch -->
+        <div class="dispatch-panel">
+          <div class="dispatch-label">Ops Decision</div>
+          ${actionButtons}
+        </div>
+
+      </div>`;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function infoRow(key, val, mono = false) {
+    const isEmpty = val === null || val === undefined || val === '' || val === 'null';
+    return `
+      <div class="info-row">
+        <span class="info-key">${key}</span>
+        <span class="info-val ${isEmpty ? 'null-val' : ''} ${mono && !isEmpty ? 'mono' : ''}">
+          ${isEmpty ? '—' : val}
+        </span>
+      </div>`;
+  }
+
+  function formatEventType(type) {
+    if (!type || type === 'unknown') return 'Unknown Event';
+    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '—';
+    try {
+      return new Date(ts).toLocaleString('en-US', {
+        month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    } catch { return ts; }
+  }
+
+  function formatCoords(loc) {
+    if (loc?.lat && loc?.lng) return `${loc.lat}, ${loc.lng}`;
+    return null;
+  }
+
+  function truncate(str, len) {
+    if (!str) return '';
+    return str.length > len ? str.substring(0, len) + '…' : str;
+  }
+
+  function toast(msg, type = 'info') {
+    const container = document.getElementById('toasts');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+</script>
+
+</body>
+</html>
