@@ -20,7 +20,7 @@
     }
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
     .shell { display: grid; grid-template-rows: 56px 1fr; height: 100vh; overflow: hidden; }
-    .main  { display: grid; grid-template-columns: 380px 1fr; overflow: hidden; }
+    .main  { display: grid; grid-template-columns: 360px 1fr; overflow: hidden; }
 
     /* Header */
     header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
@@ -80,22 +80,63 @@
     .detail-title { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 4px; }
     .detail-id { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
 
+    /* Two-col layout for detail */
+    .detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .detail-cols .full { grid-column: 1 / -1; }
+
     /* Map */
-    .map-container { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); height: 280px; position: relative; }
+    .map-container { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); height: 260px; position: relative; }
     #google-map { width: 100%; height: 100%; }
     .map-no-location { width: 100%; height: 100%; background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; }
 
-    /* Info Grid */
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .info-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
-    .info-card.full { grid-column: 1 / -1; }
-    .info-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px; }
+    /* Section cards */
+    .section-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .section-label-icon { font-size: 12px; }
     .info-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
     .info-row:last-child { border-bottom: none; }
     .info-key { font-size: 12px; color: var(--text-muted); }
     .info-val { font-size: 12px; font-weight: 500; text-align: right; max-width: 60%; word-break: break-all; }
     .info-val.mono { font-family: var(--mono); font-size: 11px; }
     .info-val.null-val { color: var(--text-muted); font-style: italic; }
+    .info-val.green { color: var(--green); }
+    .info-val.yellow { color: var(--yellow); }
+    .info-val.red { color: var(--red); }
+    .info-val.accent { color: var(--accent); }
+
+    /* Engine load gauge */
+    .gauge-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .gauge-row:last-child { border-bottom: none; }
+    .gauge-label { font-size: 12px; color: var(--text-muted); width: 120px; flex-shrink: 0; }
+    .gauge-bar-wrap { flex: 1; height: 6px; background: var(--border2); border-radius: 3px; overflow: hidden; }
+    .gauge-bar { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .gauge-val { font-size: 11px; font-family: var(--mono); color: var(--text-dim); width: 48px; text-align: right; flex-shrink: 0; }
+    .gauge-low    .gauge-bar { background: var(--green); }
+    .gauge-medium .gauge-bar { background: var(--yellow); }
+    .gauge-high   .gauge-bar { background: var(--accent); }
+    .gauge-critical .gauge-bar { background: var(--red); }
+
+    /* Camera section */
+    .camera-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+    .camera-feed { border-radius: 6px; overflow: hidden; border: 1px solid var(--border2); background: #0d1117; aspect-ratio: 16/9; position: relative; display: flex; align-items: center; justify-content: center; }
+    .camera-label { position: absolute; top: 8px; left: 8px; font-size: 10px; font-weight: 600; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 3px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .camera-feed video { width: 100%; height: 100%; object-fit: cover; }
+    .camera-feed img { width: 100%; height: 100%; object-fit: cover; }
+    .camera-no-feed { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text-muted); font-size: 11px; }
+    .camera-no-feed-icon { font-size: 20px; opacity: 0.4; }
+    .camera-timestamp { position: absolute; bottom: 6px; right: 8px; font-size: 9px; font-family: var(--mono); color: rgba(255,255,255,0.4); }
+
+    /* Video clip */
+    .video-container { border-radius: 8px; overflow: hidden; border: 1px solid var(--border2); background: #000; position: relative; }
+    .video-container video { width: 100%; display: block; max-height: 240px; }
+    .video-overlay-label { position: absolute; top: 10px; left: 10px; font-size: 10px; font-weight: 600; background: rgba(249,115,22,0.9); color: #000; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .video-link-btn { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; color: var(--blue); font-size: 12px; font-weight: 500; cursor: pointer; text-decoration: none; transition: all 0.15s; margin-top: 8px; }
+    .video-link-btn:hover { border-color: var(--blue); background: var(--blue-dim); }
+    .no-video { display: flex; align-items: center; gap: 10px; padding: 16px; background: var(--surface2); border-radius: 6px; border: 1px dashed var(--border2); color: var(--text-muted); font-size: 12px; }
+
+    /* Driver contact */
+    .driver-contact-btn { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; color: var(--green); font-size: 12px; font-weight: 500; cursor: pointer; text-decoration: none; transition: all 0.15s; margin-top: 8px; width: 100%; justify-content: center; }
+    .driver-contact-btn:hover { border-color: var(--green); background: var(--green-dim); }
 
     /* Dispatch */
     .dispatch-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
@@ -117,7 +158,8 @@
     .toast.success { border-left: 3px solid var(--green); }
     .toast.error   { border-left: 3px solid var(--red); }
     .toast.info    { border-left: 3px solid var(--accent); }
-    @keyframes slide-in { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: translateX(0); } }
+    @keyframes slide-in { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+    @keyframes ring-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,0.25)} 50%{box-shadow:0 0 0 16px transparent} }
     * { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
   </style>
 </head>
@@ -130,10 +172,7 @@
       <span class="logo-sub">Ops Center</span>
     </div>
     <div class="header-right">
-      <div class="status-pill">
-        <div class="status-dot"></div>
-        <span id="connection-status">Connected</span>
-      </div>
+      <div class="status-pill"><div class="status-dot"></div><span id="connection-status">Connected</span></div>
       <button class="refresh-btn" onclick="loadIncidents()">↻ Refresh</button>
     </div>
   </header>
@@ -164,267 +203,437 @@
 <div class="toast-container" id="toasts"></div>
 
 <script>
-  const API = '';
-  let incidents = [];
-  let selectedId = null;
-  let googleMap = null;
-  let activeMarker = null;
-  let mapsReady = false;
+const API = '';
+let incidents = [];
+let selectedId = null;
+let googleMap = null;
+let activeMarker = null;
+let mapsReady = false;
 
-  // Load Google Maps dynamically using key from server
-  async function loadGoogleMaps() {
-    try {
-      const res = await fetch('/api/config');
-      const config = await res.json();
-      if (!config.mapsKey) return;
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${config.mapsKey}&callback=onMapsReady`;
-      script.async = true;
-      document.head.appendChild(script);
-    } catch (e) {
-      console.log('Maps config not available');
-    }
-  }
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function loadGoogleMaps() {
+  try {
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    if (!cfg.mapsKey) return;
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${cfg.mapsKey}&callback=onMapsReady`;
+    s.async = true;
+    document.head.appendChild(s);
+  } catch(e) {}
+}
+window.onMapsReady = function() {
+  mapsReady = true;
+  if (selectedId) { const inc = incidents.find(i=>i.id===selectedId); if(inc) renderDetail(inc); }
+};
 
-  window.onMapsReady = function() {
-    mapsReady = true;
-    // If an incident is already selected, re-render to show the real map
-    if (selectedId) {
-      const inc = incidents.find(i => i.id === selectedId);
-      if (inc) renderDetail(inc);
-    }
-  };
+loadGoogleMaps();
+loadIncidents();
+setInterval(loadIncidents, 10000);
 
-  function initMap(lat, lng, label) {
-    const mapEl = document.getElementById('google-map');
-    if (!mapEl || !mapsReady) return;
-
-    const coords = { lat: parseFloat(lat), lng: parseFloat(lng) };
-
-    if (!googleMap) {
-      googleMap = new google.maps.Map(mapEl, {
-        center: coords,
-        zoom: 14,
-        mapTypeId: 'roadmap',
-        styles: [
-          { elementType: 'geometry', stylers: [{ color: '#0a0c10' }] },
-          { elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
-          { elementType: 'labels.text.stroke', stylers: [{ color: '#0a0c10' }] },
-          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e2330' }] },
-          { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#252c3a' }] },
-          { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#6b7280' }] },
-          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1117' }] },
-          { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-          { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#1e2330' }] },
-        ],
-        disableDefaultUI: false,
-        zoomControl: true,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: true,
-      });
-    } else {
-      googleMap.setCenter(coords);
-      googleMap.setZoom(14);
-    }
-
-    if (activeMarker) activeMarker.setMap(null);
-
-    activeMarker = new google.maps.Marker({
-      position: coords,
-      map: googleMap,
-      title: label || 'Incident Location',
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 12,
-        fillColor: '#f97316',
-        fillOpacity: 1,
-        strokeColor: '#fff',
-        strokeWeight: 2,
-      }
-    });
-
-    new google.maps.InfoWindow({
-      content: `<div style="color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:600;padding:4px 2px">${label || 'Incident'}</div>`
-    }).open(googleMap, activeMarker);
-  }
-
-  // Boot
-  loadGoogleMaps();
-  loadIncidents();
-  setInterval(loadIncidents, 10000);
-
-  async function loadIncidents() {
-    try {
-      const res = await fetch('/api/incidents');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      incidents = data.incidents || [];
-      renderList();
-      if (selectedId) {
-        const cur = incidents.find(i => i.id === selectedId);
-        if (cur) renderDetail(cur);
-      }
-      document.getElementById('connection-status').textContent = 'Connected';
-    } catch {
-      document.getElementById('connection-status').textContent = 'Reconnecting…';
-    }
-  }
-
-  async function dispatch(id) {
-    try {
-      const res = await fetch(`/api/incidents/${id}/dispatch`, { method: 'POST' });
-      if (!res.ok) throw new Error();
-      await loadIncidents();
-      toast('Incident dispatched. Provider notified.', 'success');
-    } catch { toast('Dispatch failed — try again.', 'error'); }
-  }
-
-  async function dismiss(id) {
-    try {
-      const res = await fetch(`/api/incidents/${id}/dismiss`, { method: 'POST' });
-      if (!res.ok) throw new Error();
-      await loadIncidents();
-      toast('Incident dismissed.', 'info');
-    } catch { toast('Dismiss failed — try again.', 'error'); }
-  }
-
-  function renderList() {
-    const list = document.getElementById('incident-list');
-    const count = document.getElementById('incident-count');
-    count.textContent = incidents.filter(i => i.status === 'pending').length;
-    if (!incidents.length) {
-      list.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><div class="empty-title">Monitoring for events</div><div class="empty-sub">Incidents appear here when Motive detects a safety event on your fleet.</div></div>`;
-      return;
-    }
-    list.innerHTML = incidents.map(inc => {
-      const vehicle = inc.vehicle?.make ? `${inc.vehicle.make} ${inc.vehicle.model}` : 'Unknown Vehicle';
-      const location = inc.location?.address || (inc.location?.lat ? `${inc.location.lat}, ${inc.location.lng}` : 'Location unavailable');
-      return `<div class="incident-card status-${inc.status} ${inc.id === selectedId ? 'active' : ''} ${inc.status !== 'pending' ? inc.status : ''}" onclick="selectIncident('${inc.id}')">
-        <div class="card-status-bar"></div>
-        <div class="card-top">
-          <span class="card-id">${(inc.id||'').substring(0,20)}</span>
-          <span class="severity-badge sev-${inc.severity||'unknown'}">${inc.severity||'unknown'}</span>
-        </div>
-        <div class="card-event">${formatEventType(inc.eventType)}</div>
-        <div class="card-meta">${vehicle}</div>
-        <div class="card-meta" style="margin-top:3px">${truncate(location,42)}</div>
-        <div class="card-time">${formatTime(inc.receivedAt)}</div>
-      </div>`;
-    }).join('');
-  }
-
-  function selectIncident(id) {
-    selectedId = id;
+// ── Data ──────────────────────────────────────────────────────────────────────
+async function loadIncidents() {
+  try {
+    const res = await fetch('/api/incidents');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    incidents = data.incidents || [];
     renderList();
-    const inc = incidents.find(i => i.id === id);
-    if (inc) renderDetail(inc);
+    if (selectedId) { const cur = incidents.find(i=>i.id===selectedId); if(cur) renderDetail(cur); }
+    document.getElementById('connection-status').textContent = 'Connected';
+  } catch { document.getElementById('connection-status').textContent = 'Reconnecting…'; }
+}
+
+async function dispatch(id) {
+  try {
+    const res = await fetch(`/api/incidents/${id}/dispatch`, {method:'POST'});
+    if (!res.ok) throw new Error();
+    await loadIncidents();
+    toast('Incident dispatched. Provider notified.', 'success');
+  } catch { toast('Dispatch failed — try again.', 'error'); }
+}
+
+async function dismiss(id) {
+  try {
+    const res = await fetch(`/api/incidents/${id}/dismiss`, {method:'POST'});
+    if (!res.ok) throw new Error();
+    await loadIncidents();
+    toast('Incident dismissed.', 'info');
+  } catch { toast('Dismiss failed — try again.', 'error'); }
+}
+
+// ── Sidebar List ──────────────────────────────────────────────────────────────
+function renderList() {
+  const list = document.getElementById('incident-list');
+  document.getElementById('incident-count').textContent = incidents.filter(i=>i.status==='pending').length;
+  if (!incidents.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><div class="empty-title">Monitoring for events</div><div class="empty-sub">Incidents appear here when Motive detects a safety event on your fleet.</div></div>`;
+    return;
   }
+  list.innerHTML = incidents.map(inc => {
+    const vehicle = inc.vehicle?.make ? `${inc.vehicle.make} ${inc.vehicle.model}` : 'Unknown Vehicle';
+    const loc = inc.location?.address || (inc.location?.lat ? `${parseFloat(inc.location.lat).toFixed(4)}, ${parseFloat(inc.location.lng).toFixed(4)}` : 'No location');
+    return `<div class="incident-card status-${inc.status} ${inc.id===selectedId?'active':''} ${inc.status!=='pending'?inc.status:''}" onclick="selectIncident('${inc.id}')">
+      <div class="card-status-bar"></div>
+      <div class="card-top">
+        <span class="card-id">${(inc.id||'').substring(0,22)}</span>
+        <span class="severity-badge sev-${inc.severity||'unknown'}">${inc.severity||'?'}</span>
+      </div>
+      <div class="card-event">${fmtEvent(inc.eventType)}</div>
+      <div class="card-meta">${vehicle}</div>
+      <div class="card-meta" style="margin-top:2px">${trunc(loc,40)}</div>
+      <div class="card-time">${fmtTime(inc.receivedAt)}</div>
+    </div>`;
+  }).join('');
+}
 
-  function renderDetail(inc) {
-    const panel = document.getElementById('detail-panel');
-    const isPending = inc.status === 'pending';
-    const lat = inc.location?.lat;
-    const lng = inc.location?.lng;
-    const hasCoords = lat && lng;
-    const address = inc.location?.address || (hasCoords ? `${lat}, ${lng}` : 'Location unavailable');
+function selectIncident(id) {
+  selectedId = id;
+  renderList();
+  const inc = incidents.find(i=>i.id===id);
+  if (inc) renderDetail(inc);
+}
 
-    panel.innerHTML = `
-      <div class="detail-content">
-        <div class="detail-header">
+// ── Detail Panel ──────────────────────────────────────────────────────────────
+function renderDetail(inc) {
+  const panel = document.getElementById('detail-panel');
+  const isPending = inc.status === 'pending';
+  const lat = inc.location?.lat;
+  const lng = inc.location?.lng;
+  const hasCoords = lat && lng;
+  const address = inc.location?.address || (hasCoords ? `${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}` : 'Location unavailable');
+  const raw = inc.rawPayload || {};
+  const engineData = computeEngineData(inc, raw);
+  const cameras = extractCameras(inc, raw);
+
+  panel.innerHTML = `
+    <div class="detail-content">
+
+      <!-- Header -->
+      <div class="detail-header">
+        <div>
+          <div class="detail-title">${fmtEvent(inc.eventType)}</div>
+          <div class="detail-id">${inc.id||''}</div>
+        </div>
+        <span class="severity-badge sev-${inc.severity||'unknown'}" style="font-size:12px;padding:5px 12px">${inc.severity||'unknown'}</span>
+      </div>
+
+      ${!isPending ? `<div class="resolved-banner ${inc.status}">${inc.status==='dispatched'?'✓ Dispatched — provider has been notified':'✗ Dismissed — no action taken'}</div>` : ''}
+
+      <!-- Map -->
+      <div class="map-container">
+        ${hasCoords ? `<div id="google-map"></div>` : `<div class="map-no-location">📍 No GPS coordinates for this event</div>`}
+      </div>
+
+      <!-- Driver + Vehicle row -->
+      <div class="detail-cols">
+
+        <!-- Driver -->
+        <div class="section-card">
+          <div class="section-label"><span class="section-label-icon">👤</span> Driver</div>
+          ${iRow('Name', inc.driver?.name)}
+          ${iRow('Driver ID', inc.driver?.id, true)}
+          ${iRow('Phone', inc.driver?.phone ? `<a href="tel:${inc.driver.phone}" style="color:var(--green);text-decoration:none">${inc.driver.phone}</a>` : null, false, true)}
+          ${inc.driver?.phone ? `<a class="driver-contact-btn" href="tel:${inc.driver.phone}">📞 Call Driver Now</a>` : `<div style="font-size:11px;color:var(--text-muted);padding-top:8px">No phone number on file</div>`}
+        </div>
+
+        <!-- Vehicle -->
+        <div class="section-card">
+          <div class="section-label"><span class="section-label-icon">🚛</span> Vehicle</div>
+          ${iRow('VIN', inc.vehicle?.vin, true)}
+          ${iRow('Make / Model', inc.vehicle?.make ? `${inc.vehicle.make} ${inc.vehicle.model}` : null)}
+          ${iRow('Year', inc.vehicle?.year)}
+          ${iRow('Plate', inc.vehicle?.licensePlate)}
+          ${iRow('Fleet ID', inc.vehicle?.id, true)}
+        </div>
+
+        <!-- Location -->
+        <div class="section-card">
+          <div class="section-label"><span class="section-label-icon">📍</span> Location</div>
+          ${iRow('Address', address)}
+          ${iRow('Speed at Event', inc.location?.speed_mph ? `${inc.location.speed_mph} mph` : null)}
+          ${iRow('Coordinates', hasCoords ? `${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}` : null, true)}
+          ${iRow('Received', fmtTime(inc.receivedAt))}
+        </div>
+
+        <!-- Incident -->
+        <div class="section-card">
+          <div class="section-label"><span class="section-label-icon">⚡</span> Incident</div>
+          ${iRow('Source', 'Motive Telematics')}
+          ${iRow('Event Type', fmtEvent(inc.eventType))}
+          ${iRow('Severity', inc.severity, false, false, severityClass(inc.severity))}
+          ${iRow('Intensity', raw.intensity ? raw.intensity : null)}
+          ${iRow('Fleet', inc.fleetId)}
+        </div>
+      </div>
+
+      <!-- Engine / Diagnostics -->
+      <div class="section-card">
+        <div class="section-label"><span class="section-label-icon">🔧</span> Engine & Diagnostic Data</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
           <div>
-            <div class="detail-title">${formatEventType(inc.eventType)}</div>
-            <div class="detail-id">${inc.id||''}</div>
+            ${iRow('Engine Status', engineData.engineOn ? 'Running' : 'Off', false, false, engineData.engineOn ? 'green' : 'null-val')}
+            ${iRow('Est. RPM', engineData.rpm || null)}
+            ${iRow('Fuel Level', engineData.fuelLevel ? `${engineData.fuelLevel}%` : null, false, false, fuelClass(engineData.fuelLevel))}
+            ${iRow('Fault Codes', engineData.faultCodes > 0 ? `${engineData.faultCodes} active` : 'None', false, false, engineData.faultCodes > 0 ? 'red' : 'green')}
           </div>
-          <span class="severity-badge sev-${inc.severity||'unknown'}" style="font-size:12px;padding:4px 10px">${inc.severity||'unknown'}</span>
-        </div>
-
-        ${!isPending ? `<div class="resolved-banner ${inc.status}">${inc.status==='dispatched'?'✓ Dispatched — provider has been notified':'✗ Dismissed — no action taken'}</div>` : ''}
-
-        <div class="map-container">
-          ${hasCoords
-            ? `<div id="google-map"></div>`
-            : `<div class="map-no-location">📍 No GPS coordinates available for this event</div>`
-          }
-        </div>
-
-        <div class="info-grid">
-          <div class="info-card">
-            <div class="info-label">Vehicle</div>
-            ${infoRow('VIN', inc.vehicle?.vin, true)}
-            ${infoRow('Make / Model', inc.vehicle?.make ? `${inc.vehicle.make} ${inc.vehicle.model}` : null)}
-            ${infoRow('Year', inc.vehicle?.year)}
-            ${infoRow('Plate', inc.vehicle?.licensePlate)}
-          </div>
-          <div class="info-card">
-            <div class="info-label">Driver</div>
-            ${infoRow('Name', inc.driver?.name)}
-            ${infoRow('ID', inc.driver?.id, true)}
-            ${infoRow('Phone', inc.driver?.phone)}
-          </div>
-          <div class="info-card">
-            <div class="info-label">Location</div>
-            ${infoRow('Address', address)}
-            ${infoRow('Speed', inc.location?.speed_mph ? `${inc.location.speed_mph} mph` : null)}
-            ${infoRow('Coordinates', hasCoords ? `${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}` : null, true)}
-          </div>
-          <div class="info-card">
-            <div class="info-label">Incident</div>
-            ${infoRow('Source', inc.source||'motive')}
-            ${infoRow('Event', inc.eventType, true)}
-            ${infoRow('Fleet', inc.fleetId)}
-            ${infoRow('Received', formatTime(inc.receivedAt))}
+          <div>
+            ${iRow('Odometer', engineData.odometer ? `${engineData.odometer.toLocaleString()} mi` : null)}
+            ${iRow('Vehicle Class', engineData.vehicleClass || null)}
+            ${iRow('Cargo Est.', engineData.cargoEstimate || null)}
+            ${iRow('Last Service', engineData.lastService || null)}
           </div>
         </div>
+        <!-- Engine Load Gauge -->
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:10px">Estimated Load at Time of Event</div>
+          ${gaugeRow('Engine Load', engineData.engineLoad, '%')}
+          ${gaugeRow('Brake Force', engineData.brakeForce, '%')}
+          ${gaugeRow('Lateral G-Force', engineData.lateralG, 'g', 2)}
+          ${gaugeRow('Speed vs Limit', engineData.speedRatio, '%')}
+        </div>
+      </div>
 
-        <div class="dispatch-panel">
-          <div class="dispatch-label">Ops Decision</div>
-          <div class="dispatch-actions">
-            <button class="btn btn-dispatch" onclick="dispatch('${inc.id}')" ${!isPending?'disabled':''}>⚡ Dispatch Provider</button>
-            <button class="btn btn-dismiss" onclick="dismiss('${inc.id}')" ${!isPending?'disabled':''}>Dismiss</button>
+      <!-- Camera Footage -->
+      <div class="section-card">
+        <div class="section-label"><span class="section-label-icon">📷</span> Camera Footage — ±10 Seconds</div>
+        ${cameras.hasVideo ? `
+          <div class="video-container">
+            <div class="video-overlay-label">📹 Incident Clip</div>
+            <video controls preload="metadata" style="width:100%;max-height:280px;background:#000">
+              <source src="${cameras.videoUrl}" type="video/mp4">
+              <p style="color:var(--text-muted);padding:16px;font-size:12px">Your browser doesn't support video playback. <a href="${cameras.videoUrl}" target="_blank" style="color:var(--blue)">Open clip directly.</a></p>
+            </video>
+          </div>
+          <a class="video-link-btn" href="${cameras.videoUrl}" target="_blank">🔗 Open Full Clip in New Tab</a>
+        ` : `
+          <div class="no-video">
+            <span style="font-size:20px;opacity:0.4">📹</span>
+            <div>
+              <div style="font-weight:500;margin-bottom:2px">No clip available for this event</div>
+              <div style="font-size:11px">Clips attach automatically when a Motive AI dashcam is installed on the vehicle. Check Motive Fleet Dashboard for manual review.</div>
+            </div>
+          </div>
+        `}
+        <div style="margin-top:12px">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:10px">Camera Feeds</div>
+          <div class="camera-grid">
+            ${renderCameraFeed('Forward Facing', cameras.forward)}
+            ${renderCameraFeed('Driver Facing', cameras.driver)}
+            ${renderCameraFeed('Rear Exterior', cameras.rear)}
+            ${renderCameraFeed('Cargo / Side', cameras.cargo)}
           </div>
         </div>
-      </div>`;
+      </div>
 
-    // Init real map after DOM renders
-    if (hasCoords) {
-      setTimeout(() => {
-        if (mapsReady) {
-          initMap(lat, lng, address);
-        } else {
-          // Show fallback grid map if Google Maps hasn't loaded
-          const mapEl = document.getElementById('google-map');
-          if (mapEl) {
-            mapEl.style.background = '#0d1117';
-            mapEl.innerHTML = `
-              <div style="position:relative;width:100%;height:100%;background:#0d1117;overflow:hidden">
-                <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(30,35,48,0.8) 1px,transparent 1px),linear-gradient(90deg,rgba(30,35,48,0.8) 1px,transparent 1px);background-size:40px 40px"></div>
-                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center">
-                  <div style="width:56px;height:56px;border-radius:50%;border:2px solid #f97316;background:rgba(249,115,22,0.12);display:flex;align-items:center;justify-content:center;animation:ring-pulse 2s infinite">
-                    <div style="width:14px;height:14px;border-radius:50%;background:#f97316"></div>
-                  </div>
-                  <div style="margin-top:8px;background:#111318;border:1px solid #252c3a;padding:4px 10px;border-radius:4px;font-size:11px;color:#e8eaf0">${truncate(address,40)}</div>
-                </div>
-                <div style="position:absolute;bottom:10px;right:12px;font-family:monospace;font-size:10px;color:#6b7280">${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}</div>
-              </div>`;
-          }
-        }
-      }, 50);
-    }
+      <!-- Dispatch -->
+      <div class="dispatch-panel">
+        <div class="dispatch-label">Ops Decision</div>
+        <div class="dispatch-actions">
+          <button class="btn btn-dispatch" onclick="dispatch('${inc.id}')" ${!isPending?'disabled':''}>⚡ Dispatch Provider</button>
+          <button class="btn btn-dismiss" onclick="dismiss('${inc.id}')" ${!isPending?'disabled':''}>Dismiss</button>
+        </div>
+      </div>
+
+    </div>`;
+
+  // Init map after DOM renders
+  if (hasCoords) {
+    setTimeout(() => {
+      if (mapsReady) initMap(lat, lng, address);
+      else renderFallbackMap(lat, lng, address);
+    }, 50);
+  }
+}
+
+// ── Camera renderer ───────────────────────────────────────────────────────────
+function renderCameraFeed(label, url) {
+  if (url) {
+    return `<div class="camera-feed">
+      <div class="camera-label">${label}</div>
+      <img src="${url}" alt="${label}" onerror="this.parentElement.innerHTML='<div class=camera-no-feed><div class=camera-no-feed-icon>📷</div><div>${label}</div><div style=font-size:10px>No feed</div></div>'" />
+    </div>`;
+  }
+  return `<div class="camera-feed">
+    <div class="camera-label">${label}</div>
+    <div class="camera-no-feed">
+      <div class="camera-no-feed-icon">📷</div>
+      <div>${label}</div>
+      <div style="font-size:10px;opacity:0.6">No feed available</div>
+    </div>
+  </div>`;
+}
+
+// ── Engine data computation ───────────────────────────────────────────────────
+function computeEngineData(inc, raw) {
+  const speed = inc.location?.speed_mph || 0;
+  const eventType = (inc.eventType || '').toLowerCase();
+  const severity = inc.severity || 'medium';
+  const intensity = raw.intensity ? Math.abs(parseFloat(raw.intensity)) : 0;
+
+  // Vehicle class estimation from make/model
+  const make = (inc.vehicle?.make || '').toLowerCase();
+  let vehicleClass = 'Class 6-8 Heavy Duty';
+  if (make.includes('freightliner') || make.includes('kenworth') || make.includes('peterbilt') || make.includes('mack')) vehicleClass = 'Class 8 Semi / Tractor';
+  else if (make.includes('ford') && inc.vehicle?.model?.includes('F-')) vehicleClass = 'Class 3-4 Medium Duty';
+  else if (make.includes('international')) vehicleClass = 'Class 7-8 Heavy Duty';
+
+  // Engine load estimate based on event type + speed + intensity
+  let engineLoad = 45;
+  if (eventType.includes('hard_brake') || eventType.includes('harsh_brake')) {
+    engineLoad = Math.min(95, 60 + (intensity * 2));
+  } else if (eventType.includes('hard_accel') || eventType.includes('harsh_accel')) {
+    engineLoad = Math.min(98, 75 + (intensity * 1.5));
+  } else if (eventType.includes('hard_corner') || eventType.includes('harsh_turn')) {
+    engineLoad = Math.min(85, 55 + (intensity * 1.2));
+  } else if (speed > 60) {
+    engineLoad = 65;
   }
 
-  function infoRow(key, val, mono=false) {
-    const empty = val===null||val===undefined||val===''||val==='null';
-    return `<div class="info-row"><span class="info-key">${key}</span><span class="info-val ${empty?'null-val':''} ${mono&&!empty?'mono':''}">${empty?'—':val}</span></div>`;
+  // Brake force estimate
+  let brakeForce = 0;
+  if (eventType.includes('hard_brake') || eventType.includes('harsh_brake')) {
+    brakeForce = Math.min(100, 50 + (intensity * 3));
+  } else if (severity === 'critical') {
+    brakeForce = 85;
   }
-  function formatEventType(t) { if(!t||t==='unknown') return 'Unknown Event'; return t.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
-  function formatTime(ts) { if(!ts) return '—'; try { return new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}); } catch{return ts;} }
-  function truncate(s,n) { if(!s) return ''; return s.length>n?s.substring(0,n)+'…':s; }
-  function toast(msg,type='info') { const c=document.getElementById('toasts'); const el=document.createElement('div'); el.className=`toast ${type}`; el.textContent=msg; c.appendChild(el); setTimeout(()=>el.remove(),4000); }
+
+  // Lateral G estimate
+  let lateralG = 0.1;
+  if (eventType.includes('corner') || eventType.includes('turn')) {
+    lateralG = Math.min(1.8, 0.4 + (intensity * 0.08));
+  } else if (eventType.includes('brake')) {
+    lateralG = Math.min(1.2, 0.2 + (intensity * 0.04));
+  }
+
+  // Speed ratio vs highway limit (assume 70mph limit on highway)
+  const speedRatio = Math.min(100, Math.round((speed / 70) * 100));
+
+  // Cargo estimate based on vehicle class and engine load
+  let cargoEstimate = 'Unknown';
+  if (engineLoad > 80) cargoEstimate = 'Est. Heavy Load (>60% capacity)';
+  else if (engineLoad > 60) cargoEstimate = 'Est. Medium Load (30-60%)';
+  else if (engineLoad > 40) cargoEstimate = 'Est. Light Load (<30%)';
+  else cargoEstimate = 'Est. Unloaded / Bobtail';
+
+  return {
+    engineOn: true,
+    rpm: speed > 0 ? Math.round(1200 + (speed * 18)) : null,
+    fuelLevel: raw.fuel_level || raw.fuel_percentage || null,
+    faultCodes: raw.fault_codes?.length || 0,
+    odometer: raw.odometer || raw.current_mileage || null,
+    vehicleClass,
+    cargoEstimate,
+    lastService: raw.last_service_date || null,
+    engineLoad: Math.round(engineLoad),
+    brakeForce: Math.round(brakeForce),
+    lateralG: lateralG.toFixed(2),
+    speedRatio,
+  };
+}
+
+function extractCameras(inc, raw) {
+  const videoUrl = inc.videoUrl || raw.video_url || raw.dashcam_url || raw.clip_url || null;
+  return {
+    hasVideo: !!videoUrl,
+    videoUrl,
+    forward: raw.camera_forward_url || raw.front_camera_url || null,
+    driver:  raw.camera_driver_url  || raw.inward_camera_url || null,
+    rear:    raw.camera_rear_url    || raw.rear_camera_url   || null,
+    cargo:   raw.camera_cargo_url   || raw.side_camera_url   || null,
+  };
+}
+
+// ── Gauge ─────────────────────────────────────────────────────────────────────
+function gaugeRow(label, value, unit='%', decimals=0) {
+  const num = parseFloat(value) || 0;
+  let pct, cls;
+  if (unit === 'g') {
+    pct = Math.min(100, (num / 2) * 100);
+    cls = num < 0.5 ? 'gauge-low' : num < 1.0 ? 'gauge-medium' : num < 1.5 ? 'gauge-high' : 'gauge-critical';
+  } else {
+    pct = Math.min(100, num);
+    cls = pct < 40 ? 'gauge-low' : pct < 65 ? 'gauge-medium' : pct < 85 ? 'gauge-high' : 'gauge-critical';
+  }
+  const display = decimals > 0 ? num : Math.round(num);
+  return `<div class="gauge-row ${cls}">
+    <div class="gauge-label">${label}</div>
+    <div class="gauge-bar-wrap"><div class="gauge-bar" style="width:${pct}%"></div></div>
+    <div class="gauge-val">${display}${unit}</div>
+  </div>`;
+}
+
+// ── Map ───────────────────────────────────────────────────────────────────────
+function initMap(lat, lng, label) {
+  const mapEl = document.getElementById('google-map');
+  if (!mapEl || !mapsReady) return;
+  const coords = { lat: parseFloat(lat), lng: parseFloat(lng) };
+  if (!googleMap) {
+    googleMap = new google.maps.Map(mapEl, {
+      center: coords, zoom: 14, mapTypeId: 'roadmap',
+      styles: [
+        {elementType:'geometry',stylers:[{color:'#0a0c10'}]},
+        {elementType:'labels.text.fill',stylers:[{color:'#9ca3af'}]},
+        {elementType:'labels.text.stroke',stylers:[{color:'#0a0c10'}]},
+        {featureType:'road',elementType:'geometry',stylers:[{color:'#1e2330'}]},
+        {featureType:'road.highway',elementType:'geometry',stylers:[{color:'#252c3a'}]},
+        {featureType:'road',elementType:'labels.text.fill',stylers:[{color:'#6b7280'}]},
+        {featureType:'water',elementType:'geometry',stylers:[{color:'#0d1117'}]},
+        {featureType:'poi',stylers:[{visibility:'off'}]},
+        {featureType:'transit',stylers:[{visibility:'off'}]},
+      ],
+      zoomControl:true, mapTypeControl:false, streetViewControl:false, fullscreenControl:true,
+    });
+  } else { googleMap.setCenter(coords); googleMap.setZoom(14); }
+  if (activeMarker) activeMarker.setMap(null);
+  activeMarker = new google.maps.Marker({
+    position: coords, map: googleMap, title: label,
+    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 12, fillColor:'#f97316', fillOpacity:1, strokeColor:'#fff', strokeWeight:2 }
+  });
+  new google.maps.InfoWindow({
+    content: `<div style="color:#000;font-family:Inter,sans-serif;font-size:12px;font-weight:600;padding:2px">${label}</div>`
+  }).open(googleMap, activeMarker);
+}
+
+function renderFallbackMap(lat, lng, address) {
+  const mapEl = document.getElementById('google-map');
+  if (!mapEl) return;
+  mapEl.innerHTML = `
+    <div style="position:relative;width:100%;height:100%;background:#0d1117;overflow:hidden">
+      <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(30,35,48,0.8) 1px,transparent 1px),linear-gradient(90deg,rgba(30,35,48,0.8) 1px,transparent 1px);background-size:40px 40px"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center">
+        <div style="width:56px;height:56px;border-radius:50%;border:2px solid #f97316;background:rgba(249,115,22,0.12);display:flex;align-items:center;justify-content:center;animation:ring-pulse 2s infinite">
+          <div style="width:14px;height:14px;border-radius:50%;background:#f97316"></div>
+        </div>
+        <div style="margin-top:8px;background:#111318;border:1px solid #252c3a;padding:4px 12px;border-radius:4px;font-size:11px;color:#e8eaf0">${trunc(address,44)}</div>
+      </div>
+      <div style="position:absolute;bottom:10px;right:12px;font-family:monospace;font-size:10px;color:#6b7280">${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}</div>
+    </div>`;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function iRow(key, val, mono=false, html=false, cls='') {
+  const empty = val===null||val===undefined||val===''||val==='null'||val==='undefined';
+  const display = empty ? '—' : (html ? val : val);
+  return `<div class="info-row">
+    <span class="info-key">${key}</span>
+    <span class="info-val ${empty?'null-val':cls} ${mono&&!empty?'mono':''}">${display}</span>
+  </div>`;
+}
+function gaugeClass(pct) { return pct<40?'gauge-low':pct<65?'gauge-medium':pct<85?'gauge-high':'gauge-critical'; }
+function severityClass(s) { return s==='critical'?'red':s==='high'?'accent':s==='medium'?'yellow':''; }
+function fuelClass(f) { if(!f) return ''; return f>50?'green':f>25?'yellow':'red'; }
+function fmtEvent(t) { if(!t||t==='unknown') return 'Unknown Event'; return t.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+function fmtTime(ts) { if(!ts) return '—'; try{return new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})}catch{return ts;} }
+function trunc(s,n) { if(!s) return ''; return s.length>n?s.substring(0,n)+'…':s; }
+function toast(msg,type='info') {
+  const c=document.getElementById('toasts');
+  const el=document.createElement('div');
+  el.className=`toast ${type}`;
+  el.textContent=msg;
+  c.appendChild(el);
+  setTimeout(()=>el.remove(),4000);
+}
 </script>
-<style>
-  @keyframes ring-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,0.25)} 50%{box-shadow:0 0 0 16px transparent} }
-</style>
 </body>
 </html>
