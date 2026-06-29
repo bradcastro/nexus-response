@@ -15,7 +15,7 @@ async function startPoller() {
   }
   console.log('[MOTIVE] Starting performance event poller');
   const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
+  weekAgo.setDate(weekAgo.getDate() - 30);
   startDate = weekAgo.toISOString().split('T')[0];
   try {
     const existing = await getIncidents();
