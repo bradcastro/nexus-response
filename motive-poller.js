@@ -1,6 +1,3 @@
-// motive-poller.js — Polls Motive Driver Performance Events API every 60 seconds
-// Auth: x-api-key header using MOTIVE_API_KEY from Render environment
-
 const { saveIncident, getIncidents } = require('./db');
 
 const MOTIVE_BASE = 'https://api.gomotive.com';
@@ -10,27 +7,20 @@ let pollTimer = null;
 let knownEventIds = new Set();
 let startDate = null;
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
 async function startPoller() {
   const apiKey = process.env.MOTIVE_API_KEY;
   if (!apiKey) {
     console.log('[MOTIVE] MOTIVE_API_KEY not set — poller not started');
     return;
   }
-
-  console.log('[MOTIVE] Starting performance event poller (60s interval)');
-
-  // Pull last 7 days on first run
+  console.log('[MOTIVE] Starting performance event poller');
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
   startDate = weekAgo.toISOString().split('T')[0];
-
   try {
     const existing = await getIncidents();
     existing.forEach(i => { if (i.id) knownEventIds.add(i.id); });
-    console.log(`[MOTIVE] Tracking ${knownEventIds.size} existing incidents`);
   } catch (e) {}
-
   await poll();
   pollTimer = setInterval(poll, POLL_INTERVAL_MS);
 }
@@ -39,71 +29,49 @@ function stopPoller() {
   if (pollTimer) clearInterval(pollTimer);
 }
 
-// ── Poll ──────────────────────────────────────────────────────────────────────
 async function poll() {
   const apiKey = process.env.MOTIVE_API_KEY;
   if (!apiKey) return;
-
   try {
-    const params = new URLSearchParams({
-      per_page: 25,
-      start_date: startDate,
-      event_types: ["hard_brake", "hard_accel", "hard_corner"]
-    });
-
-    const url = `${MOTIVE_BASE}/v1/driver_performance_events?${params}`;
-    console.log(`[MOTIVE] Polling performance events from ${startDate}...`);
-
+    const url = `${MOTIVE_BASE}/v1/driver_performance_events?per_page=25&start_date=${startDate}`;
+    console.log('[MOTIVE] Polling:', url);
     const res = await fetch(url, {
-      headers: {
-        'x-api-key': apiKey,
-        'Content-Type': 'application/json'
-      }
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
     });
-
     if (!res.ok) {
       const err = await res.text();
       console.error(`[MOTIVE] API error ${res.status}:`, err.substring(0, 300));
       return;
     }
-
     const data = await res.json();
     const events = data.driver_performance_events || [];
-
     if (!events.length) {
       console.log('[MOTIVE] No new performance events');
       return;
     }
-
     console.log(`[MOTIVE] ${events.length} event(s) received`);
     let saved = 0;
-
     for (const wrapper of events) {
       const event = wrapper.driver_performance_event || wrapper;
       const incident = normalizeEvent(event);
-
       if (knownEventIds.has(incident.id)) continue;
       knownEventIds.add(incident.id);
       await saveIncident(incident);
-      console.log(`[MOTIVE] ✓ ${incident.id} | ${incident.eventType} | ${incident.severity} | ${incident.location?.address || 'no location'}`);
+      console.log(`[MOTIVE] Saved: ${incident.id} | ${incident.eventType} | ${incident.severity}`);
       saved++;
     }
-
     if (saved > 0) {
-      console.log(`[MOTIVE] ${saved} new incident(s) added to dashboard`);
       startDate = new Date().toISOString().split('T')[0];
+      console.log(`[MOTIVE] ${saved} incident(s) added to dashboard`);
     }
-
   } catch (err) {
     console.error('[MOTIVE] Poll error:', err.message);
   }
 }
 
-// ── Normalize Motive event → Nexus incident ───────────────────────────────────
 function normalizeEvent(event) {
   const vehicle = event.vehicle || {};
   const driver = event.driver || {};
-
   return {
     id: `MOTIVE-${event.id || Date.now()}`,
     source: 'motive',
