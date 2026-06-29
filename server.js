@@ -71,6 +71,12 @@ app.post('/webhook/motive', async (req, res) => {
 // ─── Dashboard API ────────────────────────────────────────────────────────────
 
 // Get all incidents (for the ops dashboard)
+
+// ─── Config endpoint (serves public keys to frontend) ────────────────────────
+app.get("/api/config", (req, res) => {
+  res.json({ mapsKey: process.env.GOOGLE_MAPS_KEY || null });
+});
+
 app.get('/api/incidents', async (req, res) => {
   try {
     const incidents = await getIncidents();
