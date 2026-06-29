@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { startPoller } = require('./motive-poller');
 const express = require('express');
 const crypto = require('crypto');
 const cors = require('cors');
@@ -220,6 +221,7 @@ app.listen(PORT, () => {
   console.log(`[NEXUS] Webhook endpoint: POST /webhook/motive`);
   console.log(`[NEXUS] Dashboard API:    GET  /api/incidents`);
   console.log(`[NEXUS] Test trigger:     POST /test/trigger-event`);
+  startPoller();
 });
 
 module.exports = app;
