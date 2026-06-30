@@ -333,8 +333,9 @@ function renderDetail(inc) {
           <div class="section-label"><span class="section-label-icon">👤</span> Driver</div>
           ${iRow('Name', inc.driver?.name)}
           ${iRow('Driver ID', inc.driver?.id, true)}
-          ${iRow('Phone', inc.driver?.phone ? `<a href="tel:${inc.driver.phone}" style="color:var(--green);text-decoration:none">${inc.driver.phone}</a>` : null, false, true)}
-          ${inc.driver?.phone ? `<a class="driver-contact-btn" href="tel:${inc.driver.phone}">📞 Call Driver Now</a>` : `<div style="font-size:11px;color:var(--text-muted);padding-top:8px">No phone number on file</div>`}
+          ${iRow('Phone', inc.driver?.phone)}
+          ${iRow('Email', inc.driver?.email, true)}
+          ${inc.driver?.phone ? `<a class="driver-contact-btn" href="tel:${inc.driver.phone}">📞 Call Driver Now</a>` : `<div style="font-size:11px;color:var(--text-muted);padding-top:8px">No phone number on file — check Motive Fleet Dashboard</div>`}
         </div>
 
         <!-- Vehicle -->
@@ -470,6 +471,7 @@ function computeEngineData(inc, raw) {
   const eventType = (inc.eventType || '').toLowerCase();
   const severity = inc.severity || 'medium';
   const intensity = raw.intensity ? Math.abs(parseFloat(raw.intensity)) : 0;
+  const realDiag = inc.diagnostics || {};
 
   // Vehicle class estimation from make/model
   const make = (inc.vehicle?.make || '').toLowerCase();
@@ -516,12 +518,17 @@ function computeEngineData(inc, raw) {
   else if (engineLoad > 40) cargoEstimate = 'Est. Light Load (<30%)';
   else cargoEstimate = 'Est. Unloaded / Bobtail';
 
+  const faultCount = Array.isArray(realDiag.faultCodes) ? realDiag.faultCodes.length : (realDiag.faultCodes || 0);
+
   return {
     engineOn: true,
     rpm: speed > 0 ? Math.round(1200 + (speed * 18)) : null,
-    fuelLevel: raw.fuel_level || raw.fuel_percentage || null,
-    faultCodes: raw.fault_codes?.length || 0,
-    odometer: raw.odometer || raw.current_mileage || null,
+    fuelLevel: realDiag.fuelLevel || null,
+    fuelIsReal: !!realDiag.fuelLevel,
+    faultCodes: faultCount,
+    odometer: realDiag.odometer || null,
+    odometerIsReal: !!realDiag.odometer,
+    engineHours: realDiag.engineHours || null,
     vehicleClass,
     cargoEstimate,
     lastService: raw.last_service_date || null,
