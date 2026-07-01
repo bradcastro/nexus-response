@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { startPoller } = require('./motive-poller');
+const { startSamsaraPoller } = require('./samsara-poller');
 const express = require('express');
 const crypto = require('crypto');
 const cors = require('cors');
@@ -145,7 +146,9 @@ app.post('/test/trigger-event', async (req, res) => {
       speed_mph: 62
     },
     videoUrl: null,
-    fleetId: 'GOODYEAR-TEST'
+    fleetId: 'GOODYEAR-TEST',
+    customerName: 'Goodyear Towing',
+    customerLocation: 'Enterprise, AL'
   };
 
   const incident = {
@@ -228,6 +231,7 @@ app.listen(PORT, () => {
   console.log(`[NEXUS] Dashboard API:    GET  /api/incidents`);
   console.log(`[NEXUS] Test trigger:     POST /test/trigger-event`);
   startPoller();
+  startSamsaraPoller();
 });
 
 module.exports = app;
