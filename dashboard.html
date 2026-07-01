@@ -584,6 +584,32 @@ function showMap(lat,lng,label) {
     icon:{path:google.maps.SymbolPath.CIRCLE,scale:13,fillColor:'#f97316',fillOpacity:1,strokeColor:'#fff',strokeWeight:3}
   });
   new google.maps.InfoWindow({content:`<div style="font-family:Inter,sans-serif;font-size:12px;font-weight:600;color:#111827;padding:2px 4px">${label}</div>`}).open(gMap,gMarker);
+
+  // Draw GPS trail if available
+  const inc = incidents.find(i=>i.id===selectedId);
+  if (inc?.gpsTrail?.lat?.length > 1) {
+    const trail = inc.gpsTrail.lat.map((lt,i) => ({lat:parseFloat(lt), lng:parseFloat(inc.gpsTrail.lng[i])}));
+    if (window._gpsTrailLine) window._gpsTrailLine.setMap(null);
+    window._gpsTrailLine = new google.maps.Polyline({
+      path: trail,
+      geodesic: true,
+      strokeColor: '#f97316',
+      strokeOpacity: 0.8,
+      strokeWeight: 3,
+      map: gMap
+    });
+    // Start point marker (where event began)
+    new google.maps.Marker({
+      position: trail[0],
+      map: gMap,
+      title: 'Event Start',
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor:'#3b82f6', fillOpacity:1, strokeColor:'#fff', strokeWeight:2 }
+    });
+    // Fit map to trail bounds
+    const bounds = new google.maps.LatLngBounds();
+    trail.forEach(p => bounds.extend(p));
+    gMap.fitBounds(bounds, {padding: 40});
+  }
 }
 
 function fallbackMap(lat,lng,address) {
