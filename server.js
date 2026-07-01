@@ -75,7 +75,10 @@ app.post('/webhook/motive', async (req, res) => {
 
 // ─── Config endpoint (serves public keys to frontend) ────────────────────────
 app.get("/api/config", (req, res) => {
-  res.json({ mapsKey: process.env.GOOGLE_MAPS_KEY || null });
+  res.json({
+    mapsKey: process.env.GOOGLE_MAPS_KEY || null,
+    mapboxToken: process.env.MAPBOX_TOKEN || null
+  });
 });
 
 app.get('/api/incidents', async (req, res) => {
@@ -117,6 +120,18 @@ app.post('/api/incidents/:id/dismiss', async (req, res) => {
   } catch (err) {
     console.error('[NEXUS] Dismiss error:', err.message);
     res.status(500).json({ error: 'Dismiss failed' });
+  }
+});
+
+// ─── Debug — show raw payload of any incident ─────────────────────────────────
+app.get('/api/incidents/:id/raw', async (req, res) => {
+  try {
+    const incidents = await getIncidents();
+    const inc = incidents.find(i => i.id === req.params.id);
+    if (!inc) return res.status(404).json({ error: 'Not found' });
+    res.json({ id: inc.id, rawPayload: inc.rawPayload, videoUrl: inc.videoUrl, snapshots: inc.snapshots });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
