@@ -1,6 +1,5 @@
 // motive-poller.js
-// Primary: GET /v1/driver_safety_events (includes dashcam clips)
-// Fallback: GET /v1/driver_performance_events
+// Tries safety events first (has video clips), falls back to performance events
 const { saveIncident, getIncidents } = require('./db');
 
 const MOTIVE_BASE = 'https://api.gomotive.com';
@@ -8,7 +7,9 @@ const POLL_INTERVAL_MS = 60 * 1000;
 
 let pollTimer = null;
 let knownEventIds = new Set();
-let windowStart = null;
+let safetyWindowStart = null;
+let perfWindowStart = null;
+let useSafetyEndpoint = true; // flip to false after confirmed 404
 
 const driverCache = new Map();
 const vehicleCache = new Map();
@@ -16,12 +17,12 @@ const vehicleCache = new Map();
 async function startPoller() {
   const apiKey = process.env.MOTIVE_API_KEY;
   if (!apiKey) { console.log('[MOTIVE] MOTIVE_API_KEY not set'); return; }
-  console.log('[MOTIVE] Starting poller — safety events with dashcam clips');
+  console.log('[MOTIVE] Starting poller — 14 day lookback, safety events primary');
 
-  // 30 days back, full ISO format required by safety events endpoint
   const d = new Date();
-  d.setDate(d.getDate() - 30);
-  windowStart = d.toISOString();
+  d.setDate(d.getDate() - 14);
+  safetyWindowStart = d.toISOString();
+  perfWindowStart = d.toISOString().split('T')[0]; // YYYY-MM-DD for perf endpoint
 
   try {
     const existing = await getIncidents();
@@ -52,7 +53,7 @@ async function fetchDriver(driverId) {
       email: u.email || null
     };
     driverCache.set(driverId, d);
-    console.log(`[MOTIVE] Driver enriched: ${d.name} | phone: ${d.phone||'none'}`);
+    console.log(`[MOTIVE] Driver: ${d.name} | ${d.phone||'no phone'} | ${d.email||'no email'}`);
     return d;
   } catch(e) { return null; }
 }
@@ -84,42 +85,88 @@ async function fetchVehicle(vehicleId) {
   } catch(e) { return null; }
 }
 
+// ── Fetch video clip for a specific safety event ──────────────────────────────
+async function fetchVideoClip(eventId) {
+  if (!eventId) return null;
+  try {
+    // Try the direct safety event endpoint which sometimes has richer media
+    const res = await fetch(`${MOTIVE_BASE}/v1/driver_safety_events/${eventId}`, {
+      headers: { 'x-api-key': process.env.MOTIVE_API_KEY }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const e = data.driver_safety_event || data;
+    return e.video_url || e.dashcam_url || e.clip_url || e.dashcam_clip_url || null;
+  } catch(e) { return null; }
+}
+
 // ── Poll ──────────────────────────────────────────────────────────────────────
 async function poll() {
   const apiKey = process.env.MOTIVE_API_KEY;
   if (!apiKey) return;
 
-  // Try safety events first — includes video clips
-  try {
-    // Safety events uses start_time with full ISO timestamp
-    const safetyUrl = `${MOTIVE_BASE}/v1/driver_safety_events?per_page=25&start_time=${encodeURIComponent(windowStart)}`;
-    console.log('[MOTIVE] Polling safety events...');
-    const res = await fetch(safetyUrl, {
-      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
-    });
+  if (useSafetyEndpoint) {
+    await pollSafetyEvents(apiKey);
+  } else {
+    await pollPerformanceEvents(apiKey);
+  }
+}
 
-    if (res.ok) {
-      const data = await res.json();
-      const events = data.driver_safety_events || [];
-      console.log(`[MOTIVE] Safety events: ${events.length} found`);
-      if (events.length) await processEvents(events, 'safety');
-      else console.log('[MOTIVE] No new safety events');
-      return;
+async function pollSafetyEvents(apiKey) {
+  // Try multiple parameter formats — Motive docs are inconsistent
+  const attempts = [
+    `${MOTIVE_BASE}/v1/driver_safety_events?per_page=25&start_time=${encodeURIComponent(safetyWindowStart)}`,
+    `${MOTIVE_BASE}/v1/driver_safety_events?per_page=25&start_date=${perfWindowStart}`,
+    `${MOTIVE_BASE}/v1/driver_safety_events?per_page=25`,
+  ];
+
+  for (const url of attempts) {
+    try {
+      console.log(`[MOTIVE] Trying safety events: ${url}`);
+      const res = await fetch(url, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const events = data.driver_safety_events || [];
+        console.log(`[MOTIVE] Safety events success: ${events.length} events — URL worked: ${url}`);
+        if (events.length) {
+          await processEvents(events, 'safety');
+          // Update window so next poll only gets new events
+          safetyWindowStart = new Date().toISOString();
+        } else {
+          console.log('[MOTIVE] No new safety events');
+        }
+        return; // success — stop trying other formats
+      }
+
+      const errText = await res.text();
+      console.warn(`[MOTIVE] Safety ${res.status}: ${errText.substring(0, 200)}`);
+
+      if (res.status === 403 || res.status === 401) {
+        console.log('[MOTIVE] Auth failed on safety events — switching to performance events permanently');
+        useSafetyEndpoint = false;
+        await pollPerformanceEvents(apiKey);
+        return;
+      }
+      // 404 or other — try next URL format
+    } catch(e) {
+      console.error('[MOTIVE] Safety events error:', e.message);
     }
-
-    const errText = await res.text();
-    console.warn(`[MOTIVE] Safety events ${res.status} — ${errText.substring(0,150)}`);
-    console.log('[MOTIVE] Falling back to performance events...');
-  } catch(e) {
-    console.error('[MOTIVE] Safety events error:', e.message);
   }
 
-  // Fallback — performance events (no video, but proven to work)
+  // All safety event attempts failed — fall back to performance events
+  console.log('[MOTIVE] All safety event formats failed — falling back to performance events');
+  useSafetyEndpoint = false;
+  await pollPerformanceEvents(apiKey);
+}
+
+async function pollPerformanceEvents(apiKey) {
   try {
-    const startDate = windowStart.split('T')[0];
-    const perfUrl = `${MOTIVE_BASE}/v1/driver_performance_events?per_page=25&start_date=${startDate}`;
+    const url = `${MOTIVE_BASE}/v1/driver_performance_events?per_page=25&start_date=${perfWindowStart}`;
     console.log('[MOTIVE] Polling performance events...');
-    const res = await fetch(perfUrl, {
+    const res = await fetch(url, {
       headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
     });
     if (!res.ok) {
@@ -129,8 +176,12 @@ async function poll() {
     const data = await res.json();
     const events = data.driver_performance_events || [];
     console.log(`[MOTIVE] Performance events: ${events.length} found`);
-    if (events.length) await processEvents(events, 'performance');
-    else console.log('[MOTIVE] No new performance events');
+    if (events.length) {
+      await processEvents(events, 'performance');
+      perfWindowStart = new Date().toISOString().split('T')[0];
+    } else {
+      console.log('[MOTIVE] No new performance events');
+    }
   } catch(e) {
     console.error('[MOTIVE] Performance events error:', e.message);
   }
@@ -146,19 +197,20 @@ async function processEvents(events, type) {
     knownEventIds.add(id);
 
     const incident = await normalize(event, id, type);
-    await saveIncident(incident);
 
-    const hasVideo = !!incident.videoUrl;
-    const hasPhone = !!incident.driver?.phone;
-    console.log(`[MOTIVE] ✓ ${id} | ${incident.eventType} | ${incident.severity} | ${incident.driver?.name||'?'} | phone:${hasPhone?'✓':'✗'} | video:${hasVideo?'✓ '+incident.videoUrl.substring(0,40):'✗'}`);
+    // If no video from the list endpoint, try fetching the individual event
+    if (!incident.videoUrl && type === 'safety' && event.id) {
+      console.log(`[MOTIVE] No video in list payload — fetching individual event ${event.id}...`);
+      incident.videoUrl = await fetchVideoClip(event.id);
+    }
+
+    await saveIncident(incident);
+    const v = incident.videoUrl;
+    console.log(`[MOTIVE] ✓ ${id} | ${incident.eventType} | ${incident.severity} | ${incident.driver?.name||'?'} | phone:${incident.driver?.phone?'✓':'✗'} | video:${v?'✓ '+v.substring(0,50):'✗'}`);
     saved++;
   }
-  if (saved > 0) {
-    windowStart = new Date().toISOString();
-    console.log(`[MOTIVE] ${saved} new incident(s) saved`);
-  } else {
-    console.log(`[MOTIVE] All ${events.length} events already known`);
-  }
+  if (saved > 0) console.log(`[MOTIVE] ${saved} new incident(s) saved`);
+  else console.log(`[MOTIVE] All events already known (${events.length} checked)`);
 }
 
 // ── Normalize ─────────────────────────────────────────────────────────────────
@@ -166,27 +218,38 @@ async function normalize(event, id, type) {
   const vehicle = event.vehicle || {};
   const driver  = event.driver  || {};
 
-  const driverDetails  = await fetchDriver(driver.id);
-  const vehicleDetails = await fetchVehicle(vehicle.id);
+  const [driverDetails, vehicleDetails] = await Promise.all([
+    fetchDriver(driver.id),
+    fetchVehicle(vehicle.id)
+  ]);
 
-  // Safety events video fields — Motive uses several possible keys
+  // Extract video — safety events use various field names
   const videoUrl =
-    event.video_url ||
-    event.dashcam_url ||
-    event.dashcam_clip_url ||
-    event.clip_url ||
-    event.media_url ||
-    event.video ||
+    event.video_url            ||
+    event.dashcam_url          ||
+    event.dashcam_clip_url     ||
+    event.clip_url             ||
+    event.media_url            ||
+    event.video                ||
+    event.recording_url        ||
     null;
 
-  // Snapshot image fields
+  // Extract camera snapshots
   const snaps = event.snapshots || event.images || {};
   const snapshots = {
-    forward: snaps.road_facing  || snaps.forward  || event.road_facing_image  || null,
-    driver:  snaps.driver_facing || snaps.driver  || event.driver_facing_image || null,
-    rear:    snaps.rear          || event.rear_image    || null,
-    cargo:   snaps.cargo         || event.cargo_image   || null,
+    forward: snaps.road_facing    || snaps.forward || event.road_facing_image    || event.forward_image    || null,
+    driver:  snaps.driver_facing  || snaps.driver  || event.driver_facing_image  || event.driver_image     || null,
+    rear:    snaps.rear                            || event.rear_image                                     || null,
+    cargo:   snaps.cargo                           || event.cargo_image                                    || null,
   };
+
+  // GPS trail for map animation
+  const gpsTrail = event.m_gps_lat?.length > 1 ? {
+    lat:     event.m_gps_lat,
+    lng:     event.m_gps_lon,
+    speed:   event.m_gps_spd,
+    heading: event.m_gps_heading
+  } : null;
 
   return {
     id,
@@ -219,13 +282,7 @@ async function normalize(event, id, type) {
     },
     videoUrl,
     snapshots,
-    // Pass through GPS trail for map animation
-    gpsTrail: event.m_gps_lat && event.m_gps_lon ? {
-      lat:     event.m_gps_lat,
-      lng:     event.m_gps_lon,
-      speed:   event.m_gps_spd,
-      heading: event.m_gps_heading
-    } : null,
+    gpsTrail,
     fleetId: vehicle.number || null,
     customerName: 'Goodyear Towing',
     customerLocation: 'Enterprise, AL',
