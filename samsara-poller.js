@@ -23,7 +23,7 @@ async function startSamsaraPoller() {
   console.log('[SAMSARA] Starting safety event poller for Elite Wrecker Service');
 
   const monthAgo = new Date();
-  monthAgo.setDate(monthAgo.getDate() - 30);
+  monthAgo.setDate(monthAgo.getDate() - 14);
   startTime = monthAgo.toISOString();
 
   try {
@@ -133,7 +133,7 @@ async function poll() {
 
       const incident = await normalizeSamsaraEvent(event, incidentId);
       await saveIncident(incident);
-      console.log(`[SAMSARA] Saved: ${incident.id} | ${incident.eventType} | ${incident.severity} | driver: ${incident.driver?.name || 'unknown'}`);
+      console.log(`[SAMSARA] ✓ ${incident.id} | ${incident.eventType} | ${incident.severity} | ${incident.driver?.name||'?'} | video:${incident.videoUrl?'✓':'✗'}`);
       saved++;
     }
 
@@ -157,7 +157,11 @@ async function normalizeSamsaraEvent(event, incidentId) {
   const behavior = event.behaviorLabels?.[0]?.label || event.behaviorLabel || 'unknown';
   const location = event.location || {};
   const media = event.mediaUrls || event.media || [];
-  const videoMedia = media.find(m => m.type === 'video' || m.mediaType === 'video');
+  const videoMedia = media.find(m => m.type === 'video' || m.mediaType === 'video' || m.url?.includes('.mp4'));
+  const forwardImg = media.find(m => (m.type === 'image' || m.mediaType === 'image') && (m.label?.includes('forward') || m.label?.includes('road') || m.cameraLabel?.includes('forward')));
+  const driverImg  = media.find(m => (m.type === 'image' || m.mediaType === 'image') && (m.label?.includes('driver') || m.label?.includes('inward') || m.cameraLabel?.includes('driver')));
+  const rearImg    = media.find(m => (m.type === 'image' || m.mediaType === 'image') && m.label?.includes('rear'));
+  const cargoImg   = media.find(m => (m.type === 'image' || m.mediaType === 'image') && m.label?.includes('cargo'));
 
   return {
     id: incidentId,
@@ -189,6 +193,12 @@ async function normalizeSamsaraEvent(event, incidentId) {
       speed_mph: event.speed ? Math.round(event.speed) : null
     },
     videoUrl: videoMedia?.url || null,
+    snapshots: {
+      forward: forwardImg?.url || null,
+      driver:  driverImg?.url  || null,
+      rear:    rearImg?.url    || null,
+      cargo:   cargoImg?.url   || null,
+    },
     fleetId: 'ELITE-WRECKER',
     customerName: 'Elite Wrecker Service',
     customerLocation: 'Lake Charles, LA'
