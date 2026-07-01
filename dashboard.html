@@ -69,6 +69,20 @@
     .empty-title { font-size: 13px; font-weight: 500; color: var(--text-dim); margin-bottom: 6px; }
     .empty-sub { font-size: 12px; line-height: 1.6; }
 
+    /* Fleet Filter Tabs */
+    .fleet-tab {
+      flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border2);
+      background: transparent; color: var(--text-muted); font-size: 11px; font-weight: 500;
+      cursor: pointer; font-family: var(--sans); transition: all 0.15s; white-space: nowrap;
+    }
+    .fleet-tab:hover { border-color: var(--accent); color: var(--text); }
+    .fleet-tab.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+    .customer-badge {
+      display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600;
+      padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+      background: var(--surface2); border: 1px solid var(--border2); color: var(--text-dim); margin-bottom: 8px;
+    }
+
     /* Detail */
     .detail { display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
     .detail-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); text-align: center; padding: 48px; }
@@ -183,6 +197,11 @@
         <span class="sidebar-title">Active Incidents</span>
         <span class="incident-count" id="incident-count">0</span>
       </div>
+      <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px" id="fleet-filter">
+        <button class="fleet-tab active" data-fleet="all" onclick="setFleetFilter('all')">All Fleets</button>
+        <button class="fleet-tab" data-fleet="Goodyear Towing" onclick="setFleetFilter('Goodyear Towing')">Goodyear</button>
+        <button class="fleet-tab" data-fleet="Elite Wrecker Service" onclick="setFleetFilter('Elite Wrecker Service')">Elite Wrecker</button>
+      </div>
       <div class="incident-list" id="incident-list">
         <div class="empty-state">
           <div class="empty-icon">📡</div>
@@ -209,6 +228,20 @@ let selectedId = null;
 let googleMap = null;
 let activeMarker = null;
 let mapsReady = false;
+let fleetFilter = 'all';
+
+function setFleetFilter(fleet) {
+  fleetFilter = fleet;
+  document.querySelectorAll('.fleet-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.fleet === fleet);
+  });
+  renderList();
+}
+
+function getFilteredIncidents() {
+  if (fleetFilter === 'all') return incidents;
+  return incidents.filter(i => i.customerName === fleetFilter);
+}
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function loadGoogleMaps() {
@@ -265,12 +298,13 @@ async function dismiss(id) {
 // ── Sidebar List ──────────────────────────────────────────────────────────────
 function renderList() {
   const list = document.getElementById('incident-list');
-  document.getElementById('incident-count').textContent = incidents.filter(i=>i.status==='pending').length;
-  if (!incidents.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><div class="empty-title">Monitoring for events</div><div class="empty-sub">Incidents appear here when Motive detects a safety event on your fleet.</div></div>`;
+  const filtered = getFilteredIncidents();
+  document.getElementById('incident-count').textContent = filtered.filter(i=>i.status==='pending').length;
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><div class="empty-title">Monitoring for events</div><div class="empty-sub">${fleetFilter==='all' ? 'Incidents appear here when a telematics provider detects a safety event.' : `No incidents yet for ${fleetFilter}.`}</div></div>`;
     return;
   }
-  list.innerHTML = incidents.map(inc => {
+  list.innerHTML = filtered.map(inc => {
     const vehicle = inc.vehicle?.make ? `${inc.vehicle.make} ${inc.vehicle.model}` : 'Unknown Vehicle';
     const loc = inc.location?.address || (inc.location?.lat ? `${parseFloat(inc.location.lat).toFixed(4)}, ${parseFloat(inc.location.lng).toFixed(4)}` : 'No location');
     return `<div class="incident-card status-${inc.status} ${inc.id===selectedId?'active':''} ${inc.status!=='pending'?inc.status:''}" onclick="selectIncident('${inc.id}')">
@@ -279,6 +313,7 @@ function renderList() {
         <span class="card-id">${(inc.id||'').substring(0,22)}</span>
         <span class="severity-badge sev-${inc.severity||'unknown'}">${inc.severity||'?'}</span>
       </div>
+      ${inc.customerName ? `<div class="customer-badge">${inc.source==='samsara'?'🟦':'🟧'} ${inc.customerName}</div>` : ''}
       <div class="card-event">${fmtEvent(inc.eventType)}</div>
       <div class="card-meta">${vehicle}</div>
       <div class="card-meta" style="margin-top:2px">${trunc(loc,40)}</div>
@@ -312,6 +347,7 @@ function renderDetail(inc) {
       <!-- Header -->
       <div class="detail-header">
         <div>
+          ${inc.customerName ? `<div class="customer-badge" style="margin-bottom:8px">${inc.source==='samsara'?'🟦':'🟧'} ${inc.customerName}${inc.customerLocation ? ' · ' + inc.customerLocation : ''}</div>` : ''}
           <div class="detail-title">${fmtEvent(inc.eventType)}</div>
           <div class="detail-id">${inc.id||''}</div>
         </div>
