@@ -184,6 +184,8 @@ async function normalizeEvent(event, incidentId) {
     },
     videoUrl: event.video_url || null,
     fleetId: vehicle.number || null,
+    customerName: 'Goodyear Towing',
+    customerLocation: 'Enterprise, AL',
     diagnostics: vehicleDetails ? {
       odometer: vehicleDetails.odometer,
       fuelLevel: vehicleDetails.fuelLevel,
