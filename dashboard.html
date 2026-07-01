@@ -577,13 +577,15 @@ function computeEngineData(inc, raw) {
 
 function extractCameras(inc, raw) {
   const videoUrl = inc.videoUrl || raw.video_url || raw.dashcam_url || raw.clip_url || null;
+  const snaps = inc.snapshots || {};
+  const rawSnaps = raw.snapshots || raw.images || {};
   return {
     hasVideo: !!videoUrl,
     videoUrl,
-    forward: raw.camera_forward_url || raw.front_camera_url || null,
-    driver:  raw.camera_driver_url  || raw.inward_camera_url || null,
-    rear:    raw.camera_rear_url    || raw.rear_camera_url   || null,
-    cargo:   raw.camera_cargo_url   || raw.side_camera_url   || null,
+    forward: snaps.forward || rawSnaps.road_facing || rawSnaps.forward || raw.camera_forward_url || null,
+    driver:  snaps.driver  || rawSnaps.driver_facing || rawSnaps.driver  || raw.camera_driver_url  || null,
+    rear:    snaps.rear    || rawSnaps.rear           || raw.camera_rear_url    || null,
+    cargo:   snaps.cargo   || rawSnaps.cargo          || raw.camera_cargo_url   || null,
   };
 }
 
