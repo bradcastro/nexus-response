@@ -250,3 +250,68 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+
+// ─── Motive Safety Event Debug — fetch single event directly ─────────────────
+app.get('/api/debug/motive-safety/:eventId', async (req, res) => {
+  const apiKey = process.env.MOTIVE_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'No API key' });
+
+  const results = {};
+
+  // Try every known endpoint format
+  const endpoints = [
+    `https://api.gomotive.com/v1/driver_safety_events/${req.params.eventId}`,
+    `https://api.gomotive.com/v2/driver_safety_events/${req.params.eventId}`,
+    `https://api.gomotive.com/v1/driver_safety_events?id=${req.params.eventId}`,
+    `https://api.gomotive.com/v1/driver_performance_events/${req.params.eventId}`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const r = await fetch(url, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
+      });
+      const text = await r.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = text; }
+      results[url] = { status: r.status, data };
+    } catch(e) {
+      results[url] = { error: e.message };
+    }
+  }
+
+  res.json(results);
+});
+
+// ─── Motive Safety Events List Debug ─────────────────────────────────────────
+app.get('/api/debug/motive-safety-list', async (req, res) => {
+  const apiKey = process.env.MOTIVE_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'No API key' });
+
+  const results = {};
+  const date14 = new Date();
+  date14.setDate(date14.getDate() - 14);
+
+  const endpoints = [
+    `https://api.gomotive.com/v1/driver_safety_events?per_page=5&start_time=${encodeURIComponent(date14.toISOString())}`,
+    `https://api.gomotive.com/v1/driver_safety_events?per_page=5&start_date=${date14.toISOString().split('T')[0]}`,
+    `https://api.gomotive.com/v1/driver_safety_events?per_page=5`,
+    `https://api.gomotive.com/v2/driver_safety_events?per_page=5`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const r = await fetch(url, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
+      });
+      const text = await r.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = text.substring(0, 500); }
+      results[url] = { status: r.status, keys: typeof data === 'object' ? Object.keys(data) : null, sample: data };
+    } catch(e) {
+      results[url] = { error: e.message };
+    }
+  }
+
+  res.json(results);
+});
