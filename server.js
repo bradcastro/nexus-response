@@ -1,13 +1,13 @@
 require('dotenv').config();
-const { startPoller } = require('./motive-poller');
-const { startSamsaraPoller } = require('./samsara-poller');
 const express = require('express');
 const crypto = require('crypto');
 const cors = require('cors');
 const helmet = require('helmet');
-const { saveIncident, getIncidents, updateIncidentStatus } = require('./db');
-
 const path = require('path');
+const { saveIncident, getIncidents, updateIncidentStatus } = require('./db');
+const { startPoller } = require('./motive-poller');
+const { startSamsaraPoller } = require('./samsara-poller');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -34,83 +34,61 @@ app.get('/', (req, res) => {
   });
 });
 
-// ─── Motive Webhook Receiver ──────────────────────────────────────────────────
-app.post('/webhook/motive', async (req, res) => {
-  try {
-    const signature = req.headers['x-motive-signature'] || req.headers['x-webhook-signature'];
-    const rawBody = req.body;
-
-    // Verify the webhook came from Motive
-    if (process.env.MOTIVE_WEBHOOK_SECRET) {
-      const isValid = verifyMotiveSignature(rawBody, signature, process.env.MOTIVE_WEBHOOK_SECRET);
-      if (!isValid) {
-        console.warn('[NEXUS] Signature verification failed — possible spoofed request');
-        return res.status(401).json({ error: 'Invalid signature' });
-      }
-    }
-
-    // Parse the payload
-    const payload = JSON.parse(rawBody.toString());
-    console.log('[NEXUS] Motive event received:', JSON.stringify(payload, null, 2));
-
-    // Extract and classify the event
-    const incident = parseMotivePayload(payload);
-    console.log('[NEXUS] Incident classified:', incident.eventType, '| Severity:', incident.severity);
-
-    // Save to database (or in-memory log if no DB configured)
-    await saveIncident(incident);
-
-    // Respond immediately — Motive requires a fast 200
-    res.status(200).json({ received: true, incidentId: incident.id });
-
-  } catch (err) {
-    console.error('[NEXUS] Webhook processing error:', err.message);
-    res.status(500).json({ error: 'Processing failed' });
-  }
-});
-
-// ─── Dashboard API ────────────────────────────────────────────────────────────
-
-// Get all incidents (for the ops dashboard)
-
 // ─── Config endpoint (serves public keys to frontend) ────────────────────────
-app.get("/api/config", (req, res) => {
+app.get('/api/config', (req, res) => {
   res.json({
     mapsKey: process.env.GOOGLE_MAPS_KEY || null,
     mapboxToken: process.env.MAPBOX_TOKEN || null
   });
 });
 
+// ─── Motive Webhook Receiver ──────────────────────────────────────────────────
+app.post('/webhook/motive', async (req, res) => {
+  try {
+    const signature = req.headers['x-motive-signature'] || req.headers['x-webhook-signature'];
+    const rawBody = req.body;
+
+    if (process.env.MOTIVE_WEBHOOK_SECRET) {
+      const isValid = verifyMotiveSignature(rawBody, signature, process.env.MOTIVE_WEBHOOK_SECRET);
+      if (!isValid) {
+        console.warn('[NEXUS] Signature verification failed');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+    }
+
+    const payload = JSON.parse(rawBody.toString());
+    console.log('[NEXUS] Motive webhook received:', JSON.stringify(payload, null, 2));
+
+    const incident = parseMotivePayload(payload);
+    await saveIncident(incident);
+    res.status(200).json({ received: true, incidentId: incident.id });
+  } catch (err) {
+    console.error('[NEXUS] Webhook error:', err.message);
+    res.status(500).json({ error: 'Processing failed' });
+  }
+});
+
+// ─── Dashboard API ────────────────────────────────────────────────────────────
 app.get('/api/incidents', async (req, res) => {
   try {
     const incidents = await getIncidents();
     res.json({ incidents });
   } catch (err) {
-    console.error('[NEXUS] Error fetching incidents:', err.message);
     res.status(500).json({ error: 'Failed to fetch incidents' });
   }
 });
 
-// Dispatch an incident
 app.post('/api/incidents/:id/dispatch', async (req, res) => {
   try {
     const { id } = req.params;
     await updateIncidentStatus(id, 'dispatched');
-
     console.log(`[NEXUS] Incident ${id} DISPATCHED`);
-
-    // TODO Week 5: Fire Twilio SMS to provider
-    // TODO Week 5: Send fleet manager notification
-    // TODO Week 5: Log 911 notification
-
     res.json({ success: true, incidentId: id, status: 'dispatched' });
   } catch (err) {
-    console.error('[NEXUS] Dispatch error:', err.message);
     res.status(500).json({ error: 'Dispatch failed' });
   }
 });
 
-// Dismiss an incident
 app.post('/api/incidents/:id/dismiss', async (req, res) => {
   try {
     const { id } = req.params;
@@ -118,12 +96,11 @@ app.post('/api/incidents/:id/dismiss', async (req, res) => {
     console.log(`[NEXUS] Incident ${id} dismissed`);
     res.json({ success: true, incidentId: id, status: 'dismissed' });
   } catch (err) {
-    console.error('[NEXUS] Dismiss error:', err.message);
     res.status(500).json({ error: 'Dismiss failed' });
   }
 });
 
-// ─── Debug — show raw payload of any incident ─────────────────────────────────
+// ─── Debug — raw incident payload ─────────────────────────────────────────────
 app.get('/api/incidents/:id/raw', async (req, res) => {
   try {
     const incidents = await getIncidents();
@@ -135,7 +112,7 @@ app.get('/api/incidents/:id/raw', async (req, res) => {
   }
 });
 
-// ─── Test Endpoint (simulate a Motive event without real truck) ───────────────
+// ─── Test Endpoint ────────────────────────────────────────────────────────────
 app.post('/test/trigger-event', async (req, res) => {
   const testPayload = {
     id: `test-${Date.now()}`,
@@ -149,37 +126,115 @@ app.post('/test/trigger-event', async (req, res) => {
       year: 2021,
       licensePlate: 'AL-GTW-001'
     },
-    driver: {
-      id: 'DRV-001',
-      name: 'Test Driver',
-      phone: '+12055550001'
-    },
-    location: {
-      lat: 31.3271,
-      lng: -85.8511,
-      address: 'I-65 Northbound, Enterprise, AL 36330',
-      speed_mph: 62
-    },
+    driver: { id: 'DRV-001', name: 'Test Driver', phone: '+12055550001' },
+    location: { lat: 31.3271, lng: -85.8511, address: 'I-65 Northbound, Enterprise, AL 36330', speed_mph: 62 },
     videoUrl: null,
     fleetId: 'GOODYEAR-TEST',
     customerName: 'Goodyear Towing',
     customerLocation: 'Enterprise, AL'
   };
-
-  const incident = {
-    ...testPayload,
-    id: testPayload.id,
-    status: 'pending',
-    receivedAt: new Date().toISOString()
-  };
-
+  const incident = { ...testPayload, id: testPayload.id, status: 'pending', receivedAt: new Date().toISOString() };
   await saveIncident(incident);
   console.log('[NEXUS] Test event triggered:', incident.id);
   res.json({ success: true, incident });
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Samsara Debug ────────────────────────────────────────────────────────────
+app.get('/api/debug/samsara', async (req, res) => {
+  const apiKey = process.env.SAMSARA_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'SAMSARA_API_KEY not set in Render environment' });
 
+  const results = {};
+  const date14 = new Date();
+  date14.setDate(date14.getDate() - 14);
+
+  const endpoints = [
+    `https://api.samsara.com/fleet/safety-events?startTime=${encodeURIComponent(date14.toISOString())}&endTime=${encodeURIComponent(new Date().toISOString())}`,
+    `https://api.samsara.com/fleet/safety-events`,
+    `https://api.samsara.com/fleet/vehicles`,
+    `https://api.samsara.com/fleet/drivers`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const r = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+      });
+      const text = await r.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = text.substring(0, 300); }
+      results[url] = {
+        status: r.status,
+        keys: typeof data === 'object' ? Object.keys(data) : null,
+        recordCount: data?.data?.length ?? null,
+        sample: JSON.stringify(data).substring(0, 500)
+      };
+    } catch(e) {
+      results[url] = { error: e.message };
+    }
+  }
+  res.json(results);
+});
+
+// ─── Motive Safety Debug ──────────────────────────────────────────────────────
+app.get('/api/debug/motive-safety-list', async (req, res) => {
+  const apiKey = process.env.MOTIVE_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'No API key' });
+
+  const results = {};
+  const date14 = new Date();
+  date14.setDate(date14.getDate() - 14);
+
+  const endpoints = [
+    `https://api.gomotive.com/v1/driver_safety_events?per_page=5&start_time=${encodeURIComponent(date14.toISOString())}`,
+    `https://api.gomotive.com/v1/driver_safety_events?per_page=5&start_date=${date14.toISOString().split('T')[0]}`,
+    `https://api.gomotive.com/v1/driver_safety_events?per_page=5`,
+    `https://api.gomotive.com/v2/driver_safety_events?per_page=5`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const r = await fetch(url, { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } });
+      const text = await r.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = text.substring(0, 500); }
+      results[url] = {
+        status: r.status,
+        keys: typeof data === 'object' ? Object.keys(data) : null,
+        recordCount: Array.isArray(data?.driver_safety_events) ? data.driver_safety_events.length : null,
+        videoFields: data?.driver_safety_events?.[0] ? Object.keys(data.driver_safety_events[0]).filter(k =>
+          k.includes('video') || k.includes('clip') || k.includes('media') ||
+          k.includes('image') || k.includes('camera') || k.includes('snap')) : null,
+        sample: JSON.stringify(data).substring(0, 600)
+      };
+    } catch(e) {
+      results[url] = { error: e.message };
+    }
+  }
+  res.json(results);
+});
+
+app.get('/api/debug/motive-safety/:eventId', async (req, res) => {
+  const apiKey = process.env.MOTIVE_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'No API key' });
+  const results = {};
+  const endpoints = [
+    `https://api.gomotive.com/v1/driver_safety_events/${req.params.eventId}`,
+    `https://api.gomotive.com/v2/driver_safety_events/${req.params.eventId}`,
+    `https://api.gomotive.com/v1/driver_performance_events/${req.params.eventId}`,
+  ];
+  for (const url of endpoints) {
+    try {
+      const r = await fetch(url, { headers: { 'x-api-key': apiKey } });
+      const text = await r.text();
+      let data; try { data = JSON.parse(text); } catch { data = text.substring(0, 400); }
+      results[url] = { status: r.status, data };
+    } catch(e) { results[url] = { error: e.message }; }
+  }
+  res.json(results);
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function verifyMotiveSignature(rawBody, signature, secret) {
   if (!signature) return false;
   const hmac = crypto.createHmac('sha256', secret);
@@ -187,15 +242,11 @@ function verifyMotiveSignature(rawBody, signature, secret) {
   const expected = 'sha256=' + hmac.digest('hex');
   try {
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 function parseMotivePayload(payload) {
-  // Normalize Motive's event structure into Nexus incident format
   const event = payload.event || payload;
-
   return {
     id: `NX-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
     source: 'motive',
@@ -225,7 +276,9 @@ function parseMotivePayload(payload) {
       speed_mph: event.speed_mph || null
     },
     videoUrl: event.video_url || event.dashcam_url || null,
-    fleetId: event.fleet_id || null
+    fleetId: event.fleet_id || null,
+    customerName: 'Goodyear Towing',
+    customerLocation: 'Enterprise, AL'
   };
 }
 
@@ -250,68 +303,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-
-// ─── Motive Safety Event Debug — fetch single event directly ─────────────────
-app.get('/api/debug/motive-safety/:eventId', async (req, res) => {
-  const apiKey = process.env.MOTIVE_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'No API key' });
-
-  const results = {};
-
-  // Try every known endpoint format
-  const endpoints = [
-    `https://api.gomotive.com/v1/driver_safety_events/${req.params.eventId}`,
-    `https://api.gomotive.com/v2/driver_safety_events/${req.params.eventId}`,
-    `https://api.gomotive.com/v1/driver_safety_events?id=${req.params.eventId}`,
-    `https://api.gomotive.com/v1/driver_performance_events/${req.params.eventId}`,
-  ];
-
-  for (const url of endpoints) {
-    try {
-      const r = await fetch(url, {
-        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
-      });
-      const text = await r.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = text; }
-      results[url] = { status: r.status, data };
-    } catch(e) {
-      results[url] = { error: e.message };
-    }
-  }
-
-  res.json(results);
-});
-
-// ─── Motive Safety Events List Debug ─────────────────────────────────────────
-app.get('/api/debug/motive-safety-list', async (req, res) => {
-  const apiKey = process.env.MOTIVE_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'No API key' });
-
-  const results = {};
-  const date14 = new Date();
-  date14.setDate(date14.getDate() - 14);
-
-  const endpoints = [
-    `https://api.gomotive.com/v1/driver_safety_events?per_page=5&start_time=${encodeURIComponent(date14.toISOString())}`,
-    `https://api.gomotive.com/v1/driver_safety_events?per_page=5&start_date=${date14.toISOString().split('T')[0]}`,
-    `https://api.gomotive.com/v1/driver_safety_events?per_page=5`,
-    `https://api.gomotive.com/v2/driver_safety_events?per_page=5`,
-  ];
-
-  for (const url of endpoints) {
-    try {
-      const r = await fetch(url, {
-        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
-      });
-      const text = await r.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = text.substring(0, 500); }
-      results[url] = { status: r.status, keys: typeof data === 'object' ? Object.keys(data) : null, sample: data };
-    } catch(e) {
-      results[url] = { error: e.message };
-    }
-  }
-
-  res.json(results);
-});
