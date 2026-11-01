@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Nexus Response">
+<g fill="none" stroke="#7F93AB" stroke-width="2.4" stroke-linecap="round"><path d="M9 11 L24 25"/><path d="M40 9 L24 25"/><path d="M42 33 L24 25"/><path d="M15 41 L24 25"/></g>
+<g fill="#7F93AB"><circle cx="9" cy="11" r="3.4"/><circle cx="40" cy="9" r="3.4"/><circle cx="42" cy="33" r="3.4"/><circle cx="15" cy="41" r="3.4"/></g>
+<circle cx="24" cy="25" r="10.5" fill="none" stroke="#FF6A1A" stroke-opacity=".35" stroke-width="1.6"/>
+<circle cx="24" cy="25" r="6" fill="#FF6A1A"/>
+</svg>

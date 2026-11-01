@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dispatch Center · Nexus Response</title>
+<link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="/shared/brand.css">
+<link rel="stylesheet" href="app.css">
+<script src="/shared/brand.js"></script>
+</head>
+<body>
+<div class="nx-app nx-app--nosidebar nx-app--fill">
+  <div id="nx-topbar"></div>
+  <main class="nx-main nx-main--flush">
+    <div class="dc" id="dc" data-view="queue">
+      <!-- QUEUE -->
+      <section class="pane pane-queue" aria-label="Incident queue">
+        <div class="q-head">
+          <div class="nx-row">
+            <h2 class="q-title-h">Incident queue</h2>
+            <span class="nx-faint nx-mono" id="q-shown"></span>
+            <button class="nx-btn nx-btn--sm nx-btn--ghost" id="btn-refresh" title="Reload">Refresh</button>
+          </div>
+          <div class="q-search"><input class="nx-input" id="f-q" placeholder="Search id, unit, driver, VIN, address   ( / )" autocomplete="off"></div>
+          <div class="nx-chips" id="status-chips"></div>
+          <div class="q-filters">
+            <select class="nx-select" id="f-sev" aria-label="Severity"></select>
+            <select class="nx-select" id="f-cat" aria-label="Category"></select>
+            <select class="nx-select" id="f-fleet" aria-label="Fleet"></select>
+          </div>
+        </div>
+        <div class="q-alert nx-hide" id="q-alert" role="alert"></div>
+        <div class="q-list" id="q-list"></div>
+      </section>
+      <!-- MAP -->
+      <section class="pane pane-map" aria-label="Map">
+        <div id="map"></div>
+        <div class="map-hud">
+          <div class="hud-card" id="hud-stats"></div>
+          <div class="hud-legend">
+            <span><i style="background:var(--nx-sev-critical)"></i>Critical</span>
+            <span><i style="background:var(--nx-sev-high)"></i>High</span>
+            <span><i style="background:var(--nx-sev-medium)"></i>Medium</span>
+            <span><i style="background:var(--nx-sev-low)"></i>Low</span>
+            <span><i class="sq"></i>Provider</span>
+          </div>
+        </div>
+        <div class="map-tools">
+          <button class="nx-btn nx-btn--sm" id="btn-fit">Fit all</button>
+          <button class="nx-btn nx-btn--sm" id="btn-follow" aria-pressed="false">Follow selected</button>
+        </div>
+      </section>
+      <!-- DETAIL -->
+      <section class="pane pane-detail" aria-label="Incident detail" id="detail"></section>
+      <nav class="view-tabs" aria-label="View">
+        <button data-view="queue" class="is-active">Queue</button>
+        <button data-view="map">Map</button>
+        <button data-view="detail">Detail</button>
+      </nav>
+    </div>
+  </main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

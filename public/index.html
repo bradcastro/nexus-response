@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexus Response — Every event, resolved.</title>
+<meta name="description" content="One platform that ingests events from any telematics or camera vendor and turns them into incident management, roadside assistance, OEM warranty claims and insurer risk analytics.">
+<link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/brand.css">
+<script src="/shared/brand.js"></script>
+<style>
+  body { overflow-x: hidden; }
+  .wrap { width: min(1240px, 100%); margin: 0 auto; padding: 0 24px; }
+  .hero { position: relative; border-bottom: 1px solid var(--nx-border); }
+  .hero::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(60% 80% at 78% 40%, color-mix(in srgb, var(--nx-accent) 13%, transparent), transparent 70%); }
+  .hero .wrap { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 40px; align-items: center; padding-top: 56px; padding-bottom: 48px; }
+  .hero h1 { font-size: clamp(48px, 7vw, 92px); line-height: .92; font-weight: 700; letter-spacing: -.005em; text-transform: uppercase; margin: 18px 0 20px; }
+  .hero h1 em { font-style: normal; color: var(--nx-accent); display: block; }
+  .hero .lede { font-size: 18px; line-height: 1.55; color: var(--nx-text-dim); max-width: 520px; }
+  .hero .lede b { color: var(--nx-text); font-weight: 500; }
+  .cta { display: flex; gap: 10px; margin-top: 28px; flex-wrap: wrap; }
+  .stats { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 28px; margin-top: 34px; padding-top: 20px; border-top: 1px solid var(--nx-border); flex-wrap: wrap; }
+  .stats div { font: 500 var(--nx-text-2xs)/1.3 var(--nx-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--nx-text-faint); }
+  .stats b { display: block; font: 600 30px/1 var(--nx-font-display); color: var(--nx-text); letter-spacing: 0; margin-bottom: 4px; }
+
+  /* converge diagram */
+  .flow { width: 100%; height: auto; display: block; }
+  .flow text { font-family: var(--nx-font-mono); fill: var(--nx-text-dim); font-size: 11px; letter-spacing: .08em; }
+  .flow .node { fill: var(--nx-surface); stroke: var(--nx-border-strong); stroke-width: 1.2; }
+  .flow .nlabel { fill: var(--nx-text); font-weight: 500; font-size: 12px; }
+  .flow .in { stroke: var(--nx-text-faint); stroke-width: 1.3; fill: none; stroke-dasharray: 4 6; animation: dash 1.6s linear infinite; }
+  .flow .out { stroke: var(--nx-accent); stroke-width: 1.6; fill: none; stroke-dasharray: 4 6; animation: dash 1.2s linear infinite; }
+  .flow .hub { fill: var(--nx-accent); } .flow .ring { fill: none; stroke: var(--nx-accent); opacity: .5; transform-origin: 300px 210px; animation: ring 2.8s var(--nx-ease) infinite; }
+  .flow .ring.r2 { animation-delay: 1.4s; }
+  .flow .ob { fill: var(--nx-surface-2); stroke: var(--nx-accent); stroke-opacity: .55; stroke-width: 1.2; }
+  @keyframes dash { to { stroke-dashoffset: -20; } }
+  @keyframes ring { 0% { transform: scale(.4); opacity: .7; } 100% { transform: scale(2.4); opacity: 0; } }
+
+  /* strip */
+  .strip { border-bottom: 1px solid var(--nx-border); background: var(--nx-surface); }
+  .strip .wrap { display: flex; align-items: center; gap: 28px; padding-top: 18px; padding-bottom: 18px; flex-wrap: wrap; }
+  .strip .marks { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
+  .wm { font: 600 17px/1 var(--nx-font-mono); letter-spacing: .04em; padding: 9px 16px; border: 1px solid var(--nx-border); border-radius: var(--nx-radius); background: var(--nx-surface-2); color: var(--nx-text-dim); }
+  .wm:nth-child(1) { font-weight: 700; letter-spacing: -.02em; } .wm:nth-child(2) { font-family: var(--nx-font-display); font-size: 21px; letter-spacing: .06em; text-transform: uppercase; }
+  .wm:nth-child(3) { font-family: var(--nx-font-ui); font-weight: 600; letter-spacing: -.01em; } .wm:nth-child(4) { font-family: var(--nx-font-display); font-style: italic; font-size: 21px; font-weight: 700; }
+  .wm.any { border-style: dashed; color: var(--nx-accent); border-color: color-mix(in srgb, var(--nx-accent) 55%, transparent); }
+
+  section.block { padding: 56px 0 8px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 22px; }
+  .sec-head h2 { font-size: 34px; text-transform: uppercase; }
+  .sec-head span { color: var(--nx-text-dim); }
+
+  /* portals */
+  .portal { display: flex; flex-direction: column; gap: 12px; padding: 22px; text-decoration: none !important; color: inherit; position: relative; overflow: hidden; }
+  .portal:hover { text-decoration: none; }
+  .portal .idx { font: 600 var(--nx-text-xs)/1 var(--nx-font-mono); color: var(--nx-accent); letter-spacing: .14em; }
+  .portal h3 { font-size: 30px; text-transform: uppercase; letter-spacing: .02em; }
+  .portal .who { color: var(--nx-text-dim); font-size: 14.5px; flex: 1; }
+  .portal .who b { color: var(--nx-text); font-weight: 500; }
+  .portal .go { display: flex; align-items: center; justify-content: space-between; font: 500 var(--nx-text-xs)/1 var(--nx-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--nx-text-faint); padding-top: 14px; border-top: 1px solid var(--nx-border); }
+  .portal:hover .go { color: var(--nx-accent); }
+  .portal .corner { position: absolute; right: -30px; top: -30px; width: 110px; height: 110px; border-radius: 50%; border: 1px solid var(--nx-border); box-shadow: 0 0 0 14px color-mix(in srgb, var(--nx-border) 40%, transparent); opacity: .7; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* demo */
+  .demo-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .scen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px; }
+  .scen button { text-align: left; display: grid; gap: 6px; padding: 14px; border-radius: var(--nx-radius); border: 1px solid var(--nx-border-strong); background: var(--nx-surface-2); color: var(--nx-text); cursor: pointer; font: inherit; transition: all var(--nx-dur-fast); position: relative; }
+  .scen button:hover { border-color: var(--nx-accent); background: var(--nx-surface-3); }
+  .scen button.is-loading { opacity: .6; pointer-events: none; }
+  .scen .k { font: 500 var(--nx-text-2xs)/1 var(--nx-font-mono); letter-spacing: .1em; color: var(--nx-accent); }
+  .scen .t { font: 600 19px/1.1 var(--nx-font-display); text-transform: uppercase; letter-spacing: .03em; }
+  .scen .d { font-size: 12.5px; color: var(--nx-text-dim); line-height: 1.4; }
+  .result { margin: 0 16px 16px; border: 1px solid var(--nx-border); border-radius: var(--nx-radius); background: var(--nx-bg); min-height: 150px; max-height: 280px; overflow: auto; }
+  .result pre { margin: 0; padding: 14px; font: 400 12px/1.55 var(--nx-font-mono); color: var(--nx-text-dim); white-space: pre-wrap; word-break: break-word; }
+  .result .sum { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--nx-border); }
+  .result .ph { padding: 36px 18px; text-align: center; color: var(--nx-text-faint); font: 400 12.5px/1.6 var(--nx-font-mono); }
+  .script { counter-reset: s; list-style: none; margin: 0; padding: 6px 18px 18px; }
+  .script li { counter-increment: s; position: relative; padding: 12px 0 12px 44px; border-bottom: 1px solid var(--nx-border); }
+  .script li:last-child { border: 0; }
+  .script li::before { content: counter(s); position: absolute; left: 0; top: 11px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 15px var(--nx-font-display); border: 1px solid var(--nx-accent); color: var(--nx-accent); }
+  .script b { display: block; font: 600 17px/1.2 var(--nx-font-display); text-transform: uppercase; letter-spacing: .03em; }
+  .script span { font-size: 13px; color: var(--nx-text-dim); line-height: 1.45; display: block; margin-top: 3px; }
+  .script em { font: 500 var(--nx-text-2xs)/1 var(--nx-font-mono); color: var(--nx-text-faint); font-style: normal; letter-spacing: .1em; }
+
+  footer.foot { margin-top: 64px; padding: 24px 0 40px; border-top: 1px solid var(--nx-border); color: var(--nx-text-faint); font: 400 var(--nx-text-xs)/1.6 var(--nx-font-mono); }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  @media (max-width: 980px) { .hero .wrap { grid-template-columns: 1fr; padding-top: 36px; } .demo-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .wrap { padding: 0 16px; } .scen { grid-template-columns: 1fr; } .sec-head { flex-direction: column; gap: 4px; } .sec-head h2 { font-size: 28px; } .hero .lede { font-size: 16px; } .grid3 { grid-template-columns: 1fr !important; } .stats { gap: 18px; } }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 900px) { .grid3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="nx-topbar"></div>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <span class="nx-badge nx-badge--accent">Platform POC · live demo</span>
+      <h1>Every event,<em>resolved.</em></h1>
+      <p class="lede">Telematics and camera events from <b>any vendor</b> converge into one schema, then fan out as <b>incident management</b>, <b>roadside dispatch with trouble codes decoded</b>, <b>OEM warranty claims</b> and <b>insurer risk</b>.</p>
+      <div class="cta">
+        <a class="nx-btn nx-btn--primary nx-btn--lg" href="#demo">Run live demo</a>
+        <a class="nx-btn nx-btn--lg" href="/dispatch/">Open dispatch</a>
+      </div>
+      <div class="stats">
+        <div><b>5</b>Vendors, one schema</div>
+        <div><b>&lt; 3s</b>Event to dispatch card</div>
+        <div><b>1</b>Evidence packet per claim</div>
+      </div>
+    </div>
+
+    <svg class="flow" viewBox="0 0 600 420" role="img" aria-label="Vendor events converge into Nexus and fan out to incidents, roadside, warranty and risk">
+      <g>
+        <path class="in" d="M130 52 C 220 52, 230 210, 300 210"/><path class="in" d="M130 132 C 210 132, 230 210, 300 210"/>
+        <path class="in" d="M130 212 L 300 210"/>
+        <path class="in" d="M130 292 C 210 292, 230 210, 300 210"/><path class="in" d="M130 372 C 220 372, 230 210, 300 210"/>
+        <path class="out" d="M300 210 C 370 210, 390 52, 470 52"/><path class="out" d="M300 210 C 370 210, 400 150, 470 150"/>
+        <path class="out" d="M300 210 C 370 210, 400 270, 470 270"/><path class="out" d="M300 210 C 370 210, 390 368, 470 368"/>
+      </g>
+      <g>
+        <rect class="node" x="10" y="36" width="120" height="32" rx="6"/><text class="nlabel" x="26" y="56">MOTIVE</text>
+        <rect class="node" x="10" y="116" width="120" height="32" rx="6"/><text class="nlabel" x="26" y="136">SAMSARA</text>
+        <rect class="node" x="10" y="196" width="120" height="32" rx="6"/><text class="nlabel" x="26" y="216">GEOTAB</text>
+        <rect class="node" x="10" y="276" width="120" height="32" rx="6"/><text class="nlabel" x="26" y="296">LYTX</text>
+        <rect class="node" x="10" y="356" width="120" height="32" rx="6" style="stroke-dasharray:4 3"/><text class="nlabel" x="26" y="376">ANY WEBHOOK</text>
+        <circle class="ring" cx="300" cy="210" r="28"/><circle class="ring r2" cx="300" cy="210" r="28"/>
+        <circle cx="300" cy="210" r="46" fill="var(--nx-surface)" stroke="var(--nx-border-strong)"/>
+        <circle class="hub" cx="300" cy="210" r="17"/>
+        <text x="300" y="282" text-anchor="middle" style="fill:var(--nx-text);font-size:11px;font-weight:600">NORMALIZE · ENRICH</text>
+        <text x="300" y="298" text-anchor="middle" style="font-size:10px">AI VERDICT · DTC · VIN</text>
+        <rect class="ob" x="470" y="36" width="120" height="32" rx="6"/><text class="nlabel" x="484" y="56">INCIDENTS</text>
+        <rect class="ob" x="470" y="134" width="120" height="32" rx="6"/><text class="nlabel" x="484" y="154">ROADSIDE</text>
+        <rect class="ob" x="470" y="254" width="120" height="32" rx="6"/><text class="nlabel" x="484" y="274">WARRANTY</text>
+        <rect class="ob" x="470" y="352" width="120" height="32" rx="6"/><text class="nlabel" x="484" y="372">INSURER RISK</text>
+      </g>
+    </svg>
+  </div>
+</header>
+
+<div class="strip">
+  <div class="wrap">
+    <span class="nx-eyebrow">Ingesting from</span>
+    <div class="marks">
+      <span class="wm">Motive</span><span class="wm">Samsara</span><span class="wm">Geotab</span><span class="wm">Lytx</span>
+      <span class="wm any">+ any webhook</span>
+    </div>
+    <span class="nx-dim" style="font-size:13px">Adapter per vendor. Same incident schema out.</span>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="block" id="portals">
+    <div class="sec-head"><h2>Three portals, one source of truth</h2><span>Pick the seat you want to sit in.</span></div>
+    <div class="grid3">
+      <a class="nx-card nx-card--interactive portal" href="/dispatch/">
+        <i class="corner"></i>
+        <span class="idx">01 / OPS</span><h3>Dispatch</h3>
+        <p class="who"><b>Dispatchers see every fleet.</b> Live incident queue, camera verdict and confidence, decoded trouble codes, one-click roadside dispatch, warranty packet.</p>
+        <div class="tags"><span class="nx-badge nx-badge--critical">Live queue</span><span class="nx-badge nx-badge--info">Map</span><span class="nx-badge nx-badge--plain">DTC decode</span></div>
+        <div class="go"><span>Enter dispatch</span><span>&rarr;</span></div>
+      </a>
+      <a class="nx-card nx-card--interactive portal" href="/fleet/">
+        <i class="corner"></i>
+        <span class="idx">02 / CUSTOMER</span><h3>Fleet</h3>
+        <p class="who"><b>Fleet managers see their own trucks.</b> Open incidents, driver scores, vehicle health, roadside status and warranty dollars recovered.</p>
+        <div class="tags"><span class="nx-badge nx-badge--ok">Vehicles</span><span class="nx-badge nx-badge--plain">Drivers</span><span class="nx-badge nx-badge--plain">Warranty $</span></div>
+        <div class="go"><span>Enter fleet portal</span><span>&rarr;</span></div>
+      </a>
+      <a class="nx-card nx-card--interactive portal" href="/insurer/">
+        <i class="corner"></i>
+        <span class="idx">03 / CARRIER</span><h3>Insurer</h3>
+        <p class="who"><b>Carriers see risk across fleets and vendors.</b> Camera-verified loss data, risk tiers, benchmarks and pricing signals, apples to apples.</p>
+        <div class="tags"><span class="nx-badge nx-badge--high">Risk tiers</span><span class="nx-badge nx-badge--plain">Benchmarks</span><span class="nx-badge nx-badge--plain">Pricing</span></div>
+        <div class="go"><span>Enter insurer portal</span><span>&rarr;</span></div>
+      </a>
+    </div>
+  </section>
+
+  <section class="block" id="demo">
+    <div class="sec-head"><h2>Run the live demo</h2><span>Each button fires a realistic vendor event through the real ingestion path.</span></div>
+    <div class="demo-grid">
+      <div class="nx-card">
+        <div class="nx-card__head"><span class="nx-card__title">Event simulator</span><span class="nx-grow"></span><span class="nx-live" data-nx-live><span class="nx-live-dot nx-live-dot--off"></span><span class="nx-live__text">Offline</span></span></div>
+        <div class="scen" id="scen">
+          <button data-s="collision_camera"><span class="k">POST / collision_camera</span><span class="t">Camera-verified collision</span><span class="d">Samsara dual-facing cam: 4.2g impact, AI confirms. Critical card drops into dispatch.</span></button>
+          <button data-s="dtc_breakdown"><span class="k">POST / dtc_breakdown</span><span class="t">Breakdown + trouble codes</span><span class="d">Derate fault codes decoded, tow type and parts pre-staged, nearest provider ranked.</span></button>
+          <button data-s="warranty_failure"><span class="k">POST / warranty_failure</span><span class="t">In-warranty failure</span><span class="d">VIN decoded, coverage matched, OEM claim packet assembled with evidence.</span></button>
+          <button data-s="false_positive"><span class="k">POST / false_positive</span><span class="t">False positive filtered</span><span class="d">Vendor flags a crash; camera says pothole. Dismissed before anyone rolls a truck.</span></button>
+        </div>
+        <div class="result" id="result"><div class="ph">Pick a scenario. The response from <code>POST /api/demo/simulate</code> shows here.</div></div>
+      </div>
+
+      <aside class="nx-card">
+        <div class="nx-card__head"><span class="nx-card__title">The 5-minute story</span></div>
+        <ol class="script">
+          <li><b>One platform</b><span>Show the convergence diagram: five vendors, one schema. <em>0:00</em></span></li>
+          <li><b>Collision, verified</b><span>Fire collision_camera. Watch it land in Dispatch; open the camera verdict and signals. <em>1:00</em></span></li>
+          <li><b>Breakdown, decoded</b><span>Fire dtc_breakdown. Fault codes become a service type and a pre-staged provider. <em>2:00</em></span></li>
+          <li><b>Warranty, assembled</b><span>Fire warranty_failure. Open the claim packet: VIN, coverage, evidence, dollar value. <em>3:00</em></span></li>
+          <li><b>Risk, across fleets</b><span>Fire false_positive, then jump to Fleet and Insurer for the roll-up and pricing signal. <em>4:00</em></span></li>
+        </ol>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<footer class="foot"><div class="wrap"><span>NEXUS RESPONSE &middot; Every event, resolved.</span><span>Demo data is synthetic. <a href="/health">/health</a> &middot; <a href="/dashboard">legacy dashboard</a></span></div></footer>
+
+<script>
+  NX.topbar('', { sidebar: false, live: true });
+  var resultBox = document.getElementById('result');
+
+  function renderResult(scenario, data) {
+    var inc = data && (data.incident || data);
+    resultBox.innerHTML = '';
+    var sum = NX.el('div.sum');
+    if (inc && inc.id) {
+      sum.append(NX.el('span.nx-mono', inc.id), inc.severity && NX.badge(inc.severity), inc.status && NX.badge(inc.status),
+        inc.provider && NX.badge(inc.provider, 'plain'), NX.el('span.nx-grow'),
+        NX.el('a.nx-btn.nx-btn--primary.nx-btn--sm', { href: '/dispatch/#' + inc.id }, 'Open in dispatch →'));
+    } else {
+      sum.append(NX.badge('Sent', 'ok'), NX.el('span.nx-grow'), NX.el('a.nx-btn.nx-btn--primary.nx-btn--sm', { href: '/dispatch/' }, 'Open dispatch →'));
+    }
+    resultBox.append(sum, NX.el('pre', JSON.stringify(data, null, 2)));
+  }
+
+  document.getElementById('scen').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-s]'); if (!btn) return;
+    var s = btn.dataset.s; btn.classList.add('is-loading');
+    NX.api('/api/demo/simulate', { method: 'POST', body: { scenario: s } }).then(function (data) {
+      renderResult(s, data);
+      var inc = data && (data.incident || data);
+      NX.toast((inc && inc.severity ? inc.severity.toUpperCase() + ' ' : '') + 'event fired: ' + s + (inc && inc.id ? ' (' + inc.id + ')' : ''), 'success');
+    }).catch(function (err) {
+      resultBox.innerHTML = '';
+      resultBox.append(NX.el('div.ph', 'Could not reach the backend.', NX.el('br'), err.message, NX.el('br'), 'Start it with npm start, then try again.'));
+      NX.toast('Backend unreachable: ' + err.message, 'error');
+    }).finally(function () { btn.classList.remove('is-loading'); });
+  });
+
+  // reflect backend reachability in the live indicator
+  function ping() { fetch('/health').then(function (r) { NX.setLive(r.ok ? 'live' : 'off'); }).catch(function () { NX.setLive('off'); }); }
+  ping(); setInterval(ping, 10000);
+</script>
+</body>
+</html>

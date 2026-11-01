@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet Portal · Nexus Response</title>
+<link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="/shared/brand.css">
+<link rel="stylesheet" href="fleet.css">
+<script src="/shared/brand.js"></script>
+</head>
+<body>
+<div class="nx-app">
+  <div id="nx-topbar"></div>
+  <aside class="nx-sidebar" id="side">
+    <div class="nx-eyebrow nx-sidebar__label">Fleet portal</div>
+    <button class="nx-nav is-active" data-view="overview">Overview</button>
+    <button class="nx-nav" data-view="incidents">Incidents <span class="nx-nav__count" id="cnt-inc">0</span></button>
+    <button class="nx-nav" data-view="warranty">Warranty claims <span class="nx-nav__count" id="cnt-war">0</span></button>
+    <button class="nx-nav" data-view="drivers">Drivers <span class="nx-nav__count" id="cnt-drv">0</span></button>
+    <button class="nx-nav" data-view="vehicles">Vehicles <span class="nx-nav__count" id="cnt-veh">0</span></button>
+    <div class="fl-side-foot" id="side-source"></div>
+  </aside>
+  <main class="nx-main" id="main">
+    <div class="nx-page-head">
+      <div><div class="nx-eyebrow" id="region">&nbsp;</div><h1 id="fleet-name">Loading fleet</h1><p id="fleet-sub"></p></div>
+      <div class="fl-head-right"><span id="source-badge"></span>
+        <label class="nx-sr" for="fleet-select">Fleet</label><select class="nx-select" id="fleet-select"></select></div>
+    </div>
+    <div id="error" class="nx-hide"></div>
+    <section data-section="overview" id="v-overview"></section>
+    <section data-section="incidents" id="v-incidents" hidden></section>
+    <section data-section="warranty" id="v-warranty" hidden></section>
+    <section data-section="drivers" id="v-drivers" hidden></section>
+    <section data-section="vehicles" id="v-vehicles" hidden></section>
+  </main>
+</div>
+<div class="fl-scrim" id="scrim" hidden></div>
+<aside class="fl-drawer" id="drawer" aria-hidden="true" aria-label="Incident detail"></aside>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>NX.theme.defaultTo('light'); NX.topbar('Fleet');</script>
+<script src="fleet.js"></script>
+</body>
+</html>

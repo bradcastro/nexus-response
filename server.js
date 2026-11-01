@@ -1,143 +1,220 @@
 require('dotenv').config();
 const express = require('express');
-const crypto = require('crypto');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
-const { saveIncident, getIncidents, updateIncidentStatus } = require('./db');
+const fs = require('fs');
+
+const db = require('./db');
+const adapters = require('./src/adapters');
+const pipeline = require('./src/pipeline');
+const stream = require('./src/stream');
+const roster = require('./src/roster');
+const seeder = require('./src/seed');
+const analytics = require('./src/analytics');
+const roadside = require('./src/enrich/roadside');
+const packet = require('./src/packet');
+const media = require('./src/media');
+const scenarios = require('./src/scenarios');
+const fixtures = require('./src/fixtures');
+const { rngFrom } = require('./src/util');
 const { startPoller } = require('./motive-poller');
 const { startSamsaraPoller } = require('./samsara-poller');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DEMO = process.env.DEMO_MODE !== '0';
+const STATUSES = ['pending', 'validating', 'dispatched', 'en_route', 'on_scene', 'resolved', 'dismissed'];
+
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
 app.use(cors());
+// Keep the raw body for webhook HMAC verification.
+app.use(express.json({ limit: '2mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard.html'));
-});
+// ─── Static portals ───────────────────────────────────────────────────────────
+const PUBLIC = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC, { extensions: ['html'] }));
 
-// Raw body needed for signature verification — MUST come before json parser
-app.use('/webhook/motive', express.raw({ type: 'application/json' }));
-app.use(express.json());
+// ─── Health + legacy dashboard + config ───────────────────────────────────────
+app.get('/health', wrap(async (req, res) => res.json({ status: 'online', service: 'Nexus Response', version: '2.0.0', demoMode: DEMO, store: db.usingPostgres() ? 'postgres' : 'memory', incidents: await db.countIncidents(), sseClients: stream.count(), timestamp: new Date().toISOString() })));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
+app.get('/api/config', (req, res) => res.json({ mapsKey: process.env.GOOGLE_MAPS_KEY || null, mapboxToken: process.env.MAPBOX_TOKEN || null, demoMode: DEMO, providers: Object.keys(adapters) }));
 
-// ─── Health Check ─────────────────────────────────────────────────────────────
-app.get('/', (req, res) => {
-  res.json({
-    status: 'online',
-    service: 'Nexus Response Webhook Receiver',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
-});
+// ─── Webhooks (all vendors) ───────────────────────────────────────────────────
+app.post('/webhook/:provider', wrap(async (req, res) => {
+  const provider = req.params.provider.toLowerCase();
+  const adapter = adapters[provider];
+  if (!adapter) return res.status(404).json({ error: `Unknown provider '${provider}'`, supported: Object.keys(adapters) });
+  const v = adapter.verify(req);
+  if (!v.ok) { console.warn(`[NEXUS] ${provider} signature verification failed`); return res.status(401).json({ error: 'Invalid signature' }); }
+  if (!req.body || typeof req.body !== 'object' || !Object.keys(req.body).length) return res.status(400).json({ error: 'Empty or non-JSON body' });
+  const incident = await pipeline.ingest(provider, req.body);
+  console.log(`[NEXUS] ${provider} webhook -> ${incident.id} ${incident.eventType} (${incident.severity})`);
+  res.status(200).json({ received: true, incidentId: incident.id, incident });
+}));
 
-// ─── Config endpoint (serves public keys to frontend) ────────────────────────
-app.get('/api/config', (req, res) => {
-  res.json({
-    mapsKey: process.env.GOOGLE_MAPS_KEY || null,
-    mapboxToken: process.env.MAPBOX_TOKEN || null
-  });
-});
+// ─── Incidents ────────────────────────────────────────────────────────────────
+const addTimeline = db.addTimeline;
+async function mutate(req, res, fn) {
+  const out = await db.updateIncident(req.params.id, async (inc) => { const r = await fn(inc); return r || inc; });
+  if (!out) return res.status(404).json({ error: 'Incident not found' });
+  stream.publish(out, 'update');
+  res.json(out);
+}
 
-// ─── Motive Webhook Receiver ──────────────────────────────────────────────────
-app.post('/webhook/motive', async (req, res) => {
-  try {
-    const signature = req.headers['x-motive-signature'] || req.headers['x-webhook-signature'];
-    const rawBody = req.body;
+app.get('/api/incidents', wrap(async (req, res) => {
+  const { fleetId, status, category, provider, since } = req.query;
+  const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
+  res.json({ incidents: await db.listIncidents({ fleetId, status, category, provider, since, limit }) });
+}));
 
-    if (process.env.MOTIVE_WEBHOOK_SECRET) {
-      const isValid = verifyMotiveSignature(rawBody, signature, process.env.MOTIVE_WEBHOOK_SECRET);
-      if (!isValid) {
-        console.warn('[NEXUS] Signature verification failed');
-        return res.status(401).json({ error: 'Invalid signature' });
-      }
+app.get('/api/incidents/:id', wrap(async (req, res) => {
+  const inc = await db.getIncident(req.params.id);
+  if (!inc) return res.status(404).json({ error: 'Incident not found' });
+  res.json(inc);
+}));
+
+app.get('/api/incidents/:id/raw', wrap(async (req, res) => {
+  const inc = await db.getIncident(req.params.id);
+  if (!inc) return res.status(404).json({ error: 'Incident not found' });
+  res.json({ id: inc.id, provider: inc.provider, raw: inc.raw, rawPayload: inc.raw, clips: inc.camera && inc.camera.clips, snapshots: inc.camera && inc.camera.snapshots });
+}));
+
+app.post('/api/incidents/:id/dispatch', wrap(async (req, res) => {
+  const { providerId, note, actor } = req.body || {};
+  let notFoundProvider = false;
+  const inc0 = await db.getIncident(req.params.id);
+  if (!inc0) return res.status(404).json({ error: 'Incident not found' });
+  await mutate(req, res, (inc) => {
+    const rs = inc.roadside || (inc.roadside = { needed: false, serviceType: 'none', recommendedProvider: null, assignedProvider: null, etaMin: null });
+    let chosen = rs.recommendedProvider;
+    if (providerId) {
+      const list = roadside.listNear(inc.location.lat, inc.location.lng, rs.serviceType !== 'none' ? rs.serviceType : null);
+      const p = list.find((x) => x.id === providerId) || roadside.listNear(inc.location.lat, inc.location.lng).find((x) => x.id === providerId);
+      if (p) chosen = { id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st };
     }
+    rs.assignedProvider = chosen ? { ...chosen } : null;
+    if (chosen) rs.etaMin = chosen.etaMin;
+    inc.status = 'dispatched';
+    addTimeline(inc, actor || 'dispatcher', 'dispatched', `${chosen ? `Dispatched ${chosen.name} (${rs.serviceType}${chosen.etaMin ? `, ETA ${chosen.etaMin} min` : ''})` : 'Marked dispatched (no roadside provider)'}${note ? ' - ' + note : ''}`);
+  });
+}));
 
-    const payload = JSON.parse(rawBody.toString());
-    console.log('[NEXUS] Motive webhook received:', JSON.stringify(payload, null, 2));
+app.post('/api/incidents/:id/dismiss', wrap(async (req, res) => {
+  const { reason, actor } = req.body || {};
+  await mutate(req, res, (inc) => { inc.status = 'dismissed'; addTimeline(inc, actor || 'dispatcher', 'dismissed', reason || 'Dismissed'); });
+}));
 
-    const incident = parseMotivePayload(payload);
-    await saveIncident(incident);
-    res.status(200).json({ received: true, incidentId: incident.id });
-  } catch (err) {
-    console.error('[NEXUS] Webhook error:', err.message);
-    res.status(500).json({ error: 'Processing failed' });
-  }
+app.post('/api/incidents/:id/status', wrap(async (req, res) => {
+  const { status, note, actor } = req.body || {};
+  if (!STATUSES.includes(status)) return res.status(400).json({ error: `status must be one of ${STATUSES.join(', ')}` });
+  await mutate(req, res, (inc) => {
+    inc.status = status;
+    if (status === 'resolved') inc.resolvedAt = new Date().toISOString();
+    addTimeline(inc, actor || (['en_route', 'on_scene'].includes(status) ? 'provider' : 'dispatcher'), status, note || `Status changed to ${status}`);
+  });
+}));
+
+app.post('/api/incidents/:id/notes', wrap(async (req, res) => {
+  const { note, actor } = req.body || {};
+  if (!note) return res.status(400).json({ error: 'note is required' });
+  await mutate(req, res, (inc) => { addTimeline(inc, actor || 'dispatcher', 'note', note); });
+}));
+
+app.get('/api/incidents/:id/warranty-packet', wrap(async (req, res) => {
+  const inc = await db.getIncident(req.params.id);
+  if (!inc) return res.status(404).json({ error: 'Incident not found' });
+  const pk = packet.build(inc);
+  if (!pk) return res.status(404).json({ error: 'No warranty data for this incident (VIN not decodable)' });
+  if (req.query.format === 'html') return res.type('html').send(packet.html(pk));
+  res.json(pk);
+}));
+
+app.post('/api/incidents/:id/warranty/submit', wrap(async (req, res) => {
+  const inc0 = await db.getIncident(req.params.id);
+  if (!inc0) return res.status(404).json({ error: 'Incident not found' });
+  if (!inc0.warranty || !inc0.warranty.claimPacket) return res.status(409).json({ error: 'No eligible warranty claim on this incident' });
+  await mutate(req, res, (inc) => {
+    inc.warranty.claimPacket.status = 'submitted';
+    addTimeline(inc, (req.body && req.body.actor) || 'fleet', 'warranty_submitted', `Warranty claim ${inc.warranty.claimId} submitted to ${inc.warranty.oem} ($${inc.warranty.claimPacket.estimatedValueUsd})`);
+  });
+}));
+
+// ─── Providers, fleets, analytics ─────────────────────────────────────────────
+app.get('/api/providers', (req, res) => {
+  const lat = req.query.lat != null ? parseFloat(req.query.lat) : null;
+  const lng = req.query.lng != null ? parseFloat(req.query.lng) : null;
+  let list = roadside.listNear(lat, lng, req.query.service || null);
+  if (req.query.limit) list = list.slice(0, parseInt(req.query.limit, 10));
+  res.json(list);
 });
 
-// ─── Dashboard API ────────────────────────────────────────────────────────────
-app.get('/api/incidents', async (req, res) => {
-  try {
-    const incidents = await getIncidents();
-    res.json({ incidents });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch incidents' });
-  }
+app.get('/api/fleets', (req, res) => res.json(roster.all().map(roster.publicFleet)));
+app.get('/api/fleets/:id/summary', wrap(async (req, res) => {
+  const s = await analytics.fleetSummary(req.params.id);
+  if (!s) return res.status(404).json({ error: 'Fleet not found' });
+  res.json(s);
+}));
+app.get('/api/fleets/:id/vehicles', (req, res) => {
+  const f = roster.getFleet(req.params.id);
+  if (!f) return res.status(404).json({ error: 'Fleet not found' });
+  res.json(f.vehicles.map((v) => ({ id: v.id, unit: v.unit, vin: v.vin, plate: v.plate, year: v.year, make: v.make, model: v.model, oem: v.oem, engine: v.engine, odometer_mi: v.odometer_mi, hasCamera: v.hasCamera, driverId: v.driverId, position: v.position, ...(req.query.trail ? { trail: seeder.vehicleTrail(v) } : {}) })));
 });
+app.get('/api/fleets/:id/drivers', wrap(async (req, res) => {
+  const f = roster.getFleet(req.params.id);
+  if (!f) return res.status(404).json({ error: 'Fleet not found' });
+  const incs = await db.listIncidents({ fleetId: f.id, since: new Date(Date.now() - 30 * 86400000).toISOString(), limit: 100000 });
+  res.json(analytics.driverRows(f, incs));
+}));
+app.get('/api/insurer/portfolio', wrap(async (req, res) => res.json(await analytics.portfolio())));
+app.get('/api/insurer/fleets/:id', wrap(async (req, res) => {
+  const d = await analytics.fleetDeepDive(req.params.id);
+  if (!d) return res.status(404).json({ error: 'Fleet not found' });
+  res.json(d);
+}));
 
-app.post('/api/incidents/:id/dispatch', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await updateIncidentStatus(id, 'dispatched');
-    console.log(`[NEXUS] Incident ${id} DISPATCHED`);
-    res.json({ success: true, incidentId: id, status: 'dispatched' });
-  } catch (err) {
-    res.status(500).json({ error: 'Dispatch failed' });
-  }
+// ─── SSE ──────────────────────────────────────────────────────────────────────
+app.get('/api/stream', (req, res) => stream.subscribe(req, res, { fleetId: req.query.fleetId }));
+
+// ─── Placeholder camera media ─────────────────────────────────────────────────
+app.get('/media/snap/:id/:type.svg', wrap(async (req, res) => {
+  const inc = await db.getIncident(req.params.id);
+  res.type('image/svg+xml').set('Cache-Control', 'public, max-age=300').send(media.frame(inc, req.params.type));
+}));
+
+// ─── Demo controls ────────────────────────────────────────────────────────────
+app.post('/api/demo/seed', wrap(async (req, res) => {
+  const reset = req.query.reset === '1' || req.query.reset === 'true' || (req.body && req.body.reset);
+  const r = await seeder.seed({ reset: !!reset });
+  res.json({ ok: true, ...r });
+}));
+
+app.post('/api/demo/simulate', wrap(async (req, res) => {
+  const b = req.body || {};
+  const name = b.scenario || 'random';
+  const rng = Math.random;
+  const sc = scenarios.scenarioSpec(name, rng, { fleetId: b.fleetId, vehicleId: b.vehicleId, timestamp: new Date().toISOString() });
+  const provider = b.provider && adapters[b.provider] ? b.provider : sc.fleet.vendor;
+  const payload = fixtures.build(provider, sc.spec);
+  const incident = await pipeline.ingest(provider, payload);
+  console.log(`[NEXUS] simulate ${sc.name} -> ${incident.id} ${provider} ${incident.fleetName}`);
+  res.json({ scenario: sc.name, provider, incident, payload });
+}));
+app.get('/api/demo/sample/:provider', (req, res) => {
+  if (!adapters[req.params.provider]) return res.status(404).json({ error: 'Unknown provider' });
+  res.json(fixtures.sample(req.params.provider, req.query.kind));
 });
+app.get('/api/demo/scenarios', (req, res) => res.json({ scenarios: scenarios.SCENARIOS, extra: ['speeding', 'harsh_brake', 'harsh_turn', 'distracted', 'following_distance', 'tire', 'battery'] }));
 
-app.post('/api/incidents/:id/dismiss', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await updateIncidentStatus(id, 'dismissed');
-    console.log(`[NEXUS] Incident ${id} dismissed`);
-    res.json({ success: true, incidentId: id, status: 'dismissed' });
-  } catch (err) {
-    res.status(500).json({ error: 'Dismiss failed' });
-  }
-});
-
-// ─── Debug — raw incident payload ─────────────────────────────────────────────
-app.get('/api/incidents/:id/raw', async (req, res) => {
-  try {
-    const incidents = await getIncidents();
-    const inc = incidents.find(i => i.id === req.params.id);
-    if (!inc) return res.status(404).json({ error: 'Not found' });
-    res.json({ id: inc.id, rawPayload: inc.rawPayload, videoUrl: inc.videoUrl, snapshots: inc.snapshots });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─── Test Endpoint ────────────────────────────────────────────────────────────
-app.post('/test/trigger-event', async (req, res) => {
-  const testPayload = {
-    id: `test-${Date.now()}`,
-    eventType: 'harsh_brake',
-    severity: 'high',
-    timestamp: new Date().toISOString(),
-    vehicle: {
-      vin: '1HGBH41JXMN109186',
-      make: 'Freightliner',
-      model: 'M2 106',
-      year: 2021,
-      licensePlate: 'AL-GTW-001'
-    },
-    driver: { id: 'DRV-001', name: 'Test Driver', phone: '+12055550001' },
-    location: { lat: 31.3271, lng: -85.8511, address: 'I-65 Northbound, Enterprise, AL 36330', speed_mph: 62 },
-    videoUrl: null,
-    fleetId: 'GOODYEAR-TEST',
-    customerName: 'Goodyear Towing',
-    customerLocation: 'Enterprise, AL'
-  };
-  const incident = { ...testPayload, id: testPayload.id, status: 'pending', receivedAt: new Date().toISOString() };
-  await saveIncident(incident);
-  console.log('[NEXUS] Test event triggered:', incident.id);
+// Legacy test trigger (kept): now fires a random scenario through the real adapters.
+app.post('/test/trigger-event', wrap(async (req, res) => {
+  const sc = scenarios.scenarioSpec('random', Math.random, { timestamp: new Date().toISOString() });
+  const incident = await pipeline.ingest(sc.fleet.vendor, fixtures.build(sc.fleet.vendor, sc.spec));
   res.json({ success: true, incident });
-});
+}));
 
 // ─── Samsara Debug ────────────────────────────────────────────────────────────
 app.get('/api/debug/samsara', async (req, res) => {
@@ -234,72 +311,38 @@ app.get('/api/debug/motive-safety/:eventId', async (req, res) => {
   res.json(results);
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function verifyMotiveSignature(rawBody, signature, secret) {
-  if (!signature) return false;
-  const hmac = crypto.createHmac('sha256', secret);
-  hmac.update(rawBody);
-  const expected = 'sha256=' + hmac.digest('hex');
-  try {
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  } catch { return false; }
-}
-
-function parseMotivePayload(payload) {
-  const event = payload.event || payload;
-  return {
-    id: `NX-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-    source: 'motive',
-    rawPayload: payload,
-    eventType: event.type || event.event_type || 'unknown',
-    severity: classifySeverity(event),
-    status: 'pending',
-    receivedAt: new Date().toISOString(),
-    timestamp: event.occurred_at || event.timestamp || new Date().toISOString(),
-    vehicle: {
-      vin: event.vehicle?.vin || event.vin || null,
-      make: event.vehicle?.make || null,
-      model: event.vehicle?.model || null,
-      year: event.vehicle?.year || null,
-      licensePlate: event.vehicle?.license_plate || null,
-      id: event.vehicle?.id || null
-    },
-    driver: {
-      id: event.driver?.id || null,
-      name: event.driver?.name || null,
-      phone: event.driver?.phone_number || null
-    },
-    location: {
-      lat: event.location?.lat || event.lat || null,
-      lng: event.location?.lon || event.location?.lng || event.lon || null,
-      address: event.location?.formatted_address || null,
-      speed_mph: event.speed_mph || null
-    },
-    videoUrl: event.video_url || event.dashcam_url || null,
-    fleetId: event.fleet_id || null,
-    customerName: 'Goodyear Towing',
-    customerLocation: 'Enterprise, AL'
-  };
-}
-
-function classifySeverity(event) {
-  const type = (event.type || event.event_type || '').toLowerCase();
-  if (type.includes('collision') || type.includes('accident') || type.includes('crash')) return 'critical';
-  if (type.includes('rollover') || type.includes('airbag')) return 'critical';
-  if (type.includes('harsh_brake') || type.includes('hard_brake')) return 'high';
-  if (type.includes('harsh_accel') || type.includes('harsh_turn')) return 'medium';
-  if (type.includes('speeding')) return 'low';
-  return 'unknown';
-}
+// ─── Error handling ───────────────────────────────────────────────────────────
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+app.use((req, res, next) => {
+  if (req.method === 'GET' && req.accepts('html') && !fs.existsSync(path.join(PUBLIC, 'index.html')) && req.path === '/') {
+    return res.type('html').send('<h1>Nexus Response</h1><p>Backend online. Portals: <a href="/dispatch/">dispatch</a> <a href="/fleet/">fleet</a> <a href="/insurer/">insurer</a>. API docs: docs/API.md. <a href="/health">/health</a></p>');
+  }
+  next();
+});
+app.use((err, req, res, next) => {
+  console.error('[NEXUS] Error:', err.stack || err.message);
+  if (res.headersSent) return;
+  res.status(err.status || (err instanceof SyntaxError ? 400 : 500)).json({ error: err instanceof SyntaxError ? 'Invalid JSON' : err.message || 'Internal error' });
+});
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`[NEXUS] Server running on port ${PORT}`);
-  console.log(`[NEXUS] Webhook endpoint: POST /webhook/motive`);
-  console.log(`[NEXUS] Dashboard API:    GET  /api/incidents`);
-  console.log(`[NEXUS] Test trigger:     POST /test/trigger-event`);
-  startPoller();
-  startSamsaraPoller();
-});
+async function boot() {
+  await db.listProviders(); // warm PG connection / schema
+  if (DEMO) {
+    const r = await seeder.seed({ reset: false });
+    console.log(`[NEXUS] Demo data ${r.skipped ? 'already present' : 'seeded'}: ${r.fleets} fleets, ${r.incidents} incidents`);
+  } else {
+    // still need rosters for enrichment; seed roster only (no incidents) when DEMO_MODE=0
+    roster.set(seeder.buildRoster());
+    const all = await db.listIncidents({ limit: 100000 });
+    pipeline.seedCounter(Math.max(10000, ...all.map((i) => parseInt(String(i.id).replace(/\D/g, ''), 10) || 0)));
+  }
+  await new Promise((resolve) => app.listen(PORT, resolve));
+  console.log(`[NEXUS] Server running on port ${PORT} (${db.usingPostgres() ? 'postgres' : 'in-memory'} store, demo ${DEMO ? 'ON' : 'OFF'})`);
+  console.log(`[NEXUS] Portals: / /dispatch/ /fleet/ /insurer/   API: /api/*   Webhooks: POST /webhook/{${Object.keys(adapters).join('|')}}`);
+  if (!DEMO || process.env.ENABLE_LEGACY_POLLERS === '1') { startPoller(); startSamsaraPoller(); }
+  else console.log('[NEXUS] Legacy Motive/Samsara pollers off in demo mode (set ENABLE_LEGACY_POLLERS=1 to enable)');
+}
+if (require.main === module) boot().catch((e) => { console.error('[NEXUS] Boot failed:', e); process.exit(1); });
 
 module.exports = app;

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexus Response — Insurer Portfolio</title>
+<link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/brand.css">
+<link rel="stylesheet" href="insurer.css">
+<script src="/shared/brand.js"></script>
+</head>
+<body>
+<div class="nx-app nx-app--nosidebar">
+  <div id="nx-topbar"></div>
+  <main class="nx-main" id="main">
+    <div id="view-portfolio">
+      <div class="nx-page-head">
+        <div>
+          <div class="nx-eyebrow">Carrier portal / Commercial fleet book</div>
+          <h1>Portfolio risk</h1>
+          <p>One comparable risk view across every policyholder, whichever telematics or camera vendor they run.</p>
+        </div>
+        <div class="nx-row ins-actions">
+          <span class="nx-dim nx-mono" id="asof"></span>
+          <button class="nx-btn nx-btn--primary" id="btn-csv" type="button">Download portfolio CSV</button>
+        </div>
+      </div>
+      <div id="err"></div>
+      <div class="nx-kpis" id="kpis"></div>
+
+      <div class="nx-grid ins-split">
+        <section class="nx-card">
+          <div class="nx-card__head"><h2 class="nx-card__title">Risk vs exposure</h2><span class="nx-dim ins-note">Bubble area = events, 30d</span></div>
+          <div class="nx-card__body" id="scatter"></div>
+        </section>
+        <section class="nx-card">
+          <div class="nx-card__head"><h2 class="nx-card__title">Risk-tier distribution</h2></div>
+          <div class="nx-card__body" id="dist"></div>
+        </section>
+      </div>
+
+      <section class="nx-card ins-gap" id="claims-card">
+        <div class="nx-card__head"><h2 class="nx-card__title">Claims intelligence</h2><span class="nx-dim ins-note" id="claims-note"></span></div>
+        <div class="nx-card__body" id="claims"></div>
+      </section>
+
+      <section class="nx-card ins-gap">
+        <div class="nx-card__head ins-wrap">
+          <h2 class="nx-card__title">Policyholders</h2>
+          <div class="ins-filters">
+            <input class="nx-input" id="q" type="search" placeholder="Search policyholder" aria-label="Search policyholders">
+            <select class="nx-select" id="f-vendor" aria-label="Filter by vendor"></select>
+            <select class="nx-select" id="f-tier" aria-label="Filter by tier"></select>
+          </div>
+        </div>
+        <div class="nx-card__body nx-card--flush"><div class="nx-table-wrap" id="table"></div></div>
+      </section>
+
+      <section class="nx-card ins-gap">
+        <div class="nx-card__head"><h2 class="nx-card__title">Across vendors</h2><span class="nx-dim ins-note">Same schema, same scoring, equal footing</span></div>
+        <div class="nx-card__body" id="vendors"></div>
+      </section>
+    </div>
+
+    <div id="view-dive" hidden></div>
+  </main>
+</div>
+<script>NX.theme.defaultTo('light'); NX.topbar('Insurer', { sidebar: false });</script>
+<script src="insurer.js"></script>
+</body>
+</html>

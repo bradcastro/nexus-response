@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 232 48" width="232" height="48" role="img" aria-label="Nexus Response">
+<style>.w{font:700 21px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.5px;fill:#0B1220}.s{fill:#FF6A1A}@media (prefers-color-scheme:dark){.w{fill:#EAF0F8}}</style>
+<g fill="none" stroke="#7F93AB" stroke-width="2.4" stroke-linecap="round"><path d="M9 11 L24 25"/><path d="M40 9 L24 25"/><path d="M42 33 L24 25"/><path d="M15 41 L24 25"/></g>
+<g fill="#7F93AB"><circle cx="9" cy="11" r="3.4"/><circle cx="40" cy="9" r="3.4"/><circle cx="42" cy="33" r="3.4"/><circle cx="15" cy="41" r="3.4"/></g>
+<circle cx="24" cy="25" r="10.5" fill="none" stroke="#FF6A1A" stroke-opacity=".35" stroke-width="1.6"/>
+<circle cx="24" cy="25" r="6" fill="#FF6A1A"/>
+<text class="w" x="58" y="22">NEXUS</text>
+<text class="w s" x="58" y="42" style="font-weight:500;font-size:15px;letter-spacing:3.2px">RESPONSE</text>
+</svg>
