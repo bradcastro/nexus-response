@@ -29,7 +29,8 @@ const STATUSES = ['pending', 'validating', 'dispatched', 'en_route', 'on_scene',
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
+// OSM tile servers reject requests with no Referer, so keep the origin on cross-origin requests
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
 app.use(cors());
 // Keep the raw body for webhook HMAC verification.
 app.use(express.json({ limit: '2mb', verify: (req, res, buf) => { req.rawBody = buf; } }));

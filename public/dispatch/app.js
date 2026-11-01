@@ -223,7 +223,8 @@
     S._bounds = bounds;
   }
   function focusSelection() {
-    if (!map || !S._bounds) return;
+    if (!map) return;
+    if (!S._bounds || !S._bounds.length) return fitAll();
     if (S._bounds.length > 1) map.fitBounds(L.latLngBounds(S._bounds).pad(0.3), { maxZoom: 14, animate: true });
     else map.setView(S._bounds[0], Math.max(map.getZoom(), 12), { animate: true });
   }
