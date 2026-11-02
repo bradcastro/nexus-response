@@ -1,4 +1,18 @@
-# Nexus Response — Webhook Receiver
+# Nexus Response
+
+One platform that ingests events from any telematics or camera vendor (Motive, Samsara, Geotab, Lytx, Mantis), normalizes them, and gives dispatch, fleets and insurers one view of incidents, roadside, OEM warranty claims and risk. **Demo data only: every fleet, driver, dealer and outbound action is invented or simulated.**
+
+## Live demo
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/bradcastro/nexus-webhook/tree/poc-mantis-demo)
+
+Click the button, sign in to Render, and press **Apply** (free plan). In a few minutes you get a public URL. The launcher at `/` links to the Dispatch, Fleet, Insurer and Onboarding portals. Data lives in memory and reseeds on restart; the free plan sleeps after inactivity, so the first load can take about 30 seconds.
+
+Run locally instead: `npm install && npm start`, then open http://localhost:3000. See `docs/DEPLOY.md` and `docs/ARCHITECTURE.md`.
+
+---
+
+# Webhook Receiver (original notes)
 
 Telematics event ingestion layer for the Nexus Response platform.
 Receives First Responder and safety events from Motive (and future providers),

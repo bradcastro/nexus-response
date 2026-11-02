@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: nexus-response-demo
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DEMO_MODE
+        value: "1"
+      - key: REQUIRE_AUTH
+        value: "0"
