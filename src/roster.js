@@ -11,6 +11,9 @@ function set(f) {
   }
 }
 const all = () => fleets;
+function reindex() { set(fleets); }
+function addFleet(f) { fleets = fleets.filter((x) => x.id !== f.id).concat([f]); set(fleets); return f; }
+function removeFleet(id) { fleets = fleets.filter((x) => x.id !== id); set(fleets); }
 const getFleet = (id) => fleets.find((f) => f.id === id) || null;
 const getVehicle = (id) => vehById.get(id) || null;
 const getDriver = (id) => drvById.get(id) || null;
@@ -18,5 +21,5 @@ const findVehicle = (provider, vin, provId) => (vin && byVin.get(vin)) || (provI
 const findDriver = (provider, provId, name) => (provId && drvByProv.get(`${provider}:${provId}`)) || (name && fleets.flatMap((f) => f.drivers).find((d) => d.name === name)) || null;
 const defaultFleetForProvider = (p) => fleets.find((f) => f.vendor === p) || fleets[0] || null;
 const fleetByCompany = (company) => (company && fleets.find((f) => f.companyId === company)) || null;
-const publicFleet = (f) => ({ id: f.id, name: f.name, vendor: f.vendor, vehicles: f.vehicles.length, drivers: f.drivers.length, region: f.region, home: f.home, cameraCoveragePct: Math.round((100 * f.vehicles.filter((v) => v.hasCamera).length) / f.vehicles.length) });
-module.exports = { set, all, getFleet, getVehicle, getDriver, findVehicle, findDriver, defaultFleetForProvider, fleetByCompany, publicFleet };
+const publicFleet = (f) => ({ id: f.id, name: f.name, vendor: f.vendor, onboarding: f.onboarding || { status: 'demo' }, vehicles: f.vehicleCount || f.vehicles.length, drivers: f.drivers.length, region: f.region, home: f.home, cameraCoveragePct: f.vehicles.length ? Math.round((100 * f.vehicles.filter((v) => v.hasCamera).length) / f.vehicles.length) : 0 });
+module.exports = { reindex, addFleet, removeFleet, set, all, getFleet, getVehicle, getDriver, findVehicle, findDriver, defaultFleetForProvider, fleetByCompany, publicFleet };

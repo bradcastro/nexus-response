@@ -356,6 +356,44 @@ code, kbd, .nx-mono { font-family: var(--nx-font-mono); font-size: .92em; }
 .nx-pulse-critical { animation: nx-pulse-c 1.6s ease-in-out infinite; }
 @keyframes nx-pulse-c { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--nx-sev-critical) 30%, transparent); } }
 
+
+/* ---------- v3 components: stepper, dropzone, progress, stat-delta, alert-card ---------- */
+.nx-stepper { display: flex; gap: 0; list-style: none; margin: 0; padding: 0; counter-reset: nxs; }
+.nx-stepper__step { flex: 1; position: relative; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0; counter-increment: nxs; color: var(--nx-text-faint); font: 500 var(--nx-text-sm)/1.2 var(--nx-font-ui); min-width: 0; }
+.nx-stepper__step::before { content: counter(nxs); flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 13px var(--nx-font-mono); border: 1px solid var(--nx-border-strong); background: var(--nx-surface-2); }
+.nx-stepper__step::after { content: ""; flex: 1; height: 1px; background: var(--nx-border-strong); min-width: 12px; }
+.nx-stepper__step:last-child::after { display: none; }
+.nx-stepper__step.is-active { color: var(--nx-text); } .nx-stepper__step.is-active::before { border-color: var(--nx-accent); background: var(--nx-accent); color: var(--nx-accent-ink); box-shadow: var(--nx-glow); }
+.nx-stepper__step.is-done { color: var(--nx-text-dim); } .nx-stepper__step.is-done::before { content: "\2713"; border-color: var(--nx-ok); color: var(--nx-ok); background: color-mix(in srgb, var(--nx-ok) 14%, transparent); }
+.nx-stepper__step.is-done::after { background: var(--nx-ok); }
+.nx-stepper__label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nx-dropzone { display: grid; justify-items: center; gap: 6px; padding: 32px 20px; text-align: center; border: 1.5px dashed var(--nx-border-strong); border-radius: var(--nx-radius-lg); background: var(--nx-surface-2); color: var(--nx-text-dim); cursor: pointer; transition: all var(--nx-dur-fast); }
+.nx-dropzone:hover, .nx-dropzone.is-over { border-color: var(--nx-accent); background: color-mix(in srgb, var(--nx-accent) 8%, var(--nx-surface-2)); color: var(--nx-text); }
+.nx-dropzone.has-file { border-style: solid; border-color: var(--nx-ok); }
+.nx-dropzone__title { font: 600 var(--nx-text-lg)/1.2 var(--nx-font-display); text-transform: uppercase; letter-spacing: .03em; color: var(--nx-text); }
+.nx-dropzone input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.nx-progress { height: 8px; border-radius: 8px; background: var(--nx-surface-3); overflow: hidden; position: relative; }
+.nx-progress > i { display: block; height: 100%; width: var(--p, 0%); background: var(--c, var(--nx-accent)); border-radius: 8px; transition: width var(--nx-dur-slow) var(--nx-ease); }
+.nx-progress--indeterminate > i { width: 35%; animation: nx-indet 1.2s ease-in-out infinite; }
+.nx-progress--ok { --c: var(--nx-ok); } .nx-progress--danger { --c: var(--nx-danger); }
+@keyframes nx-indet { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+.nx-stat-delta { display: inline-flex; align-items: center; gap: 4px; font: 500 var(--nx-text-xs)/1 var(--nx-font-mono); font-variant-numeric: tabular-nums; color: var(--nx-text-dim); }
+.nx-stat-delta::before { content: "\25AC"; font-size: 9px; }
+.nx-stat-delta.is-up::before { content: "\25B2"; } .nx-stat-delta.is-down::before { content: "\25BC"; }
+/* is-good / is-bad set meaning independent of direction (risk up = bad, savings up = good) */
+.nx-stat-delta.is-good { color: var(--nx-ok); } .nx-stat-delta.is-bad { color: var(--nx-sev-critical); }
+.nx-alert-card { --c: var(--nx-sev-high); position: relative; display: grid; gap: 8px; padding: 14px 16px 14px 18px; background: var(--nx-surface); border: 1px solid var(--nx-border); border-radius: var(--nx-radius-lg); overflow: hidden; }
+.nx-alert-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+.nx-alert-card--critical { --c: var(--nx-sev-critical); } .nx-alert-card--high { --c: var(--nx-sev-high); } .nx-alert-card--medium { --c: var(--nx-sev-medium); } .nx-alert-card--low { --c: var(--nx-sev-low); }
+.nx-alert-card__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.nx-alert-card__title { font: 600 var(--nx-text-lg)/1.2 var(--nx-font-display); letter-spacing: .02em; text-transform: uppercase; }
+.nx-alert-card__why { margin: 0; padding-left: 16px; color: var(--nx-text-dim); font-size: var(--nx-text-sm); }
+.nx-alert-card__prob { margin-left: auto; font: 600 var(--nx-text-md)/1 var(--nx-font-mono); color: var(--c); }
+.nx-alert-card__actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+.nx-alert-card.is-new { animation: nx-flash 2.4s var(--nx-ease); }
+.nx-badge--mantis { --c: var(--nx-accent); }
+@media (max-width: 640px) { .nx-stepper__label { display: none; } .nx-stepper__step.is-active .nx-stepper__label { display: block; } }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) { .nx-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .nx-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
@@ -369,9 +407,14 @@ code, kbd, .nx-mono { font-family: var(--nx-font-mono); font-size: .92em; }
   .nx-main { padding: var(--nx-sp-4); }
   .nx-grid--2, .nx-grid--3, .nx-grid--4 { grid-template-columns: minmax(0, 1fr); }
   .nx-brand__name { display: none; }
-  .nx-switcher a { padding: 5px 8px; }
+  .nx-switcher a { padding: 5px 6px; font-size: 12px; }
   .nx-live__text { display: none; }
-  .nx-topbar { gap: var(--nx-sp-2); }
+  .nx-topbar { gap: var(--nx-sp-2); padding: 0 var(--nx-sp-3); min-width: 0; }
+  .nx-switcher { min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; }
+  .nx-switcher::-webkit-scrollbar { display: none; }
+  .nx-switcher a { flex: none; }
+  .nx-portal-name { display: none; }
+  .nx-topbar__right { gap: var(--nx-sp-2); flex: none; }
   .nx-modal-backdrop { align-items: end; padding: 0; }
   .nx-modal { border-radius: var(--nx-radius-lg) var(--nx-radius-lg) 0 0; max-height: 92vh; }
 }

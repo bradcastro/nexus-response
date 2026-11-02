@@ -17,4 +17,13 @@ function publish(incident, change = 'update') {
     c.res.write(`id: ${seq}\nevent: incident\ndata: ${payload}\n\n`);
   }
 }
-module.exports = { subscribe, publish, count: () => clients.size };
+// generic named event (e.g. 'alert') for other modules
+function publishEvent(name, data, filter = {}) {
+  seq++;
+  const payload = JSON.stringify(data);
+  for (const c of clients) {
+    if (c.filter.fleetId && filter.fleetId && c.filter.fleetId !== filter.fleetId) continue;
+    c.res.write(`id: ${seq}\nevent: ${name}\ndata: ${payload}\n\n`);
+  }
+}
+module.exports = { publishEvent, subscribe, publish, count: () => clients.size };

@@ -16,6 +16,7 @@
   <aside class="nx-sidebar" id="side">
     <div class="nx-eyebrow nx-sidebar__label">Fleet portal</div>
     <button class="nx-nav is-active" data-view="overview">Overview</button>
+    <button class="nx-nav" data-view="predict">Ahead of risk <span class="nx-nav__count" id="cnt-pred">0</span></button>
     <button class="nx-nav" data-view="incidents">Incidents <span class="nx-nav__count" id="cnt-inc">0</span></button>
     <button class="nx-nav" data-view="warranty">Warranty claims <span class="nx-nav__count" id="cnt-war">0</span></button>
     <button class="nx-nav" data-view="drivers">Drivers <span class="nx-nav__count" id="cnt-drv">0</span></button>
@@ -29,8 +30,10 @@
       <div class="fl-head-right"><span id="source-badge"></span>
         <label class="nx-sr" for="fleet-select">Fleet</label><select class="nx-select" id="fleet-select"></select></div>
     </div>
+    <div id="onboard" class="fl-onboard" hidden></div>
     <div id="error" class="nx-hide"></div>
     <section data-section="overview" id="v-overview"></section>
+    <section data-section="predict" id="v-predict" hidden></section>
     <section data-section="incidents" id="v-incidents" hidden></section>
     <section data-section="warranty" id="v-warranty" hidden></section>
     <section data-section="drivers" id="v-drivers" hidden></section>

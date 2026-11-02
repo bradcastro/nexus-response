@@ -182,7 +182,7 @@
   };
 
   /* ---------------- topbar ---------------- */
-  var PORTALS = [['Dispatch', '/dispatch/'], ['Fleet', '/fleet/'], ['Insurer', '/insurer/']];
+  var PORTALS = [['Dispatch', '/dispatch/'], ['Fleet', '/fleet/'], ['Insurer', '/insurer/'], ['Onboarding', '/onboarding/']];
   // NX.topbar('Dispatch', {mount:'#nx-topbar'|Element, sidebar:true, live:true, right:[Node...]}) -> <header class="nx-topbar">
   // Mounts by replacing #nx-topbar, else prepends to .nx-app, else body.
   NX.topbar = function (portalName, opts) {

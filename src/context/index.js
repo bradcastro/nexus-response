@@ -13,6 +13,8 @@ const YARDS = {
   fleet_goodyear: { name: 'Goodyear Towing Yard', address: 'Enterprise, AL', lat: 31.3152, lng: -85.8552 },
   fleet_piedmont: { name: 'Piedmont Logistics Terminal', address: '5100 Statesville Rd, Charlotte, NC', lat: 35.2702, lng: -80.8502 },
   fleet_bluegrass: { name: 'Bluegrass Dairy Transport Terminal', address: 'Lexington, KY', lat: 38.0406, lng: -84.5037 },
+  fleet_redline: { name: 'Redline Regional Terminal', address: 'Nashville, TN', lat: 36.16, lng: -86.78 },
+  fleet_magnolia: { name: 'Magnolia Beverage Distribution Center', address: 'Jackson, MS', lat: 32.3, lng: -90.18 },
   fleet_summit: { name: 'Summit Last-Mile Hub', address: 'Atlanta, GA', lat: 33.8, lng: -84.4 },
 };
 const iso = (ms) => new Date(ms).toISOString();

@@ -21,7 +21,7 @@ const compact = (a) => a.filter(Boolean);
 
 function skeleton(provider, id, ts) {
   return {
-    provider, providerEventId: id != null ? String(id) : null, eventType: 'other', timestamp: ts ? new Date(ts).toISOString() : new Date().toISOString(),
+    provider, providerEventId: id != null ? String(id) : null, eventType: 'other', timestamp: (() => { if (!ts) return new Date().toISOString(); const d = new Date(ts); return isNaN(d) ? null : d.toISOString(); })(),
     vehicle: {}, driver: {}, location: {}, trail: [],
     camera: { provider, verified: false, aiVerdict: 'no_video', confidence: 0, clips: [], snapshots: [], signals: [] },
     diagnostics: null, _dtcRaw: [], _hints: {}, raw: null,

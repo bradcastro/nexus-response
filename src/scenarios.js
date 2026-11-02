@@ -26,7 +26,7 @@ function pickDtcs(rng, cls, group) {
   return out;
 }
 
-const TYPE_W = [['collision', 10, 'collision'], ['rollover', 0.35, 'collision'], ['harsh_brake', 16, 'harsh'], ['harsh_accel', 6, 'harsh'], ['harsh_turn', 7, 'harsh'], ['speeding', 14, 'speeding'], ['distracted', 10, 'distraction'], ['following_distance', 8, 'distraction'], ['fault_code', 16, 'diag'], ['breakdown', 4, 'diag'], ['tire', 6, 'diag'], ['battery', 4, 'diag']];
+const TYPE_W = [['collision', 19, 'collision'], ['rollover', 0.35, 'collision'], ['harsh_brake', 16, 'harsh'], ['harsh_accel', 6, 'harsh'], ['harsh_turn', 7, 'harsh'], ['speeding', 14, 'speeding'], ['distracted', 10, 'distraction'], ['following_distance', 8, 'distraction'], ['fault_code', 16, 'diag'], ['breakdown', 4, 'diag'], ['tire', 6, 'diag'], ['battery', 4, 'diag']];
 const pickType = (rng, profile) => weighted(rng, TYPE_W.map(([t, w, k]) => [t, w * (profile[k] || 1)]));
 
 const pickLoc = (rng, regions) => { const pool = LOCATIONS.filter((l) => l.r.some((x) => regions.includes(x))); return pick(rng, pool.length ? pool : LOCATIONS); };
@@ -42,7 +42,7 @@ function makeSpec(rng, fleet, vehicle, type, o = {}) {
   else if (type === 'collision' || type === 'rollover') speed = int(rng, 28, 68);
   else if (stationary) speed = type === 'breakdown' ? int(rng, 0, 12) : int(rng, 0, 62);
   else speed = int(rng, 34, 66);
-  const hasCamera = o.hasCamera != null ? o.hasCamera : vehicle.hasCamera && !stationary;
+  const hasCamera = o.hasCamera != null ? o.hasCamera : vehicle.hasCamera && (!stationary || fleet.vendor === 'mantis');
   let gForce = o.gForce, airbag = o.airbag, aiLabel = o.aiLabel, aiConfidence = o.aiConfidence, roadSurface = o.roadSurface;
   const mlVendor = fleet.vendor === 'lytx' ? 1 : fleet.vendor === 'samsara' ? 0.6 : fleet.vendor === 'motive' ? 0.5 : 0.3;
   if (gForce === undefined) {
@@ -55,6 +55,25 @@ function makeSpec(rng, fleet, vehicle, type, o = {}) {
     else if (type === 'harsh_turn') gForce = round(range(rng, 0.4, 0.75), 2);
     else if (type === 'harsh_accel') gForce = round(range(rng, 0.35, 0.6), 2);
     else gForce = null;
+  }
+  const isMantis = fleet.vendor === 'mantis';
+  const distractionKind = type === 'distracted' ? (o.distractionKind || pick(rng, ['phone', 'phone', 'drowsy', 'drowsy', 'smoking'])) : undefined;
+  const otherKind = type === 'other' ? (o.otherKind || pick(rng, ['seatbelt', 'lane'])) : undefined;
+  let mantis;
+  if (isMantis && hasCamera) {
+    const fp = aiLabel === 'false_positive';
+    mantis = {
+      followS: round(type === 'following_distance' ? range(rng, 0.4, 0.95) : type === 'harsh_brake' ? range(rng, 0.7, 1.4) : range(rng, 1.6, 3.4), 1),
+      drowsiness: round(distractionKind === 'drowsy' ? range(rng, 0.65, 0.97) : range(rng, 0.02, 0.28), 2),
+      phone: distractionKind === 'phone', smoking: distractionKind === 'smoking', seatbelt: otherKind !== 'seatbelt',
+      laneDeparture: otherKind === 'lane' || (type === 'collision' && !fp && rng() < 0.25),
+      fcw: !fp && (type === 'collision' || (type === 'following_distance' && rng() < 0.5) || (type === 'harsh_brake' && rng() < 0.55)),
+      eyesOff: round(distractionKind === 'phone' ? range(rng, 2.2, 5.5) : distractionKind === 'drowsy' ? range(rng, 1.5, 3.5) : range(rng, 0.2, 1.1), 1),
+    };
+    if (aiLabel == null || !['false_positive'].includes(aiLabel)) {
+      aiLabel = type === 'collision' || type === 'rollover' ? 'confirmed_collision' : type === 'distracted' ? 'distraction' : (type === 'harsh_brake' || type === 'following_distance') ? 'near_miss' : 'confirmed_event';
+    }
+    aiConfidence = aiConfidence != null && aiLabel === 'false_positive' ? aiConfidence : round(range(rng, 0.9, 0.99), 2);
   }
   let dtcs = o.dtcs;
   if (!dtcs && (type === 'fault_code' || type === 'breakdown')) {
@@ -72,7 +91,7 @@ function makeSpec(rng, fleet, vehicle, type, o = {}) {
     hasCamera, driverFacing: hasCamera,
     odometer_mi: o.odometer_mi != null ? o.odometer_mi : Math.max(1000, Math.round(vehicle.odometer_mi - ageDays * mpd)),
     engineHours: Math.round((o.odometer_mi != null ? o.odometer_mi : vehicle.odometer_mi - ageDays * mpd) / (heavy ? 38 : 28)),
-    dtcs, faultLamp: dtcs ? true : false,
+    dtcs, faultLamp: dtcs ? true : false, mantis, distractionKind, otherKind,
   };
 }
 
@@ -86,7 +105,7 @@ function inWarrantyFor(v, cat, at = new Date()) {
 }
 
 function scenarioSpec(name, rng, o = {}) {
-  const fleets = roster.all();
+  const fleets = roster.all().filter((f) => !f.custom && f.vehicles.length);
   let fleet = o.fleetId ? roster.getFleet(o.fleetId) : null;
   const withVeh = (f, pred) => vehiclesOf(f, pred);
   const ts = o.timestamp || new Date().toISOString();

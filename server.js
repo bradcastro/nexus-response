@@ -6,6 +6,8 @@ const path = require('path');
 const fs = require('fs');
 
 const db = require('./db');
+const ingest = require('./src/ingest');
+const ingestLog = require('./src/ingest/log');
 const adapters = require('./src/adapters');
 const pipeline = require('./src/pipeline');
 const stream = require('./src/stream');
@@ -35,29 +37,33 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
 app.use(cors());
 // Keep the raw body for webhook HMAC verification.
-app.use(express.json({ limit: '2mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
+app.use(express.json({ limit: '30mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 
 // ─── Static portals ───────────────────────────────────────────────────────────
 const PUBLIC = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC, { extensions: ['html'] }));
 
 // ─── Health + legacy dashboard + config ───────────────────────────────────────
-app.get('/health', wrap(async (req, res) => res.json({ status: 'online', service: 'Nexus Response', version: '2.0.0', demoMode: DEMO, store: db.usingPostgres() ? 'postgres' : 'memory', incidents: await db.countIncidents(), sseClients: stream.count(), timestamp: new Date().toISOString() })));
+app.get('/health', wrap(async (req, res) => res.json({ status: 'online', service: 'Nexus Response', version: '2.0.0', demoMode: DEMO, store: db.usingPostgres() ? 'postgres' : 'memory', requireAuth: process.env.REQUIRE_AUTH === '1', incidents: await db.countIncidents(), sseClients: stream.count(), timestamp: new Date().toISOString() })));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/api/config', (req, res) => res.json({ mapsKey: process.env.GOOGLE_MAPS_KEY || null, mapboxToken: process.env.MAPBOX_TOKEN || null, demoMode: DEMO, providers: Object.keys(adapters) }));
 
-// ─── Webhooks (all vendors) ───────────────────────────────────────────────────
-app.post('/webhook/:provider', wrap(async (req, res) => {
-  const provider = req.params.provider.toLowerCase();
-  const adapter = adapters[provider];
-  if (!adapter) return res.status(404).json({ error: `Unknown provider '${provider}'`, supported: Object.keys(adapters) });
-  const v = adapter.verify(req);
-  if (!v.ok) { console.warn(`[NEXUS] ${provider} signature verification failed`); return res.status(401).json({ error: 'Invalid signature' }); }
-  if (!req.body || typeof req.body !== 'object' || !Object.keys(req.body).length) return res.status(400).json({ error: 'Empty or non-JSON body' });
-  const incident = await pipeline.ingest(provider, req.body);
-  console.log(`[NEXUS] ${provider} webhook -> ${incident.id} ${incident.eventType} (${incident.severity})`);
-  res.status(200).json({ received: true, incidentId: incident.id, incident });
-}));
+// ─── Webhooks, batch ingest, ingest log/health/replay (src/ingest) ───────────
+app.use(ingest.router);
+const onboarding = require('./src/onboarding');
+const importer = require('./src/importer');
+const assess = require('./src/assess');
+app.use(onboarding.router);
+app.use(importer.router);
+app.use(assess.router);
+const opsMod = require('./src/ops');
+app.use(opsMod.router);
+app.use(require('./src/insurer').router);
+// pages for link-based, no-login views (other agents own the HTML)
+for (const [route, dir] of [['/job/:token', 'job'], ['/report/:token', 'report']]) app.get(route, (req, res, next) => { const f = path.join(PUBLIC, dir, 'index.html'); fs.existsSync(f) ? res.sendFile(f) : next(); });
+// Predictive risk router (owned by the predict agent). Optional: the server runs without it.
+try { app.use('/api/predict', require('./src/routes/predict')); console.log('[NEXUS] predict router mounted at /api/predict'); }
+catch (e) { if (e.code !== 'MODULE_NOT_FOUND' || !/routes\/predict|predict/.test(e.message)) console.error('[NEXUS] predict router failed to load:', e.message); }
 
 // ─── Incidents ────────────────────────────────────────────────────────────────
 const addTimeline = db.addTimeline;
@@ -69,9 +75,11 @@ async function mutate(req, res, fn) {
 }
 
 app.get('/api/incidents', wrap(async (req, res) => {
-  const { fleetId, status, category, provider, since } = req.query;
+  const { fleetId, status, category, provider, since, source } = req.query;
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
-  res.json({ incidents: await db.listIncidents({ fleetId, status, category, provider, since, limit }) });
+  // historical imports are hidden from global lists unless a fleet/source is requested explicitly
+  const notSource = !fleetId && !source && req.query.includeImported !== '1' ? 'historical_import' : undefined;
+  res.json({ incidents: await db.listIncidents({ fleetId, status, category, provider, since, limit, source, notSource }) });
 }));
 
 app.get('/api/incidents/:id', wrap(async (req, res) => {
@@ -97,7 +105,7 @@ app.post('/api/incidents/:id/dispatch', wrap(async (req, res) => {
   let notFoundProvider = false;
   const inc0 = await db.getIncident(req.params.id);
   if (!inc0) return res.status(404).json({ error: 'Incident not found' });
-  await mutate(req, res, (inc) => {
+  await mutate(req, res, async (inc) => {
     const rs = inc.roadside || (inc.roadside = { needed: false, serviceType: 'none', recommendedProvider: null, assignedProvider: null, etaMin: null });
     let chosen = rs.recommendedProvider;
     if (providerId) {
@@ -106,8 +114,14 @@ app.post('/api/incidents/:id/dispatch', wrap(async (req, res) => {
       if (p) chosen = { id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st };
     }
     rs.assignedProvider = chosen ? { ...chosen } : null;
+    const td = req.body && req.body.towDestination;
+    if (td && typeof td === 'object' && td.name) {
+      rs.towDestination = { kind: td.kind || 'nearest_shop', name: td.name, address: td.address || null, lat: td.lat != null ? td.lat : null, lng: td.lng != null ? td.lng : null, distanceMi: td.distanceMi != null ? td.distanceMi : null };
+      addTimeline(inc, actor || 'dispatcher', 'tow_destination', `Tow destination set: ${td.name}${td.distanceMi ? ` (${td.distanceMi} mi)` : ''}`);
+    }
     if (chosen) rs.etaMin = chosen.etaMin;
     inc.status = 'dispatched';
+    if (chosen) { const jl = await opsMod.createJob(inc, chosen, actor, req); if (jl) { inc.jobLink = jl; addTimeline(inc, actor || 'dispatcher', 'job_link_sent', `Job link ${jl.url} texted to ${chosen.name} (simulated)`); } }
     addTimeline(inc, actor || 'dispatcher', 'dispatched', `${chosen ? `Dispatched ${chosen.name} (${rs.serviceType}${chosen.etaMin ? `, ETA ${chosen.etaMin} min` : ''})` : 'Marked dispatched (no roadside provider)'}${note ? ' - ' + note : ''}`);
   });
 }));
@@ -140,16 +154,6 @@ app.get('/api/incidents/:id/warranty-packet', wrap(async (req, res) => {
   if (!pk) return res.status(404).json({ error: 'No warranty data for this incident (VIN not decodable)' });
   if (req.query.format === 'html') return res.type('html').send(packet.html(pk));
   res.json(pk);
-}));
-
-app.post('/api/incidents/:id/warranty/submit', wrap(async (req, res) => {
-  const inc0 = await db.getIncident(req.params.id);
-  if (!inc0) return res.status(404).json({ error: 'Incident not found' });
-  if (!inc0.warranty || !inc0.warranty.claimPacket) return res.status(409).json({ error: 'No eligible warranty claim on this incident' });
-  await mutate(req, res, (inc) => {
-    inc.warranty.claimPacket.status = 'submitted';
-    addTimeline(inc, (req.body && req.body.actor) || 'fleet', 'warranty_submitted', `Warranty claim ${inc.warranty.claimId} submitted to ${inc.warranty.oem} ($${inc.warranty.claimPacket.estimatedValueUsd})`);
-  });
 }));
 
 // ─── Providers, fleets, analytics ─────────────────────────────────────────────
@@ -342,24 +346,38 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use((err, req, res, next) => {
-  console.error('[NEXUS] Error:', err.stack || err.message);
+app.use(async (err, req, res, next) => {
   if (res.headersSent) return;
+  const isHook = req.path.startsWith('/webhook/');
+  if (err.type === 'entity.too.large') {
+    if (isHook) await ingestLog.record({ provider: req.path.split('/')[2], status: 'rejected', error: 'payload too large', statusCode: 413 }).catch(() => {});
+    return res.status(413).json({ error: 'payload_too_large', message: 'Request body exceeds the 30MB limit' });
+  }
+  if (err instanceof SyntaxError && isHook) {
+    const raw = req.rawBody ? req.rawBody.toString('utf8').slice(0, 20000) : null;
+    const entry = await ingestLog.record({ provider: req.path.split('/')[2], status: 'rejected', error: 'malformed JSON: ' + err.message, statusCode: 400, rawBody: raw, payloadBytes: req.rawBody ? req.rawBody.length : 0, auth: 'unknown' }).catch(() => ({}));
+    return res.status(400).json({ error: 'malformed_json', message: err.message, logId: entry.id });
+  }
+  console.error('[NEXUS] Error:', err.stack || err.message);
   res.status(err.status || (err instanceof SyntaxError ? 400 : 500)).json({ error: err instanceof SyntaxError ? 'Invalid JSON' : err.message || 'Internal error' });
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function boot() {
-  await db.listProviders(); // warm PG connection / schema
+  await db.listProviders(); // warm PG connection / run migrations
+  const restored = await onboarding.loadPersisted();
+  if (restored) console.log(`[NEXUS] restored ${restored} onboarded fleet(s) from the database`);
+  await importer.bootRecover();
   if (DEMO) {
     const r = await seeder.seed({ reset: false });
     console.log(`[NEXUS] Demo data ${r.skipped ? 'already present' : 'seeded'}: ${r.fleets} fleets, ${r.incidents} incidents`);
   } else {
     // still need rosters for enrichment; seed roster only (no incidents) when DEMO_MODE=0
     roster.set(seeder.buildRoster());
-    const all = await db.listIncidents({ limit: 100000 });
-    pipeline.seedCounter(Math.max(10000, ...all.map((i) => parseInt(String(i.id).replace(/\D/g, ''), 10) || 0)));
+    const all = await db.listIncidents({ limit: 100000, clone: false });
+    pipeline.seedCounter(Math.max(10000, ...all.map((i) => { const m = /^NX-(\d+)$/.exec(i.id); return m ? +m[1] : 0; })));
   }
+  try { const pr = require('./src/predict'); if (pr && typeof pr.onBoot === 'function') await pr.onBoot({ db, roster, pipeline, stream }); } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') console.error('[NEXUS] predict onBoot failed:', e.message); }
   await new Promise((resolve) => app.listen(PORT, resolve));
   console.log(`[NEXUS] Server running on port ${PORT} (${db.usingPostgres() ? 'postgres' : 'in-memory'} store, demo ${DEMO ? 'ON' : 'OFF'})`);
   console.log(`[NEXUS] Portals: / /dispatch/ /fleet/ /insurer/   API: /api/*   Webhooks: POST /webhook/{${Object.keys(adapters).join('|')}}`);

@@ -15,6 +15,13 @@
 <div class="nx-app nx-app--nosidebar">
   <div id="nx-topbar"></div>
   <main class="nx-main" id="main">
+    <nav class="ins-nav nx-no-print" id="ins-nav" aria-label="Insurer sections">
+      <a href="#" data-nav="digest">Digest</a>
+      <a href="#portfolio" data-nav="portfolio">Portfolio</a>
+      <a href="#projections" data-nav="projections">Projections</a>
+      <a href="#assess" data-nav="assess">Assess a new fleet</a>
+      <a href="#assessments" data-nav="assessments">Assessments</a>
+    </nav>
     <div id="view-portfolio">
       <div class="nx-page-head">
         <div>
@@ -69,5 +76,6 @@
 </div>
 <script>NX.theme.defaultTo('light'); NX.topbar('Insurer', { sidebar: false });</script>
 <script src="insurer.js"></script>
+<script src="insurer-v3.js"></script>
 </body>
 </html>

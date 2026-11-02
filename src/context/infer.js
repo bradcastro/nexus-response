@@ -110,7 +110,8 @@ function inferContents(input) {
   const tt = trailer && trailer.type;
   if (tt === 'reefer' && trailer.reefer) {
     const sp = trailer.reefer.setpointF;
-    cat = sp <= 10 ? 'frozen_food' : 'perishable_food'; tempSens = true; reeferRunning = trailer.reefer.unitRunning; conf += 0.4;
+    cat = sp <= 10 ? 'frozen_food' : 'perishable_food'; tempSens = true;
+    if (src && src.contentHint === 'beverage') { cat = 'beverage'; basis.push(`${via}: ${src.businessName} (beverage bottler/distributor) + temperature-controlled box => chilled beverages`); } reeferRunning = trailer.reefer.unitRunning; conf += 0.4;
     basis.push(`Reefer unit ${trailer.reefer.unitRunning ? 'running' : 'NOT running'} at ${sp}F => ${cat === 'frozen_food' ? 'frozen' : 'chilled'} product`);
     if (sType && ['food_distributor', 'cold_storage'].includes(sType)) { conf += 0.2; basis.push(`${via}: ${src.businessName} (${sType}) => food cold chain`); }
   } else if (tt === 'tanker') {

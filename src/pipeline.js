@@ -7,6 +7,21 @@ const db = require('../db');
 const stream = require('./stream');
 const { rngFrom, round } = require('./util');
 
+const listeners = [];
+const onIncident = (fn) => { listeners.push(fn); };
+function deriveSignals(inc) {
+  const h = inc._hints || {}, t = inc.eventType, out = [];
+  const push = (key, label, value, unit) => out.push({ key, label, value: value == null ? null : value, unit: unit || null, triggered: true });
+  if (t === 'following_distance') push('following_distance_s', 'Tailgating / following distance', null, 's');
+  else if (t === 'distracted') push('phone_use', 'Distraction (phone / inattention)', null, null);
+  else if (t === 'harsh_brake') push('harsh_braking', 'Harsh braking', h.gForce, 'g');
+  else if (t === 'harsh_accel') push('harsh_acceleration', 'Harsh acceleration', h.gForce, 'g');
+  else if (t === 'harsh_turn') push('harsh_cornering', 'Harsh cornering', h.gForce, 'g');
+  else if (t === 'speeding') push('speeding', 'Speeding', inc.location && inc.location.speed_mph, 'mph');
+  else if (t === 'collision' || t === 'rollover') push('impact', 'Impact', h.gForce, 'g');
+  else if (t === 'fault_code' || t === 'breakdown') push('dtc_active', 'Active fault code', inc.diagnostics ? inc.diagnostics.dtcs.length : null, 'codes');
+  return out;
+}
 let counter = 10000;
 const nextId = () => 'NX-' + ++counter;
 function seedCounter(n) { if (n > counter) counter = n; }
@@ -54,8 +69,9 @@ async function processIncident(inc, opts = {}) {
   const provider = inc.provider;
 
   // --- resolve roster ---
-  const rv = roster.findVehicle(provider, inc.vehicle.vin, inc.vehicle.providerVehicleId);
-  const fleet = (rv && roster.getFleet(rv.fleetId)) || roster.fleetByCompany(inc._companyId) || roster.defaultFleetForProvider(provider);
+  let rv = roster.findVehicle(provider, inc.vehicle.vin, inc.vehicle.providerVehicleId);
+  if (rv && opts.fleetId && rv.fleetId !== opts.fleetId) rv = null; // vehicle belongs to another fleet: treat as unmapped for this client
+  const fleet = (opts.fleetId && roster.getFleet(opts.fleetId)) || (rv && roster.getFleet(rv.fleetId)) || roster.fleetByCompany(inc._companyId) || roster.defaultFleetForProvider(provider);
   inc.fleetId = fleet ? fleet.id : 'fleet_unknown';
   inc.fleetName = fleet ? fleet.name : 'Unknown Fleet';
   const iv = inc.vehicle;
@@ -95,11 +111,16 @@ async function processIncident(inc, opts = {}) {
     inc.timeline.push({ t: T(7), actor: 'system', action: 'auto_dismissed', note: 'Camera AI classified event as false positive - auto-dismissed' });
   }
 
+  if (!inc.signals) inc.signals = deriveSignals(inc);
+  if (opts.test) inc.test = true;
   // strip internals
   for (const k of Object.keys(inc)) if (k.startsWith('_')) delete inc[k];
   if (opts.save === false) return inc;
   await db.saveIncident(inc);
-  if (!opts.silent) stream.publish(inc, 'new');
+  if (!opts.silent) {
+    stream.publish(inc, 'new');
+    for (const fn of listeners) { try { fn(inc); } catch (e) { console.error('[NEXUS] onIncident listener failed:', e.message); } }
+  }
   return inc;
 }
 
@@ -111,4 +132,4 @@ async function ingest(provider, payload, opts = {}) {
   return processIncident(inc, opts);
 }
 
-module.exports = { ingest, nextId, seedCounter, makeTrail };
+module.exports = { processIncident, onIncident, ingest, nextId, seedCounter, makeTrail };

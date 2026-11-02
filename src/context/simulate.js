@@ -12,6 +12,8 @@ const PROFILES = {
   tanker_milk: P({ trailer: 'tanker', pickup: (p) => p.placeType === 'farm', frac: [0.9, 1.0], cat: 'perishable_food', milk: true }),
   tanker_fuel: P({ trailer: 'tanker', trailerTare: 15000, pickup: (p) => p.placeType === 'port' && p.contentHint === 'fuel', frac: [0.9, 1.0], cat: 'fuel_liquid' }),
   dry_grocery: P({ trailer: 'dry_van', pickup: (p) => p.placeType === 'grocery_dc' && !p.contentHint, frac: [0.55, 0.9], cat: 'dry_grocery' }),
+  reefer_beverage: P({ trailer: 'reefer', pickup: (p) => p.contentHint === 'beverage', frac: [0.75, 0.95], reefer: [36, 44], cat: 'beverage' }),
+  box_beverage: P({ trailer: 'none', pickup: (p) => p.contentHint === 'beverage', frac: [0.5, 0.9], cat: 'beverage' }),
   dry_beverage: P({ trailer: 'dry_van', pickup: (p) => p.contentHint === 'beverage', frac: [0.8, 0.98], cat: 'beverage' }),
   dry_general: P({ trailer: 'dry_van', pickup: (p) => p.placeType === 'retail_dc', frac: [0.5, 0.88], cat: 'unknown' }),
   dry_machinery: P({ trailer: 'dry_van', pickup: (p) => p.placeType === 'manufacturer' && !p.contentHint, frac: [0.5, 0.85], cat: 'machinery' }),
@@ -31,6 +33,8 @@ const FLEET_MIX = {
   fleet_goodyear: { class8: [['lowboy_equipment', 2], ['car_hauler', 3]], box: [['tow_vehicle', 1]] },
   fleet_piedmont: { class8: [['dry_general', 3], ['reefer_perishable', 2], ['reefer_frozen', 0.7], ['flatbed_lumber', 1.2], ['flatbed_steel', 1], ['dry_machinery', 1.2], ['dry_grocery', 1.5]], box: [['box_grocery', 1]] },
   fleet_bluegrass: { class8: [['tanker_milk', 4], ['reefer_dairy', 3], ['reefer_frozen', 0.8]], box: [['box_grocery', 1]] },
+  fleet_redline: { class8: [['dry_general', 3], ['reefer_perishable', 2], ['flatbed_steel', 1], ['dry_machinery', 1.5], ['dry_grocery', 1.5]], box: [['box_grocery', 1]] },
+  fleet_magnolia: { class8: [['reefer_beverage', 3], ['dry_beverage', 4]], box: [['box_beverage', 1]] },
   fleet_summit: { van: [['van_parcel', 1]], class8: [['dry_general', 1]], box: [['box_grocery', 1]] },
 };
 

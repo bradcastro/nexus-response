@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexus Response — Client Onboarding</title>
+<link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/brand.css">
+<link rel="stylesheet" href="onboarding.css">
+<script src="/shared/brand.js"></script>
+<script>NX.theme.defaultTo('light');</script>
+</head>
+<body>
+<div class="nx-app">
+  <div id="nx-topbar"></div>
+  <aside class="nx-sidebar" id="side">
+    <div class="nx-eyebrow nx-sidebar__label">Get a client live</div>
+    <a class="nx-nav" href="#clients" data-view="clients">Clients</a>
+    <a class="nx-nav" href="#add" data-view="add"><span class="ob-step">1</span> Add a client</a>
+    <a class="nx-nav" href="#roster" data-view="roster"><span class="ob-step">2</span> Load vehicles</a>
+    <a class="nx-nav" href="#import" data-view="import"><span class="ob-step">3</span> Import history</a>
+    <div class="nx-eyebrow nx-sidebar__label">Keep it healthy</div>
+    <a class="nx-nav" href="#health" data-view="health">Integration health</a>
+    <a class="nx-nav" href="#checklist" data-view="checklist">Go-live checklist</a>
+    <div class="nx-sidebar__foot nx-faint ob-small">Webhook keys are shown once. Copy them when you create the client.</div>
+  </aside>
+  <main class="nx-main" id="main"><div id="view"></div></main>
+</div>
+<script src="onboarding.js"></script>
+</body>
+</html>

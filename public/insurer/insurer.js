@@ -13,7 +13,7 @@
   function signed(v, d) { v = num(v); return v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d == null ? 1 : d) + '%'; }
   function avg(a) { a = a.filter(function (x) { return x != null; }); return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
   function wavg(items, val, w) { var sw = 0, s = 0; items.forEach(function (i) { var v = val(i), ww = w(i); if (v != null && ww) { s += v * ww; sw += ww; } }); return sw ? s / sw : null; }
-  var VENDOR_NAMES = { motive: 'Motive', samsara: 'Samsara', geotab: 'Geotab', lytx: 'Lytx', generic: 'Generic' };
+  var VENDOR_NAMES = { mantis: 'Mantis', motive: 'Motive', samsara: 'Samsara', geotab: 'Geotab', lytx: 'Lytx', generic: 'Generic' };
   function vName(v) { return VENDOR_NAMES[String(v || '').toLowerCase()] || fmt.label(v); }
   function vColor(v) { return 'var(--v-' + (VENDOR_NAMES[String(v || '').toLowerCase()] ? String(v).toLowerCase() : 'generic') + ')'; }
   function vendorChip(v) { return '<span class="ins-vendor" style="--c:' + vColor(v) + '"><i></i>' + esc(vName(v)) + '</span>'; }
@@ -269,7 +269,9 @@
   function route() {
     var id = decodeURIComponent(location.hash.slice(1));
     var p = $('#view-portfolio'), d = $('#view-dive');
-    if (!id) { p.hidden = false; d.hidden = true; document.title = 'Nexus Response — Insurer Portfolio'; return; }
+    var v3 = window.INS_V3;
+    if (v3) { v3.hide(); v3.nav(id); if (v3.match(id)) { p.hidden = true; d.hidden = true; window.scrollTo(0, 0); $('#main').scrollTop = 0; v3.route(id); return; } }
+    if (!id || id === 'portfolio') { p.hidden = false; d.hidden = true; document.title = 'Nexus Response — Insurer Portfolio'; return; }
     p.hidden = true; d.hidden = false; window.scrollTo(0, 0); $('#main').scrollTop = 0;
     d.replaceChildren(NX.skeleton(5));
     NX.api('/api/insurer/fleets/' + encodeURIComponent(id)).then(function (data) { if (decodeURIComponent(location.hash.slice(1)) === id) renderDive(id, data); })
@@ -290,7 +292,7 @@
   function incidentHTML(i) {
     var sig = i.signals || [], fp = i.aiVerdict === 'false_positive';
     return '<div class="ins-ev__item"><div class="ins-ev__head">' + NX.badgeHTML(i.severity) + '<b>' + esc(fmt.label(i.eventType)) + '</b>' + (fp ? NX.badgeHTML('False positive', 'warn') : NX.badgeHTML('Camera verified', 'ok')) +
-      '<span class="nx-mono nx-dim" style="margin-left:auto">' + esc(i.id) + '</span></div><div class="ins-ev__row">' +
+      '<span class="nx-mono nx-dim" style="margin-left:auto">' + esc(i.id) + ' <button class="nx-btn nx-btn--sm nx-btn--ghost nx-no-print" data-share="incident:' + esc(i.id) + '" type="button">Share</button></span></div><div class="ins-ev__row">' +
       (i.snapshot ? '<img class="ins-ev__img" loading="lazy" alt="Camera frame for ' + esc(i.id) + '" src="' + esc(i.snapshot) + '">' : '') + '<div>' +
       '<div class="ins-note nx-dim">' + esc(fmt.dateTime(i.timestamp)) + (i.address ? ' · ' + esc(i.address) : '') + (i.driver ? ' · ' + esc(i.driver) : '') + (i.vehicle ? ' · ' + esc(i.vehicle) : '') + '</div>' +
       (i.aiVerdict ? '<div style="margin-top:6px;font-size:var(--nx-text-sm)">AI verdict: <b>' + esc(fmt.label(i.aiVerdict)) + '</b>' + (i.confidence != null ? ' at ' + Math.round(i.confidence * 100) + '% confidence' : '') + '</div>' : '') +
@@ -359,8 +361,9 @@
     var incs = D.recentVerifiedIncidents || [], drivers = D.driversRanked || [], imps = improvements(D, f);
     var portfolioAvg = function (k) { return avg(state.fleets.map(function (x) { return x[k]; })); };
     var h = '<button class="nx-btn nx-btn--ghost nx-btn--sm ins-back nx-no-print" data-back type="button">← Portfolio</button>';
+    h += '<div class="ins-subtabs nx-no-print"><a class="is-active" href="#' + esc(id) + '">Risk overview</a><a href="#' + esc(id) + '/drive">Nexus Drive Score</a></div>';
     h += '<div class="nx-page-head"><div><div class="nx-eyebrow">Policyholder deep dive</div><h1>' + esc(f.name) + '</h1><p>' + vendorChip(f.vendor) + ' · ' + fmt.number(f.vehicles) + ' vehicles' + (D.fleet.drivers ? ' · ' + fmt.number(D.fleet.drivers) + ' drivers' : '') + (D.fleet.region ? ' · ' + esc(D.fleet.region) : '') + '</p></div>' +
-      '<div class="nx-row ins-actions nx-no-print"><button class="nx-btn" id="btn-print" type="button">Print / save PDF</button></div></div>';
+      '<div class="nx-row ins-actions nx-no-print"><button class="nx-btn" data-share="fleet:' + esc(id) + '" type="button">Share read-only link</button><button class="nx-btn" id="btn-print" type="button">Print / save PDF</button></div></div>';
     h += '<div class="nx-kpis"><div class="nx-kpi nx-kpi--accent"><div class="nx-kpi__label">Risk score</div><div class="nx-kpi__value">' + f.riskScore.toFixed(0) + '</div><div class="nx-kpi__delta">' + tierHTML(f.riskTier, f.riskScore) + ' ' + trendHTML(f.trend) + '</div></div>' +
       '<div class="nx-kpi"><div class="nx-kpi__label">Portfolio rank</div><div class="nx-kpi__value">' + (B.riskRank || '—') + ' / ' + (B.of || '—') + '</div><div class="nx-kpi__delta nx-dim">' + (B.riskRank && B.riskRank === B.of ? 'highest risk' : '1 = lowest risk') + '</div></div>' +
       '<div class="nx-kpi"><div class="nx-kpi__label">Events /100 vehicles</div><div class="nx-kpi__value">' + (f.ev100 == null ? '—' : f.ev100.toFixed(1)) + '</div><div class="nx-kpi__delta nx-dim">30 days</div></div>' +
@@ -403,8 +406,8 @@
     var th = e.target.closest('#table th[data-sort]');
     if (th) { var k = th.dataset.sort, s = state.sort; state.sort = { key: k, dir: s.key === k ? -s.dir : (k === 'name' || k === 'vendor' ? 1 : -1) }; renderTable(); return; }
     var tr = e.target.closest('#table tr[data-fleet]'); if (tr) return openFleet(tr.dataset.fleet);
-    if (e.target.closest('[data-back]')) { history.pushState('', document.title, location.pathname); route(); }
-    if (e.target.closest('#btn-print')) window.print();
+    if (e.target.closest('[data-back]')) { location.hash = '#portfolio'; }
+    if (e.target.closest('#btn-print')) { var vv = e.target.closest('[data-printable]') || $('#view-dive'); vv.classList.add('ins-printing'); window.print(); setTimeout(function () { vv.classList.remove('ins-printing'); }, 500); }
     if (e.target.closest('#btn-csv')) csv();
   });
   document.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('#table tr[data-fleet]'); if (tr && e.key === 'Enter') openFleet(tr.dataset.fleet); });
@@ -414,6 +417,7 @@
   window.addEventListener('hashchange', route);
   document.addEventListener('nx:theme', function () { if (state.P && !$('#view-portfolio').hidden) renderScatter(); });
 
+  window.INS = { state: state, num: num, pick: pick, pct: pct, pctTxt: pctTxt, signed: signed, avg: avg, vName: vName, vColor: vColor, vendorChip: vendorChip, tierHTML: tierHTML, tierColor: tierColor, trendHTML: trendHTML, chips: chips, dl: dl, normFleet: normFleet, $: $, openFleet: openFleet };
   load();
   NX.sse('/api/stream', function () { clearTimeout(load._t); load._t = setTimeout(function () { if (!location.hash) load(); }, 1500); }, { events: ['incident'] });
 })();

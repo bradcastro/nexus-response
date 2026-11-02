@@ -11,7 +11,7 @@
   var S = {
     inc: new Map(),          // id -> incident
     sel: null,               // selected id
-    filters: { status: 'open', sev: '', cat: '', fleet: '', q: '' },
+    filters: { status: 'open', sev: '', cat: '', fleet: '', vendor: '', q: '' }, mode: 'live',
     fleets: [],
     providers: [],           // providers near selected incident
     provFor: null,
@@ -24,6 +24,8 @@
   try { S.sound = localStorage.getItem('nx-dispatch-sound') !== '0'; } catch (e) {}
 
   /* ---------- helpers ---------- */
+  var isHist = function (i) { return i && (i.source === 'historical_import' || (i.import && i.import.jobId)); };
+  var VENDORS = [['mantis', 'Mantis'], ['motive', 'Motive'], ['samsara', 'Samsara'], ['geotab', 'Geotab'], ['lytx', 'Lytx'], ['generic', 'Generic']];
   var isClosed = function (i) { return !!CLOSED[i.status]; };
   var title = function (i) { return fmt.label(i.eventType || 'event'); };
   var unit = function (i) { var v = i.vehicle || {}; return v.unit || v.name || v.plate || v.id || 'Unit'; };
@@ -77,13 +79,15 @@
   function counts() {
     var c = { all: 0, open: 0 };
     STATUS_LIST.forEach(function (s) { c[s] = 0; });
-    S.inc.forEach(function (i) { c.all++; c[i.status] = (c[i.status] || 0) + 1; if (!isClosed(i)) c.open++; });
+    S.inc.forEach(function (i) { if (isHist(i)) return; c.all++; c[i.status] = (c[i.status] || 0) + 1; if (!isClosed(i)) c.open++; });
     return c;
   }
   function filtered() {
     var f = S.filters, q = f.q.trim().toLowerCase();
     var out = [];
     S.inc.forEach(function (i) {
+      if (isHist(i)) return;
+      if (f.vendor && i.provider !== f.vendor) return;
       if (f.status === 'open' ? isClosed(i) : (f.status !== 'all' && i.status !== f.status)) return;
       if (f.sev && i.severity !== f.sev) return;
       if (f.cat && i.category !== f.cat) return;
@@ -106,6 +110,7 @@
   }
   function fillSelects() {
     $('#f-sev').innerHTML = '<option value="">All severity</option>' + NX.severities.map(function (s) { return '<option value="' + s + '">' + fmt.label(s) + '</option>'; }).join('');
+    $('#f-vendor').innerHTML = '<option value="">All vendors</option>' + VENDORS.map(function (v) { return '<option value="' + v[0] + '">' + v[1] + (v[0] === 'mantis' ? ' (camera-first)' : '') + '</option>'; }).join('');
     $('#f-cat').innerHTML = '<option value="">All categories</option>' + CATS.map(function (s) { return '<option value="' + s + '">' + fmt.label(s) + '</option>'; }).join('');
     paintFleetSelect();
   }
@@ -132,9 +137,11 @@
       '<div class="qr-title">' + esc(title(i)) + ' &middot; ' + esc(unit(i)) + '</div>' +
       '<div class="qr-sub">' + esc(i.fleetName || '') + ' &middot; ' + esc((i.driver || {}).name || 'Unassigned driver') + '</div>' +
       '<div class="qr-sub">' + esc(addr(i)) + '</div>' +
-      '<div class="qr-tags"><span class="qr-id">' + esc(i.id) + '</span>' + tags + '<span class="tag">' + esc(i.provider || '') + '</span></div></div>';
+      '<div class="qr-tags"><span class="qr-id">' + esc(i.id) + '</span>' + tags + '<span class="tag' + (i.provider === 'mantis' ? ' acc' : '') + '">' + esc(i.provider || '') + '</span></div></div>';
   }
   function renderQueue() {
+    var cl = $('#c-live'); if (cl) cl.textContent = counts().open || 0;
+    if (S.mode === 'proactive') return NXPro.renderList();
     chips();
     var list = filtered(), box = $('#q-list');
     $('#q-shown').textContent = list.length + ' shown';
@@ -149,8 +156,8 @@
   }
   function renderHud() {
     var o = [], crit = 0, un = 0, act = 0;
-    S.inc.forEach(function (i) { if (isClosed(i)) return; o.push(i); if (i.severity === 'critical') crit++; if (i.status === 'pending' || i.status === 'validating') un++; else act++; });
-    $('#hud-stats').innerHTML = [['Open', o.length], ['Critical', crit], ['Unassigned', un], ['In progress', act]].map(function (x) { return '<div class="hud-stat"><b' + (x[0] === 'Critical' && x[1] ? ' style="color:var(--nx-sev-critical)"' : '') + '>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
+    S.inc.forEach(function (i) { if (isHist(i) || isClosed(i)) return; o.push(i); if (i.severity === 'critical') crit++; if (i.status === 'pending' || i.status === 'validating') un++; else act++; });
+    $('#hud-stats').innerHTML = [['Open', o.length], ['Critical', crit], ['Unassigned', un], ['In progress', act], ['Watch', '<span id="hud-watch">' + (S.alerts ? Array.from(S.alerts.values()).filter(function (a) { return a.status === 'open'; }).length : 0) + '</span>']].map(function (x) { return '<div class="hud-stat"><b' + (x[0] === 'Critical' && x[1] ? ' style="color:var(--nx-sev-critical)"' : '') + '>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
   }
 
   /* ---------- map ---------- */
@@ -162,7 +169,7 @@
     setTiles();
     trailLayer = L.layerGroup().addTo(map); provLayer = L.layerGroup().addTo(map);
     document.addEventListener('nx:theme', setTiles);
-    if (window.ResizeObserver) new ResizeObserver(function () { map.invalidateSize(); }).observe($('#map'));
+    if (window.ResizeObserver) var roT; new ResizeObserver(function () { map.invalidateSize(); clearTimeout(roT); roT = setTimeout(function () { if (S.mode === 'proactive') return NXPro.drawMap(true); if (S.sel) focusSelection(); else if (markers.size) fitAll(); }, 200); }).observe($('#map'));
   }
   function setTiles() {
     if (!map) return;
@@ -177,6 +184,7 @@
   }
   function syncMarkers() {
     if (!map) return;
+    if (S.mode === 'proactive') { markers.forEach(function (m) { map.removeLayer(m); }); markers.clear(); return; }
     var show = new Set(filtered().map(function (i) { return i.id; }));
     if (S.sel) show.add(S.sel);
     markers.forEach(function (m, id) { if (!show.has(id) || !S.inc.has(id)) { map.removeLayer(m); markers.delete(id); } });
@@ -200,6 +208,7 @@
   }
   function drawSelection() {
     if (!map) return;
+    if (S.mode === 'proactive') return NXPro.drawMap();
     trailLayer.clearLayers(); provLayer.clearLayers();
     var i = S.inc.get(S.sel); if (!i || !i.location) return;
     var c = sevColor(i.severity), bounds = [[i.location.lat, i.location.lng]];
@@ -263,7 +272,7 @@
     if (!o.noHash) { try { history.replaceState(null, '', '#' + encodeURIComponent(id)); } catch (e) {} }
     var cached = S.inc.get(id);
     S.pick = null; S.providers = []; S.provFor = null; S.camTab = 'road'; S.dealerPick = null; S.ctxFor = null;
-    renderQueue(); renderDetail(); syncMarkers();
+    renderQueue(); renderDetail(); syncMarkers(); NXAct.load(id);
     if (cached) { afterSelect(cached); }
     if (o.view && window.innerWidth <= 1100) setView(o.view);
     api('/api/incidents/' + encodeURIComponent(id)).then(function (full) {
@@ -301,7 +310,7 @@
     select(l[k].id);
   }
   function upsert(i, fromStream) {
-    if (!i || !i.id) return;
+    if (!i || !i.id || isHist(i)) return;
     var prev = S.inc.get(i.id);
     S.inc.set(i.id, i);
     if (fromStream) {
@@ -313,7 +322,7 @@
     }
     paintFleetSelect();
     renderQueue(); renderHud(); syncMarkers();
-    if (S.sel === i.id) { drawSelection(); renderDetail(); }
+    if (S.sel === i.id) { drawSelection(); renderDetail(); if (fromStream) NXAct.afterAction(i.id); }
   }
   var flashTimer;
   function criticalAlert(i) {
@@ -331,7 +340,7 @@
   function load() {
     S.loading = true; S.error = null; renderQueue();
     return api('/api/incidents', { query: { limit: 300 } }).then(function (d) {
-      S.inc.clear(); listFrom(d, 'incidents').forEach(function (i) { S.inc.set(i.id, i); });
+      S.inc.clear(); listFrom(d, 'incidents').forEach(function (i) { if (!isHist(i)) S.inc.set(i.id, i); });
       S.loading = false; S.error = null;
       paintFleetSelect(); renderQueue(); renderHud(); syncMarkers();
       var h = decodeURIComponent((location.hash || '').slice(1));
@@ -347,7 +356,7 @@
     var id = S.sel; if (!id) return Promise.resolve();
     var key = kind; S.busy[key] = true; renderDetail();
     return api('/api/incidents/' + encodeURIComponent(id) + path, { method: 'POST', body: body || {} }).then(function (r) {
-      var inc = r && (r.incident || r); if (inc && inc.id) upsert(inc);
+      var inc = r && (r.incident || r); var jl = (r && r.jobLink) || (inc && inc.jobLink); if (jl) NXAct.setJob(id, jl); if (inc && inc.id) upsert(inc);
       if (okMsg) NX.toast(okMsg, 'success');
       return inc;
     }).catch(function (e) { NX.toast(e.message, 'error'); }).then(function (x) { delete S.busy[key]; renderDetail(); return x; });
@@ -392,7 +401,7 @@
     m = NX.modal('Simulate live event', box);
   }
   function showHelp() {
-    var rows = [['j / k', 'Next / previous incident'], ['d', 'Dispatch selected provider'], ['x', 'Dismiss incident'], ['1 / 2 / 3', 'Mark en route / on scene / resolved'], ['n', 'Add note'], ['/', 'Search queue'], ['f', 'Fit map to all'], ['Esc', 'Clear selection / close']];
+    var rows = [['j / k', 'Next / previous incident'], ['v', 'Validate event'], ['d', 'Dispatch tow'], ['f', 'Notify fleet manager'], ['p', 'Call authorities'], ['i', 'FNOL to insurer'], ['o', 'Submit OEM claim'], ['g', 'Notify cargo owner'], ['e', 'Share ETA with driver'], ['x', 'Dismiss incident'], ['1 / 2 / 3', 'En route / on scene / resolved'], ['n', 'Add note'], ['t', 'Contacts / comms log'], ['H', 'Shift handoff notes'], ['m', 'Live / Proactive'], ['/', 'Search queue'], ['z', 'Fit map to all'], ['Esc', 'Clear / close']];
     NX.modal('Keyboard shortcuts', NX.el('div.help-grid', rows.map(function (r) { return [NX.el('kbd', r[0]), NX.el('span', r[1])]; })));
   }
 
@@ -460,7 +469,7 @@
     var dis = closed ? ' disabled' : '';
     return panel('Roadside', NX.badgeHTML(asg ? 'Assigned' : r.needed ? 'Needed' : 'Optional', asg ? 'ok' : r.needed ? 'accent' : 'plain'),
       top + (provs ? '<div class="nx-eyebrow" style="margin:12px 0 6px">Nearby providers</div><div class="provs">' + provs + '</div>' : '') +
-      '<div style="margin-top:12px">' + btn(lbl + ' <kbd>d</kbd>', 'nx-btn--primary nx-btn--block', 'dispatch', dis) + '</div>');
+      NXAct.jobLinkHTML(i) + '<div style="margin-top:12px">' + btn(lbl + ' <kbd>d</kbd>', 'nx-btn--primary nx-btn--block', 'dispatch', dis) + '</div>');
   }
   function warrantyHTML(i) {
     var w = i.warranty, v = i.vehicle || {};
@@ -502,7 +511,8 @@
     if (!i.risk) return '';
     return '<div class="nx-row" style="gap:8px;flex-wrap:wrap"><span class="nx-eyebrow">Risk score</span><b class="nx-mono">' + i.risk.eventScore + '</b>' + (i.risk.tags || []).map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') + '</div>';
   }
-  function renderDetail() {
+  function renderDetail(fromPro) {
+    if (S.mode === 'proactive') { if (fromPro) return; return NXPro.renderDetail(); }
     var i = S.inc.get(S.sel), keepScroll = detailEl.scrollTop, note = $('#note-in');
     if (note && S.sel) S.noteDraft[S.sel] = note.value;
     var focusNote = note && document.activeElement === note;
@@ -510,16 +520,14 @@
     if (!i) { detailEl.innerHTML = S.detailError ? '' : '<div class="sk"><span class="nx-skel nx-skel--lg"></span><span class="nx-skel nx-skel--block"></span><span class="nx-skel nx-skel--block"></span></div>'; if (S.detailError) detailEl.appendChild(NX.empty('Incident not found', S.detailError)); return; }
     var closed = isClosed(i), fp = isFP(i);
     var head = '<header class="d-head" style="--c:' + sevColor(i.severity) + '"><div class="d-id">' + NX.badgeHTML(i.severity) + NX.badgeHTML(i.status) + '<span class="nx-mono">' + esc(i.id) + '</span><span class="nx-mono" style="margin-left:auto">' + esc(fmt.ago(i.receivedAt || i.timestamp)) + '</span></div>' +
-      '<h2 class="d-title">' + esc(title(i)) + ' &middot; ' + esc(unit(i)) + '</h2><div class="d-sub">' + esc(addr(i)) + '</div>' +
-      '<div class="d-actions">' + (closed ? '' : btn('Dispatch <kbd>d</kbd>', 'nx-btn--primary nx-btn--sm', 'dispatch') + btn('Dismiss <kbd>x</kbd>', 'nx-btn--sm', 'dismissopen', '', 'dismiss')) +
-      '<button class="nx-btn nx-btn--sm nx-btn--ghost" data-act="center">Center map</button></div></header>';
+      '<div class="d-titlerow"><div class="nx-grow"><h2 class="d-title">' + esc(title(i)) + ' &middot; ' + esc(unit(i)) + '</h2><div class="d-sub">' + esc(addr(i)) + '</div></div>' + NXAct.ring(i) +
+      '<div class="d-mini">' + (closed ? '' : btn('Dismiss <kbd>x</kbd>', 'nx-btn--sm nx-btn--ghost', 'dismissopen', '', 'dismiss')) + '<button class="nx-btn nx-btn--sm nx-btn--ghost" data-act="center">Map</button></div></div>' + NXAct.strip(i) + '</header>';
     var C = window.NXCtx, cam = camHTML(i), dtc = dtcHTML(i), road = roadsideHTML(i), war = warrantyHTML(i), veh = vehicleHTML(i), tl = timelineHTML(i);
-    var load = C.load(i, panel), dealer = C.dealer(i, panel, btn, S), eq = C.equipment(i, panel), trip = C.trip(i, panel), tele = C.telemetry(i, panel);
+    var sop = NXAct.sop(i, panel), oem = NXAct.oem(i, panel), coord = NXAct.coord(i, panel), load = C.load(i, panel), dealer = C.dealer(i, panel, btn, S), eq = C.equipment(i, panel), trip = C.trip(i, panel), tele = C.telemetry(i, panel);
     var haz = !!(i.load && i.load.contents && i.load.contents.hazmat);
     // triage order: hazmat/severity context first, then verification, what is on the truck, how to respond, then history
-    var sections = fp ? [cam, tl, veh, dtc, road, war] : haz ? [load, cam, road, dealer, dtc, eq, trip, tele, war, veh, tl] : [cam, load, dealer, road, dtc, eq, trip, tele, war, veh, tl];
-    head = head.replace('</header>', C.chips(i) + '</header>');
-    sections.unshift(C.hazBanner(i));
+    var sections = fp ? [cam, sop, tl, coord, veh, dtc, road, war] : haz ? [sop, load, cam, road, dealer, dtc, oem, eq, trip, tele, coord, war, veh, tl] : [sop, cam, load, dealer, road, dtc, oem, eq, trip, tele, coord, war, veh, tl];
+    sections.unshift(C.chips(i)); sections.unshift(C.hazBanner(i)); sections.unshift(NXPro.banner(i));
     detailEl.innerHTML = head + '<div class="d-body">' + riskHTML(i) + sections.join('') + '</div>';
     detailEl.scrollTop = keepScroll;
     if (focusNote) { var n = $('#note-in'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
@@ -551,7 +559,7 @@
   /* ---------- wiring ---------- */
   fillSelects();
   $('#status-chips').addEventListener('click', function (e) { var b = e.target.closest('[data-st]'); if (!b) return; S.filters.status = b.dataset.st; renderQueue(); syncMarkers(); });
-  ['sev', 'cat', 'fleet'].forEach(function (k) { $('#f-' + k).addEventListener('change', function (e) { S.filters[k] = e.target.value; renderQueue(); syncMarkers(); }); });
+  ['sev', 'cat', 'fleet', 'vendor'].forEach(function (k) { $('#f-' + k).addEventListener('change', function (e) { S.filters[k] = e.target.value; renderQueue(); syncMarkers(); }); });
   $('#f-q').addEventListener('input', function (e) { S.filters.q = e.target.value; renderQueue(); syncMarkers(); });
   $('#q-list').addEventListener('click', function (e) { var r = e.target.closest('[data-id]'); if (r) select(r.dataset.id, { view: 'detail' }); });
   $('#btn-refresh').addEventListener('click', load);
@@ -566,6 +574,9 @@
     if (e.key === 'Escape') { if (typing) { t.blur(); return; } if (S.sel) { S.sel = null; S.providers = []; history.replaceState(null, '', location.pathname); renderQueue(); renderDetail(); drawSelection(); syncMarkers(); } return; }
     if (typing) return;
     var k = e.key;
+    if (S.mode === 'proactive') { if (k === '/') return; if (NXPro.key(k)) { e.preventDefault(); return; } if (k === 'm') return setMode('live'); }
+    if (k === 'm') return setMode('proactive');
+    if (NXAct.key(k)) { e.preventDefault(); return; }
     if (k === 'j' || k === 'ArrowDown') { e.preventDefault(); nav(1); }
     else if (k === 'k' || k === 'ArrowUp') { e.preventDefault(); nav(-1); }
     else if (k === 'd') doDispatch();
@@ -573,20 +584,38 @@
     else if (k === '1' || k === '2' || k === '3') { var i = S.inc.get(S.sel); if (i && !isClosed(i)) setStatus(['en_route', 'on_scene', 'resolved'][+k - 1]); }
     else if (k === 'n') { var n = $('#note-in'); if (n) { e.preventDefault(); n.focus(); } }
     else if (k === '/') { e.preventDefault(); $('#f-q').focus(); }
-    else if (k === 'f') fitAll();
+    else if (k === 'z') fitAll();
     else if (k === '?') showHelp();
   });
+  function setMode(m) {
+    if (S.mode === m) return; S.mode = m;
+    document.querySelectorAll('#mode-switch button').forEach(function (b) { b.classList.toggle('is-active', b.dataset.mode === m); });
+    var pro = m === 'proactive';
+    $('#dc').classList.toggle('is-pro', pro);
+    ['status-chips', 'live-filters', 'f-q'].forEach(function (id) { var e = $('#' + id); (e.closest && id === 'f-q' ? e.closest('.q-search') : e).classList.toggle('nx-hide', pro); });
+    $('#pro-chips').classList.toggle('nx-hide', !pro); $('#pro-filters').classList.toggle('nx-hide', !pro);
+    $('.q-title-h').textContent = pro ? 'Predicted risks' : 'Incident queue';
+    $('#btn-refresh').onclick = pro ? NXPro.load : load;
+    trailLayer && trailLayer.clearLayers(); provLayer && provLayer.clearLayers();
+    renderQueue(); renderDetail(); syncMarkers();
+    if (pro) { NXPro.drawMap(true); } else { syncMarkers(); drawSelection(); if (S.sel) focusSelection(); else fitAll(); }
+  }
+  document.querySelectorAll('#mode-switch button').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
+  window.NXD = null;
   // keep relative times fresh
   setInterval(function () { if (!S.loading) { renderQueue(); } }, 20000);
   // first user gesture unlocks audio
   document.addEventListener('click', function () { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {} }, { once: true });
 
   initMap();
+  NXAct.init({ S: S, api: api, act: act, upsert: upsert, renderDetail: renderDetail, dispatch: doDispatch, dismiss: doDismiss });
+  NXPro.init({ S: S, api: api, inc: S.inc, map: function () { return map; }, layers: function () { return { trail: trailLayer, prov: provLayer }; }, renderDetail: renderDetail, setView: setView, setMode: setMode });
   renderDetail(); renderHud();
   api('/api/fleets').then(function (d) { S.fleets = listFrom(d, 'fleets'); paintFleetSelect(); }).catch(function () {});
   load();
   NX.sse('/api/stream', function (data, type) {
+    if (type === 'alert') return NXPro.upsert(data && (data.alert || data));
     var inc = data && (data.incident || data);
     if (inc && inc.id) upsert(inc, true);
-  }, { events: ['incident'], onStatus: function (ok) { if (ok && S._wasDown) { S._wasDown = false; load(); } if (!ok) S._wasDown = true; } });
+  }, { events: ['incident', 'alert'], onStatus: function (ok) { if (ok && S._wasDown) { S._wasDown = false; load(); NXPro.load(); } if (!ok) S._wasDown = true; } });
 })();

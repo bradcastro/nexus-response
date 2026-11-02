@@ -16,6 +16,13 @@ function verify(inc) {
     return out;
   }
   const t = inc.eventType;
+  if (h.aiVerdict) { // vendor (e.g. Mantis) already classified the clip with its own AI - trust it, keep our evidence list
+    out.aiVerdict = h.aiVerdict; out.confidence = round(clamp(h.aiConfidence != null ? h.aiConfidence : 0.9, 0, 0.99), 2);
+    out.verified = out.confidence >= 0.6;
+    for (const x of h.extraSignals || []) sig.push(x);
+    if (h.aiVerdict === 'false_positive') sig.push('Event below threshold per vendor AI');
+    return out;
+  }
   const id = inc.providerEventId || inc.id || 'x';
   let verdict, conf;
   const vendorLabel = (h.aiLabel || '').toLowerCase();

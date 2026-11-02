@@ -46,3 +46,9 @@ Fast and functional. 120ms hover, 200ms enter, 400ms meters, ease `cubic-bezier(
 
 ## Layout
 Dense, data-first. Shell = topbar (52px) + sidebar (232px) + main. Sidebar collapses to a drawer under 900px; grids go single column under 640px. Print hides chrome and forces a white, black-text theme (warranty packets).
+
+## v3 additions
+- **Mantis** is the featured camera-first partner: in the launcher it gets the accent-filled wordmark with a "camera-first partner" tag, the same accent node in the convergence diagram, and `.nx-badge--mantis`. Other vendors stay neutral wordmarks (text only, never real logos).
+- **Predict and prevent** story: history in, risk assessed, projected, alert before the crash. Predictive alerts use `.nx-alert-card` (severity stripe), forecasts use `.nx-stat-delta`; keep them visually distinct from live incidents.
+- **Wizard components**: `.nx-stepper` (step status: done = green check, active = orange), `.nx-dropzone` (dashed, orange on hover or drag), `.nx-progress` (orange determinate, green when done, indeterminate for unknown length). Catalog with markup in docs/HANDOFFS.md.
+- Portal order everywhere: Dispatch, Fleet, Insurer, Onboarding.

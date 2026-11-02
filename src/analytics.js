@@ -35,12 +35,12 @@ const COMPONENTS = [
   { key: 'distraction', label: 'Distraction & following distance', weight: 0.15, cap: 30, types: DISTRACT, unit: 'distraction events / 100 vehicles / 30d' },
   { key: 'maintenance', label: 'Maintenance / DTC backlog', weight: 0.15, cap: 30, types: MAINT, unit: 'fault & breakdown events / 100 vehicles / 30d' },
 ];
-const TIERS = [[0, 'low'], [30, 'moderate'], [44, 'elevated'], [60, 'high']];
+const TIERS = [[0, 'low'], [35, 'moderate'], [50, 'elevated'], [68, 'high']];
 const tierOf = (s) => TIERS.filter(([t]) => s >= t).pop()[1];
 
 async function all30(now = Date.now()) {
   const since = new Date(now - 30 * DAY).toISOString();
-  return db.listIncidents({ since, limit: 100000 });
+  return db.listIncidents({ since, limit: 100000, clone: false });
 }
 
 function driverScores(incs) {
@@ -64,11 +64,13 @@ function driverRows(fleet, incs) {
   });
 }
 
-function fleetMetrics(fleet, incs, now = Date.now()) {
+const activeFleets = (incs) => { const has = new Set(incs.map((i) => i.fleetId)); return roster.all().filter((f) => !f.prospect && (has.has(f.id) || !f.onboarding || f.onboarding.status === 'demo')); };
+function fleetMetrics(fleet, incs, now = Date.now(), windowDays = 30) {
   const mine = incs.filter((i) => i.fleetId === fleet.id);
   const real = mine.filter((i) => !isFP(i));
-  const nVeh = fleet.vehicles.length;
-  const per100 = (n) => round((n / nVeh) * 100, 1);
+  const nVeh = Math.max(1, fleet.vehicleCount || fleet.vehicles.length);
+  const sc = 30 / windowDays;
+  const per100 = (n) => round((n / nVeh) * 100 * sc, 1);
   const comps = COMPONENTS.map((c) => {
     const n = real.filter((i) => c.types.includes(i.eventType)).length;
     const rate = per100(n);
@@ -76,7 +78,7 @@ function fleetMetrics(fleet, incs, now = Date.now()) {
   });
   const riskScore = Math.round(comps.reduce((s, c) => s + c.score * c.weight, 0));
   const half = (from, to) => real.filter((i) => { const age = (now - new Date(i.timestamp)) / DAY; return age >= from && age < to; }).reduce((s, i) => s + (i.risk ? i.risk.eventScore : 30), 0);
-  const recent = half(0, 15), prior = half(15, 30);
+  const recent = half(0, windowDays / 2), prior = half(windowDays / 2, windowDays);
   const ratio = prior === 0 ? (recent > 0 ? 2 : 1) : recent / prior;
   const trend = ratio > 1.18 ? 'up' : ratio < 0.85 ? 'down' : 'flat';
   const withCam = mine.filter((i) => i.camera && i.camera.aiVerdict !== 'no_video');
@@ -84,11 +86,11 @@ function fleetMetrics(fleet, incs, now = Date.now()) {
   const verifiedEventPct = mine.length ? Math.round((100 * mine.filter((i) => i.camera && i.camera.verified).length) / mine.length) : 0;
   const collisions = comps[0].count;
   const sev = fleet.vehicles[0] && fleet.vehicles[0].cls === 'heavy' ? 14000 : 5500;
-  const estLoss = collisions * sev * 0.55;
+  const estLoss = collisions * sc * sev * 0.55;
   const premiumMonthly = nVeh * (fleet.vehicles[0] && fleet.vehicles[0].cls === 'heavy' ? 9800 : 6400) / 12;
   return {
     id: fleet.id, name: fleet.name, vendor: fleet.vendor, vehicles: nVeh, riskScore, riskTier: tierOf(riskScore), components: comps,
-    events30d: mine.length, events30dPer100veh: per100(mine.length), collisionRate: comps[0].rate, trend, cameraCoveragePct, verifiedEventPct,
+    events: mine.length, events30d: Math.round(mine.length * sc), events30dPer100veh: per100(mine.length), collisionRate: comps[0].rate, trend, cameraCoveragePct, verifiedEventPct,
     falsePositivesFiltered: mine.length - real.length, estLossUsd: Math.round(estLoss), estMonthlyPremiumUsd: Math.round(premiumMonthly), cargo: cargoExposure(mine),
   };
 }
@@ -102,7 +104,7 @@ function topFactors(m, portfolioAvgByKey) {
 
 async function portfolio() {
   const incs = await all30();
-  const metrics = roster.all().map((f) => fleetMetrics(f, incs));
+  const metrics = activeFleets(incs).map((f) => fleetMetrics(f, incs));
   const avgByKey = {};
   for (const c of COMPONENTS) avgByKey[c.key] = round(metrics.reduce((s, m) => s + m.components.find((x) => x.key === c.key).rate, 0) / metrics.length, 1);
   const fleets = metrics.map((m) => ({
@@ -131,8 +133,9 @@ async function fleetDeepDive(fleetId) {
   const fleet = roster.getFleet(fleetId);
   if (!fleet) return null;
   const incs = await all30();
-  const metrics = roster.all().map((f) => fleetMetrics(f, incs));
-  const m = metrics.find((x) => x.id === fleetId);
+  const metrics = activeFleets(incs).map((f) => fleetMetrics(f, incs));
+  let m = metrics.find((x) => x.id === fleetId);
+  if (!m) { m = fleetMetrics(fleet, incs); metrics.push(m); }
   const avgScore = round(metrics.reduce((s, x) => s + x.riskScore * x.vehicles, 0) / metrics.reduce((s, x) => s + x.vehicles, 0), 1);
   const avgByKey = {};
   for (const c of COMPONENTS) avgByKey[c.key] = round(metrics.reduce((s, x) => s + x.components.find((y) => y.key === c.key).rate, 0) / metrics.length, 1);
@@ -191,7 +194,7 @@ async function fleetSummary(fleetId) {
   const openByVeh = new Map();
   open.forEach((i) => { const e = openByVeh.get(i.vehicle.id) || { n: 0, dtc: 0, loc: i.location, sev: i.severity }; e.n++; e.dtc += i.diagnostics ? i.diagnostics.dtcs.length : 0; openByVeh.set(i.vehicle.id, e); });
   const recovered = incs.filter((i) => i.warranty && i.warranty.claimPacket && ['paid', 'approved'].includes(i.warranty.claimPacket.status)).reduce((s, i) => s + i.warranty.claimPacket.estimatedValueUsd, 0);
-  const pendingClaims = incs.filter((i) => i.warranty && i.warranty.claimPacket && ['draft', 'ready', 'submitted'].includes(i.warranty.claimPacket.status));
+  const pendingClaims = incs.filter((i) => i.warranty && i.warranty.claimPacket && ['draft', 'ready', 'submitted', 'under_review', 'more_info_needed'].includes(i.warranty.claimPacket.status));
   return {
     fleet: roster.publicFleet(fleet),
     kpis: {
@@ -211,4 +214,4 @@ async function fleetSummary(fleetId) {
   };
 }
 
-module.exports = { portfolio, fleetDeepDive, fleetSummary, driverRows, OPEN };
+module.exports = { fleetMetrics, COMPONENTS, tierOf, topFactors, cargoExposure, portfolio, fleetDeepDive, fleetSummary, driverRows, OPEN };

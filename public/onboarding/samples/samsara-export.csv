@@ -1,0 +1,301 @@
+Event ID,Behavior,Time,Vehicle Name,VIN,Driver Name,Latitude,Longitude,Speed (mph),Severity,Media URL
+sam-lgv0,Rolling Stop,2026-08-04T09:52:05Z,PD-104,1XPBD49X9N9737641,Tamika Hale,30.36428,-80.98918,29,high,
+sam-lm22,Following Distance,2026-08-04T14:39:59Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.21149,-84.89608,36,medium,
+sam-lnji,Harsh Braking,2026-08-04T16:44:31Z,PD-114,1XPBD49XXN7166589,Rosa Park,29.74735,-81.55466,60,low,
+sam-lnon,Harsh Braking,2026-08-05T11:24:22Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.70816,-81.37395,47,medium,https://clips.samsara.example/samsara/msg01vn4283.mp4
+sam-li6a,Rolling Stop,2026-08-05T11:59:57Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.96407,-81.66714,44,medium,
+sam-li04,Harsh Turn,2026-08-05T20:23:04Z,PD-107,4V4NC9EHXN9492317,Jo Moody,34.85201,-80.88869,63,medium,https://clips.samsara.example/samsara/msgjangg84.mp4
+sam-lgsy,Following Distance,2026-08-06T03:50:41Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.25439,-81.84783,50,medium,
+sam-lkac,Speeding,2026-08-06T05:50:53Z,PD-104,1XPBD49X9N9737641,Tamika Hale,29.71844,-81.78749,77,low,
+sam-liae,Harsh Braking,2026-08-06T08:33:04Z,PD-109,1XPBD49X9N2208294,Kim Reyes,29.66786,-80.82979,62,medium,
+sam-ll67,Rolling Stop,2026-08-06T16:14:05Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,33.25776,-85.10059,50,low,
+sam-lj58,Harsh Acceleration,2026-08-07T08:49:30Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,30.88149,-82.41854,34,low,
+sam-ljbe,Speeding,2026-08-07T18:10:01Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.26365,-80.85714,78,medium,
+sam-lirv,Harsh Braking,2026-08-07T20:31:56Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,32.6521,-81.20988,63,low,
+sam-lhuz,Harsh Turn,2026-08-08T09:56:52Z,PD-116,1FUJGLDR6N2788460,Lena Boone,33.99404,-85.24446,60,low,
+sam-lhbg,Speeding,2026-08-08T20:58:50Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.67917,-80.7114,75,low,
+sam-lhy2,Speeding,2026-08-09T03:57:30Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,31.84473,-81.60462,84,low,
+sam-lix0,Harsh Turn,2026-08-09T08:27:10Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.00914,-84.68237,65,low,
+sam-lh16,Harsh Acceleration,2026-08-09T17:36:39Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,34.33485,-84.98222,37,low,
+sam-lhx1,Following Distance,2026-08-11T07:18:17Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.54635,-80.78018,39,low,https://clips.samsara.example/samsara/msobwiw881.mp4
+sam-li59,Speeding,2026-08-11T12:04:51Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,29.67908,-82.07212,76,medium,https://clips.samsara.example/samsara/msom51vc89.mp4
+sam-lilp,Harsh Braking,2026-08-11T13:28:27Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,32.71992,-81.72083,30,low,
+sam-lmee,Harsh Turn,2026-08-11T16:12:08Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.64952,-81.46326,40,medium,
+sam-lidh,Harsh Turn,2026-08-11T16:48:56Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,35.40662,-81.4346,52,low,
+sam-ljvy,Harsh Turn,2026-08-11T20:39:24Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.93217,-80.0913,54,low,
+sam-lmgg,Harsh Braking,2026-08-11T23:15:56Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,31.6243,-80.40872,52,medium,
+sam-lnwv,Rolling Stop,2026-08-12T18:50:47Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.78424,-80.67827,51,low,
+sam-lhrw,Harsh Acceleration,2026-08-13T15:15:27Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.01078,-81.10811,54,low,
+sam-lifj,Following Distance,2026-08-14T14:25:45Z,PD-113,1XKYD49XXN8741008,Nate Quinn,34.77459,-80.86301,54,medium,
+sam-ln32,Speeding,2026-08-15T03:49:33Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,34.86066,-80.9939,78,low,
+sam-lnqp,Rolling Stop,2026-08-15T09:47:07Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.91163,-80.15527,70,medium,
+sam-llij,Harsh Acceleration,2026-08-15T20:55:52Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.97853,-80.60542,57,low,
+sam-llmn,Following Distance,2026-08-16T09:22:03Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,31.10368,-81.39902,36,low,https://clips.samsara.example/samsara/msvliy60211.mp4
+sam-lhfk,Mobile Usage,2026-08-16T10:22:15Z,PD-120,3HSDJAPR3N1225096,Gus Farah,32.49038,-80.56921,47,low,
+sam-lgio,Speeding,2026-08-16T17:18:18Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.6725,-80.92385,79,medium,https://clips.samsara.example/samsara/msw2jes032.mp4
+sam-lnhg,Speeding,2026-08-16T22:32:59Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.12832,-84.22129,83,low,
+sam-limq,Harsh Turn,2026-08-17T14:01:34Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.16468,-80.98182,46,medium,https://clips.samsara.example/samsara/msxay9f4106.mp4
+sam-lk8a,Harsh Braking,2026-08-17T15:15:39Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.21578,-84.13563,34,low,
+sam-lnnm,Harsh Braking,2026-08-17T16:24:22Z,PD-120,3HSDJAPR3N1225096,Gus Farah,32.05748,-81.98432,34,low,
+sam-ll89,Harsh Braking,2026-08-17T17:02:30Z,PD-113,1XKYD49XXN8741008,Nate Quinn,34.65013,-80.21871,58,medium,
+sam-lghn,Speeding,2026-08-17T17:19:04Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.39734,-84.16865,76,low,
+sam-lmjj,Harsh Acceleration,2026-08-18T11:58:15Z,PD-104,1XPBD49X9N9737641,Tamika Hale,30.54491,-82.5104,29,low,
+sam-ll78,Harsh Turn,2026-08-18T13:16:36Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.01058,-81.58935,32,medium,
+sam-lfu0,Harsh Braking,2026-08-18T14:54:59Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.66272,-80.19547,29,low,
+sam-ll9a,Harsh Acceleration,2026-08-18T15:35:10Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.3416,-83.56499,53,high,https://clips.samsara.example/samsara/msytqhf4198.mp4
+sam-lo0z,Harsh Braking,2026-08-18T19:26:09Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,35.26996,-80.90858,66,low,
+sam-licg,Harsh Braking,2026-08-18T21:36:17Z,PD-103,1XKYD49XXN2240042,Luis Cole,34.28243,-81.64573,58,low,
+sam-lfw2,Harsh Braking,2026-08-18T23:37:23Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.05455,-84.57659,54,low,
+sam-llxy,Harsh Braking,2026-08-19T12:40:15Z,PD-114,1XPBD49XXN7166589,Rosa Park,30.74231,-81.24124,67,medium,https://clips.samsara.example/samsara/mt02xe3c222.mp4
+sam-ljkn,Speeding,2026-08-19T13:51:56Z,PD-114,1XPBD49XXN7166589,Rosa Park,29.79732,-82.53684,78,low,
+sam-lmzz,Mobile Usage,2026-08-19T15:56:26Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,33.55053,-81.14081,46,medium,
+sam-ln98,Harsh Braking,2026-08-19T19:09:05Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.6576,-80.01097,41,medium,
+sam-lgjp,Mobile Usage,2026-08-20T05:50:51Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.63412,-81.39796,53,medium,
+sam-lipt,Harsh Turn,2026-08-20T06:56:36Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,29.70418,-81.52169,41,low,
+sam-lk79,Following Distance,2026-08-20T14:47:05Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.96294,-80.9199,48,high,
+sam-lhch,Following Distance,2026-08-20T14:47:22Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.70535,-84.29692,47,low,
+sam-lfmt,Harsh Turn,2026-08-20T17:35:32Z,PD-116,1FUJGLDR6N2788460,Lena Boone,33.08018,-84.04816,39,medium,
+sam-li26,Harsh Braking,2026-08-21T02:24:11Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.91329,-80.27629,61,medium,
+sam-lkgi,Speeding,2026-08-21T08:59:33Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.37319,-81.62266,83,medium,
+sam-lihl,Harsh Braking,2026-08-22T15:52:44Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.43117,-83.64725,68,low,
+sam-lios,Following Distance,2026-08-22T16:37:10Z,PD-114,1XPBD49XXN7166589,Rosa Park,29.92157,-80.91422,43,low,https://clips.samsara.example/samsara/mt4lpmgg108.mp4
+sam-lkkm,Crash,2026-08-22T17:53:25Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,30.38028,-82.46836,19,critical,
+sam-lh05,Harsh Acceleration,2026-08-22T23:27:50Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.48427,-81.50924,38,low,
+sam-li37,Harsh Braking,2026-08-23T07:55:42Z,PD-114,1XPBD49XXN7166589,Rosa Park,30.23591,-81.60198,46,low,
+sam-lllm,Harsh Braking,2026-08-23T10:02:58Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.90481,-80.42602,40,high,
+sam-lnut,Harsh Braking,2026-08-23T10:14:23Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,34.81576,-80.81602,37,low,
+sam-liuy,Mobile Usage,2026-08-23T19:59:51Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,33.28705,-84.40411,31,low,
+sam-lfv1,Harsh Turn,2026-08-24T05:05:41Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,34.99131,-81.27336,57,low,
+sam-lnml,Following Distance,2026-08-24T14:13:48Z,PD-110,3HSDJAPR1N4356705,Wes Greer,31.82987,-81.9448,44,high,
+sam-lnsr,Harsh Braking,2026-08-24T16:29:23Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,32.58108,-81.946,37,medium,
+sam-ljcf,Harsh Turn,2026-08-24T21:01:53Z,PD-106,1FUJGLDR3N6528199,Priya Stone,34.02813,-85.13201,67,low,
+sam-litx,Harsh Acceleration,2026-08-25T12:36:10Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.87205,-85.0554,30,medium,
+sam-liy1,Speeding,2026-08-25T18:25:14Z,PD-115,3HSDJAPR0N1137235,Hank Shah,32.75612,-81.55624,79,low,
+sam-lmpp,Following Distance,2026-08-26T07:35:17Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,31.71095,-81.31324,47,low,
+sam-lnzy,Harsh Acceleration,2026-08-26T12:38:21Z,PD-120,3HSDJAPR3N1225096,Gus Farah,32.80358,-80.95795,33,low,
+sam-lfry,Crash,2026-08-26T14:29:04Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,34.47537,-81.10206,55,high,
+sam-lmqq,Harsh Turn,2026-08-26T21:17:13Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,35.24751,-80.60622,30,low,
+sam-lmbb,Following Distance,2026-08-27T10:14:07Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.8302,-79.96572,36,low,
+sam-lm99,Speeding,2026-08-27T12:42:13Z,PD-109,1XPBD49X9N2208294,Kim Reyes,30.75845,-81.6792,84,low,https://clips.samsara.example/samsara/mtbiiqh4233.mp4
+sam-ln87,Mobile Usage,2026-08-27T14:49:09Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,34.42987,-81.414,54,medium,
+sam-lkdf,Following Distance,2026-08-28T06:16:36Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.21325,-80.3127,43,medium,
+sam-lgdj,Harsh Braking,2026-08-28T08:24:17Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.35146,-81.34565,48,low,
+sam-lm33,Harsh Acceleration,2026-08-28T09:30:29Z,PD-106,1FUJGLDR3N6528199,Priya Stone,32.96627,-84.19224,36,low,
+sam-lhty,Following Distance,2026-08-28T09:39:12Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.7399,-81.39189,62,low,
+sam-lg06,Speeding,2026-08-28T17:21:16Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.70956,-81.42507,80,low,
+sam-lh38,Harsh Turn,2026-08-28T17:48:32Z,PD-106,1FUJGLDR3N6528199,Priya Stone,34.39569,-84.85755,61,low,
+sam-lj47,Mobile Usage,2026-08-28T22:46:03Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.63035,-84.37154,50,medium,
+sam-lgw1,Harsh Braking,2026-08-29T15:10:44Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.42529,-80.71691,63,medium,
+sam-lmff,Harsh Braking,2026-08-29T16:08:44Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.56505,-80.39325,45,medium,
+sam-llbc,Rolling Stop,2026-08-29T17:20:21Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,30.66965,-82.4438,70,medium,
+sam-llfg,Speeding,2026-08-30T09:43:15Z,PD-120,3HSDJAPR3N1225096,Gus Farah,32.69406,-81.59155,80,medium,https://clips.samsara.example/samsara/mtfmg4zc204.mp4
+sam-ljy0,Mobile Usage,2026-08-30T12:22:20Z,PD-106,1FUJGLDR3N6528199,Priya Stone,32.98936,-84.71348,28,low,https://clips.samsara.example/samsara/mtfs4py8152.mp4
+sam-lgtz,Harsh Acceleration,2026-08-30T17:54:49Z,PD-106,1FUJGLDR3N6528199,Priya Stone,34.41197,-83.68213,51,medium,
+sam-llef,Rolling Stop,2026-08-30T20:41:08Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,31.00236,-82.02349,41,high,https://clips.samsara.example/samsara/mtg9y6jk203.mp4
+sam-li48,Harsh Acceleration,2026-08-31T08:47:21Z,PD-114,1XPBD49XXN7166589,Rosa Park,30.83884,-82.10058,61,high,
+sam-lk9b,Speeding,2026-08-31T09:15:28Z,PD-103,1XKYD49XXN2240042,Luis Cole,34.39628,-81.69826,85,low,https://clips.samsara.example/samsara/mth0w9ds163.mp4
+sam-lg9f,Speeding,2026-09-01T10:46:44Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.74025,-80.43734,82,low,
+sam-lkmo,Speeding,2026-09-01T12:59:32Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,34.44539,-84.17069,74,low,
+sam-lmvv,Speeding,2026-09-02T00:40:22Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.72958,-81.73113,87,high,
+sam-ljps,Mobile Usage,2026-09-02T07:00:37Z,PD-109,1XPBD49X9N2208294,Kim Reyes,30.30234,-82.18342,44,medium,
+sam-lhsx,Harsh Braking,2026-09-02T07:42:06Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.30397,-80.48724,61,medium,https://clips.samsara.example/samsara/mtjsfw6o77.mp4
+sam-liei,Speeding,2026-09-02T09:05:51Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.2735,-80.63355,85,low,
+sam-ljor,Harsh Turn,2026-09-02T11:59:01Z,PD-110,3HSDJAPR1N4356705,Wes Greer,31.91764,-81.81579,28,low,
+sam-llde,Speeding,2026-09-02T12:02:50Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.31458,-80.30074,78,medium,
+sam-lkvx,Mobile Usage,2026-09-02T14:55:57Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.50461,-80.11363,39,low,
+sam-ll45,Harsh Braking,2026-09-03T09:43:21Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.1254,-80.76319,42,low,
+sam-li8c,Harsh Braking,2026-09-03T17:46:00Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.28526,-81.45783,29,medium,
+sam-lmmm,Harsh Braking,2026-09-03T18:29:31Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.0864,-81.61515,35,medium,https://clips.samsara.example/samsara/mtlv0bug246.mp4
+sam-lhdi,Speeding,2026-09-04T10:11:16Z,PD-103,1XKYD49XXN2240042,Luis Cole,34.70865,-80.47195,78,medium,
+sam-lkbd,Harsh Braking,2026-09-04T23:17:12Z,PD-116,1FUJGLDR6N2788460,Lena Boone,33.53022,-84.49204,47,low,
+sam-lh8d,Crash,2026-09-05T21:07:06Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,35.6427,-80.09512,34,high,
+sam-lmdd,Speeding,2026-09-05T23:17:53Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.73072,-81.05888,81,high,
+sam-lglr,Harsh Braking,2026-09-06T07:37:38Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,34.37151,-84.03317,39,low,
+sam-lgbh,Harsh Braking,2026-09-07T05:30:14Z,PD-118,1XKYD49X3N2521745,Beth Brooks,34.71881,-80.51223,67,medium,
+sam-lmaa,Harsh Acceleration,2026-09-07T08:17:13Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.95088,-80.45039,56,low,
+sam-lksu,Harsh Braking,2026-09-07T08:43:17Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.26205,-80.89043,46,medium,
+sam-lmxx,Following Distance,2026-09-07T15:39:00Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.30341,-80.92532,32,medium,
+sam-lnkj,Following Distance,2026-09-07T20:59:48Z,PD-113,1XKYD49XXN8741008,Nate Quinn,34.13958,-80.76467,47,low,https://clips.samsara.example/samsara/mtrq502o279.mp4
+sam-ljz1,Crash,2026-09-08T13:09:38Z,PD-115,3HSDJAPR0N1137235,Hank Shah,31.93288,-81.23343,54,critical,
+sam-lhw0,Harsh Braking,2026-09-08T14:31:52Z,PD-109,1XPBD49X9N2208294,Kim Reyes,30.39124,-81.97107,38,high,https://clips.samsara.example/samsara/mtsrpyv480.mp4
+sam-lgnt,Rolling Stop,2026-09-08T14:41:27Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.45467,-80.89219,63,high,
+sam-lfnu,Rolling Stop,2026-09-08T16:14:59Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.84384,-80.66556,52,low,
+sam-lg7d,Crash,2026-09-09T10:22:18Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,35.16603,-81.08875,34,high,
+sam-lm00,Following Distance,2026-09-10T00:01:30Z,PD-116,1FUJGLDR6N2788460,Lena Boone,34.15854,-84.63296,65,medium,
+sam-lg39,Harsh Turn,2026-09-10T04:35:07Z,PD-104,1XPBD49X9N9737641,Tamika Hale,29.77243,-80.95853,66,low,
+sam-ln65,Harsh Turn,2026-09-11T02:35:56Z,PD-109,1XPBD49X9N2208294,Kim Reyes,31.05628,-82.11416,46,medium,
+sam-lgkq,Mobile Usage,2026-09-11T13:46:00Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,35.08372,-80.69355,43,medium,
+sam-ljux,Speeding,2026-09-11T14:20:26Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.52733,-83.86181,77,low,
+sam-lgpv,Mobile Usage,2026-09-11T14:24:03Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,33.15528,-84.56189,37,medium,https://clips.samsara.example/samsara/mtx1rgzc39.mp4
+sam-lltu,Harsh Turn,2026-09-11T14:29:43Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.17012,-83.98117,65,low,
+sam-lfx3,Harsh Acceleration,2026-09-11T17:05:19Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.81593,-81.72681,69,medium,
+sam-lnts,Speeding,2026-09-12T16:45:03Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,35.8216,-81.6865,86,medium,
+sam-lk57,Harsh Braking,2026-09-13T08:25:58Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.61227,-80.97063,45,low,
+sam-lhot,Harsh Braking,2026-09-13T21:18:15Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.92025,-81.39152,58,low,https://clips.samsara.example/samsara/mu0bfu8o73.mp4
+sam-lgou,Harsh Turn,2026-09-14T08:46:05Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.29897,-83.64037,49,high,https://clips.samsara.example/samsara/mu100edk38.mp4
+sam-llpq,Speeding,2026-09-15T01:55:23Z,PD-107,4V4NC9EHXN9492317,Jo Moody,34.43821,-80.61387,87,medium,https://clips.samsara.example/samsara/mu20s35k214.mp4
+sam-lndc,Speeding,2026-09-15T14:04:22Z,PD-114,1XPBD49XXN7166589,Rosa Park,30.56226,-82.26363,79,medium,
+sam-lnfe,Harsh Braking,2026-09-15T22:07:32Z,PD-113,1XKYD49XXN8741008,Nate Quinn,34.03933,-81.08148,47,medium,
+sam-liko,Mobile Usage,2026-09-16T05:13:53Z,PD-116,1FUJGLDR6N2788460,Lena Boone,33.60355,-85.08568,58,low,https://clips.samsara.example/samsara/mu3nb7mw104.mp4
+sam-lktv,Harsh Braking,2026-09-16T07:07:32Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,33.66647,-81.9247,36,medium,
+sam-lh7c,Speeding,2026-09-16T12:40:59Z,PD-104,1XPBD49X9N9737641,Tamika Hale,30.43086,-81.58638,81,low,
+sam-lisw,Speeding,2026-09-16T17:39:34Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,31.63047,-81.98101,82,medium,
+sam-lgci,Speeding,2026-09-17T07:42:30Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,34.46351,-81.67118,84,low,
+sam-lgy3,Rolling Stop,2026-09-17T08:28:36Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,30.9704,-81.06841,68,high,
+sam-lfy4,Mobile Usage,2026-09-17T18:21:21Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.22417,-80.59465,62,medium,
+sam-lhjo,Harsh Braking,2026-09-17T18:53:26Z,PD-103,1XKYD49XXN2240042,Luis Cole,34.28413,-81.86774,67,medium,
+sam-lfsz,Following Distance,2026-09-17T23:50:17Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.11588,-83.82346,49,low,
+sam-ll12,Harsh Turn,2026-09-18T02:05:55Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.39607,-84.27538,31,low,
+sam-ljhk,Speeding,2026-09-18T11:17:02Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.88915,-85.25001,86,medium,
+sam-lg17,Speeding,2026-09-18T11:57:12Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.52306,-84.83498,79,low,
+sam-llop,Mobile Usage,2026-09-18T19:35:14Z,PD-106,1FUJGLDR3N6528199,Priya Stone,32.99816,-84.59107,49,medium,https://clips.samsara.example/samsara/mu7cyma8213.mp4
+sam-lmss,Rolling Stop,2026-09-19T08:37:02Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,31.01142,-81.56402,39,low,https://clips.samsara.example/samsara/mu84w0q8252.mp4
+sam-lgms,Mobile Usage,2026-09-19T09:51:15Z,PD-109,1XPBD49X9N2208294,Kim Reyes,30.62446,-81.33122,44,medium,
+sam-lkjl,Harsh Braking,2026-09-19T10:39:16Z,PD-113,1XKYD49XXN8741008,Nate Quinn,33.89526,-81.17385,48,high,
+sam-lmww,Speeding,2026-09-19T13:59:48Z,PD-109,1XPBD49X9N2208294,Kim Reyes,29.59731,-81.95136,76,medium,https://clips.samsara.example/samsara/mu8gf3mo256.mp4
+sam-lg4a,Crash,2026-09-19T14:33:22Z,PD-116,1FUJGLDR6N2788460,Lena Boone,33.42729,-84.93111,30,critical,https://clips.samsara.example/samsara/mu8hm9n418.mp4
+sam-ln54,Harsh Braking,2026-09-20T11:09:21Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,33.10293,-84.94239,59,medium,
+sam-lnba,Speeding,2026-09-20T19:42:44Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.32631,-85.1748,82,medium,https://clips.samsara.example/samsara/mua83yu8270.mp4
+sam-li15,Speeding,2026-09-21T16:53:25Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,35.96068,-80.14079,74,high,
+sam-lhej,Speeding,2026-09-22T03:29:37Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.73089,-80.20219,78,medium,
+sam-lkpr,Harsh Acceleration,2026-09-22T07:33:29Z,PD-104,1XPBD49X9N9737641,Tamika Hale,30.47071,-81.59145,54,high,
+sam-lkxz,Harsh Turn,2026-09-22T15:45:39Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.30972,-81.12638,55,medium,
+sam-lo31,Speeding,2026-09-22T17:43:11Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,30.73119,-81.84111,80,low,https://clips.samsara.example/samsara/mucypxg8297.mp4
+sam-ll56,Harsh Braking,2026-09-23T09:49:37Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.20252,-84.017,61,low,
+sam-lhin,Speeding,2026-09-23T11:44:29Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.41196,-81.16676,75,low,
+sam-lgek,Harsh Braking,2026-09-23T14:57:41Z,PD-104,1XPBD49X9N9737641,Tamika Hale,29.98279,-80.87552,54,medium,
+sam-lluv,Mobile Usage,2026-09-24T13:38:18Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.46882,-80.21535,57,medium,
+sam-lj9c,Speeding,2026-09-24T14:45:04Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.39972,-83.54797,74,low,
+sam-lfov,Speeding,2026-09-24T16:08:48Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.13955,-80.96651,83,low,
+sam-llvw,Harsh Turn,2026-09-25T05:59:30Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.11032,-80.81157,42,low,
+sam-lgx2,Mobile Usage,2026-09-25T07:54:48Z,PD-107,4V4NC9EHXN9492317,Jo Moody,34.8384,-81.37889,48,medium,
+sam-lhmr,Speeding,2026-09-25T11:32:39Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.42538,-85.08069,79,low,https://clips.samsara.example/samsara/mugvsz4o71.mp4
+sam-lj8b,Speeding,2026-09-25T13:30:35Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.19026,-80.90706,85,low,
+sam-lknp,Harsh Braking,2026-09-25T19:59:47Z,PD-114,1XPBD49XXN7166589,Rosa Park,29.74295,-82.50175,60,low,https://clips.samsara.example/samsara/muhdx5iw177.mp4
+sam-lkik,Rolling Stop,2026-09-25T20:44:45Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,32.42278,-80.55847,45,low,
+sam-lk13,Mobile Usage,2026-09-25T22:34:46Z,PD-104,1XPBD49X9N9737641,Tamika Hale,29.72939,-81.11082,36,medium,
+sam-lm11,Speeding,2026-09-26T11:50:26Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.41025,-81.41625,85,low,
+sam-lfqx,Rolling Stop,2026-09-26T13:59:19Z,PD-116,1FUJGLDR6N2788460,Lena Boone,34.47419,-83.95284,49,medium,
+sam-llqr,Speeding,2026-09-27T08:18:45Z,PD-116,1FUJGLDR6N2788460,Lena Boone,33.51089,-83.85045,86,low,
+sam-llab,Harsh Turn,2026-09-27T09:17:53Z,PD-120,3HSDJAPR3N1225096,Gus Farah,31.35452,-80.58825,36,medium,
+sam-lkhj,Speeding,2026-09-27T11:15:57Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.48139,-81.58864,77,low,
+sam-lmii,Harsh Braking,2026-09-28T06:17:43Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.27806,-84.57918,35,low,
+sam-ljlo,Following Distance,2026-09-28T22:17:36Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,33.96959,-83.97217,45,high,
+sam-lmnn,Harsh Turn,2026-09-29T00:07:14Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,35.96548,-80.75803,45,medium,https://clips.samsara.example/samsara/mulx2xjk247.mp4
+sam-lngf,Following Distance,2026-09-29T06:43:41Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.72562,-80.2404,45,low,
+sam-lkoq,Mobile Usage,2026-09-29T19:19:00Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,33.11447,-83.74183,58,medium,
+sam-ljdg,Speeding,2026-09-29T23:04:33Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.39693,-81.80825,86,low,
+sam-ljsv,Speeding,2026-09-30T10:35:05Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,31.5798,-80.6173,85,low,
+sam-liz2,Harsh Acceleration,2026-09-30T16:34:58Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,29.73783,-82.06984,52,high,
+sam-lmtt,Speeding,2026-10-01T13:50:41Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,32.09846,-81.51411,87,medium,
+sam-lk02,Following Distance,2026-10-01T14:31:31Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.00262,-84.17962,59,medium,
+sam-llkl,Speeding,2026-10-02T10:37:30Z,PD-113,1XKYD49XXN8741008,Nate Quinn,34.51993,-81.92786,82,medium,
+sam-li9d,Speeding,2026-10-02T10:49:14Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,35.3657,-81.34329,79,low,
+sam-llno,Speeding,2026-10-02T15:38:18Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.10222,-84.47425,76,low,https://clips.samsara.example/samsara/mur4nuhc212.mp4
+sam-lk46,Crash,2026-10-02T18:00:10Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.20207,-83.79095,20,high,
+sam-ljnq,Following Distance,2026-10-03T14:42:49Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,34.66385,-80.95951,33,medium,
+sam-lhpu,Speeding,2026-10-04T01:58:29Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.63481,-80.17655,81,medium,
+sam-lk24,Following Distance,2026-10-04T02:45:16Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.02329,-80.99911,52,medium,
+sam-lgag,Harsh Acceleration,2026-10-04T04:19:24Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.70632,-83.95093,46,low,
+sam-lm55,Harsh Braking,2026-10-04T14:55:34Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.174,-84.05332,68,low,https://clips.samsara.example/samsara/muty0lf4229.mp4
+sam-lhaf,Harsh Turn,2026-10-04T17:18:29Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,33.04135,-84.85515,33,low,https://clips.samsara.example/samsara/muu34dxk59.mp4
+sam-lm66,Harsh Braking,2026-10-05T06:00:01Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,33.93775,-85.08085,67,medium,
+sam-lhqv,Following Distance,2026-10-05T12:30:35Z,PD-110,3HSDJAPR1N4356705,Wes Greer,31.69508,-81.10697,37,high,https://clips.samsara.example/samsara/muv89zw875.mp4
+sam-llcd,Following Distance,2026-10-05T21:57:49Z,PD-110,3HSDJAPR1N4356705,Wes Greer,31.36055,-81.60078,53,medium,
+sam-lm77,Harsh Braking,2026-10-06T11:53:19Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.52567,-81.23366,65,low,https://clips.samsara.example/samsara/muwmdx94231.mp4
+sam-lgqw,Harsh Braking,2026-10-06T11:56:07Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.14514,-80.49251,51,high,
+sam-lo42,Harsh Acceleration,2026-10-06T12:43:26Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.91867,-84.77504,31,low,
+sam-lned,Harsh Acceleration,2026-10-06T16:25:30Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.94397,-81.59366,52,medium,
+sam-linr,Following Distance,2026-10-07T10:22:59Z,PD-118,1XKYD49X3N2521745,Beth Brooks,33.80521,-81.10814,31,low,
+sam-lm44,Speeding,2026-10-07T10:58:15Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,29.88004,-82.04613,78,medium,https://clips.samsara.example/samsara/muxzuyjc228.mp4
+sam-llst,Harsh Acceleration,2026-10-07T12:17:47Z,PD-115,3HSDJAPR0N1137235,Hank Shah,32.12742,-81.98977,41,medium,https://clips.samsara.example/samsara/muy2p8mw217.mp4
+sam-lk35,Speeding,2026-10-08T11:48:12Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,33.85228,-84.89801,87,low,
+sam-lmkk,Harsh Turn,2026-10-08T12:11:45Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.48441,-84.56307,29,medium,
+sam-ligk,Harsh Braking,2026-10-08T13:08:09Z,PD-103,1XKYD49XXN2240042,Luis Cole,34.59439,-81.01118,32,medium,
+sam-ll01,Harsh Acceleration,2026-10-08T13:30:52Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.87906,-83.87086,42,low,https://clips.samsara.example/samsara/muzkr2sg189.mp4
+sam-lgrx,Speeding,2026-10-08T15:51:19Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.00976,-81.1721,87,low,
+sam-liim,Mobile Usage,2026-10-08T19:48:12Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,29.61638,-81.23523,47,medium,
+sam-lkuw,Harsh Braking,2026-10-09T00:34:39Z,PD-106,1FUJGLDR3N6528199,Priya Stone,32.98651,-83.66603,29,low,
+sam-lj36,Speeding,2026-10-09T12:12:36Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,33.96479,-85.23998,83,low,
+sam-lo53,Speeding,2026-10-10T01:16:04Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,35.45134,-80.62143,81,low,
+sam-lkz0,Harsh Braking,2026-10-10T01:27:52Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,33.96109,-84.587,68,low,https://clips.samsara.example/samsara/mv1pszwg188.mp4
+sam-llyz,Harsh Braking,2026-10-10T07:03:23Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.02384,-85.20842,57,low,https://clips.samsara.example/samsara/mv21sh2w223.mp4
+sam-lg5b,Rolling Stop,2026-10-10T07:42:48Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.60748,-81.56955,34,low,
+sam-lj69,Following Distance,2026-10-10T12:30:24Z,PD-108,1XKYD49XXN2096007,Andre Pruitt,34.52209,-81.7828,66,medium,
+sam-lkln,Harsh Braking,2026-10-10T12:46:42Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,30.20875,-81.63768,31,low,
+sam-lh9e,Harsh Braking,2026-10-10T13:22:24Z,PD-103,1XKYD49XXN2240042,Luis Cole,34.1741,-81.46671,48,medium,
+sam-llhi,Harsh Acceleration,2026-10-10T16:05:42Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.61734,-81.06484,30,low,
+sam-lnrq,Harsh Braking,2026-10-10T18:43:14Z,PD-103,1XKYD49XXN2240042,Luis Cole,34.05452,-80.21507,58,medium,https://clips.samsara.example/samsara/mv2qshjk286.mp4
+sam-ljtw,Harsh Braking,2026-10-10T19:04:50Z,PD-115,3HSDJAPR0N1137235,Hank Shah,32.44126,-81.22621,35,low,
+sam-ljeh,Speeding,2026-10-10T21:16:00Z,PD-118,1XKYD49X3N2521745,Beth Brooks,33.89024,-80.18465,85,low,https://clips.samsara.example/samsara/mv2w8y2o133.mp4
+sam-llwx,Harsh Acceleration,2026-10-10T23:05:38Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.02019,-85.23266,29,medium,
+sam-lnpo,Harsh Braking,2026-10-11T08:51:57Z,PD-116,1FUJGLDR6N2788460,Lena Boone,33.8998,-84.32745,56,medium,
+sam-lmrr,Following Distance,2026-10-12T10:28:57Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.67915,-80.62925,39,low,
+sam-lkwy,Following Distance,2026-10-12T14:13:39Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.34894,-81.70731,68,low,https://clips.samsara.example/samsara/mv5c1i60186.mp4
+sam-llgh,Harsh Braking,2026-10-12T18:08:28Z,PD-113,1XKYD49XXN8741008,Nate Quinn,34.43168,-81.37543,46,low,
+sam-lnlk,Rolling Stop,2026-10-13T03:24:39Z,PD-106,1FUJGLDR3N6528199,Priya Stone,32.97818,-85.18048,41,low,
+sam-ljjm,Rolling Stop,2026-10-13T03:48:29Z,PD-113,1XKYD49XXN8741008,Nate Quinn,34.16785,-80.89958,47,low,
+sam-lggm,Speeding,2026-10-13T04:21:15Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.05373,-81.60333,76,low,
+sam-ln10,Harsh Braking,2026-10-13T07:09:32Z,PD-118,1XKYD49X3N2521745,Beth Brooks,34.53851,-81.83202,57,low,
+sam-lfz5,Speeding,2026-10-13T15:45:22Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,29.54786,-81.5172,78,medium,
+sam-lhlq,Harsh Braking,2026-10-13T16:30:38Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.7649,-80.63723,52,medium,
+sam-lkce,Speeding,2026-10-14T09:01:27Z,PD-104,1XPBD49X9N9737641,Tamika Hale,29.73399,-81.00934,77,medium,https://clips.samsara.example/samsara/mv7vrpso166.mp4
+sam-lj25,Harsh Acceleration,2026-10-14T12:38:51Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.70759,-81.35714,60,medium,
+sam-lnvu,Following Distance,2026-10-15T02:56:37Z,PD-104,1XPBD49X9N9737641,Tamika Hale,30.53156,-82.28119,68,medium,https://clips.samsara.example/samsara/mv8y6e14290.mp4
+sam-lmhh,Harsh Turn,2026-10-15T06:44:39Z,PD-110,3HSDJAPR1N4356705,Wes Greer,32.38414,-81.86818,66,low,
+sam-llrs,Speeding,2026-10-15T09:54:06Z,PD-104,1XPBD49X9N9737641,Tamika Hale,29.97633,-81.005,82,low,
+sam-lj14,Harsh Braking,2026-10-15T13:48:00Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.85007,-81.32762,45,low,
+sam-lfpw,Harsh Acceleration,2026-10-15T20:19:36Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.32872,-84.81684,44,medium,
+sam-lmoo,Rolling Stop,2026-10-16T03:22:47Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.63862,-80.64199,49,high,
+sam-lh6b,Harsh Acceleration,2026-10-16T10:35:55Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.62883,-84.34896,33,low,https://clips.samsara.example/samsara/mvau0wl455.mp4
+sam-lnyx,Mobile Usage,2026-10-16T10:55:49Z,PD-106,1FUJGLDR3N6528199,Priya Stone,34.0547,-84.35784,42,medium,
+sam-lmcc,Following Distance,2026-10-16T15:09:23Z,PD-115,3HSDJAPR0N1137235,Hank Shah,32.69135,-81.28166,32,low,
+sam-lkrt,Following Distance,2026-10-16T15:23:12Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,30.16083,-82.3371,28,low,
+sam-libf,Following Distance,2026-10-16T17:58:22Z,PD-120,3HSDJAPR3N1225096,Gus Farah,32.23166,-80.28869,69,low,https://clips.samsara.example/samsara/mvb9twds95.mp4
+sam-ln21,Harsh Acceleration,2026-10-17T08:34:29Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.27085,-80.97389,29,low,
+sam-ljad,Following Distance,2026-10-17T09:59:42Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.49198,-84.26953,61,medium,
+sam-lna9,Mobile Usage,2026-10-17T18:33:22Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,35.77766,-81.46459,65,medium,
+sam-ljgj,Harsh Turn,2026-10-18T17:20:10Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.28003,-80.80638,33,high,https://clips.samsara.example/samsara/mve3ch74135.mp4
+sam-lm88,Speeding,2026-10-19T03:51:22Z,PD-102,4V4NC9EH4N0226179,Dana Mills,35.92417,-80.88271,83,medium,
+sam-lg6c,Harsh Turn,2026-10-19T11:22:47Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.34101,-83.82321,46,low,
+sam-lhgl,Harsh Acceleration,2026-10-20T07:15:16Z,PD-109,1XPBD49X9N2208294,Kim Reyes,31.05597,-81.35699,65,low,
+sam-ljfi,Harsh Braking,2026-10-20T13:52:18Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,35.52166,-81.04382,68,medium,https://clips.samsara.example/samsara/mvgqsv2o134.mp4
+sam-lnxw,Speeding,2026-10-21T01:48:17Z,PD-112,4V4NC9EH0N5153914,Curtis Ellis,34.77265,-81.42307,75,medium,
+sam-livz,Rolling Stop,2026-10-21T06:54:25Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,35.27973,-80.7005,57,low,
+sam-lh27,Harsh Braking,2026-10-21T10:03:59Z,PD-115,3HSDJAPR0N1137235,Hank Shah,32.22228,-81.93674,37,high,https://clips.samsara.example/samsara/mvhy33iw51.mp4
+sam-lgz4,Following Distance,2026-10-21T11:12:25Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.4111,-84.37308,32,low,
+sam-lkqs,Mobile Usage,2026-10-22T10:58:07Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,34.04757,-85.12971,64,low,
+sam-lg28,Speeding,2026-10-22T20:10:30Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,34.38148,-83.66841,76,low,
+sam-ljwz,Speeding,2026-10-23T05:14:35Z,PD-104,1XPBD49X9N9737641,Tamika Hale,29.69789,-81.29795,77,low,https://clips.samsara.example/samsara/mvkimmpk151.mp4
+sam-lh5a,Harsh Acceleration,2026-10-23T07:08:17Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,32.59781,-80.60773,31,low,
+sam-lhhm,Harsh Acceleration,2026-10-23T08:53:37Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,31.76773,-81.51376,65,low,
+sam-lhkp,Following Distance,2026-10-23T15:12:39Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,29.60899,-82.13994,52,low,https://clips.samsara.example/samsara/mvl3zqzc69.mp4
+sam-ln76,Speeding,2026-10-24T02:51:17Z,PD-114,1XPBD49XXN7166589,Rosa Park,30.21595,-80.87505,75,medium,https://clips.samsara.example/samsara/mvlsy748266.mp4
+sam-ll34,Speeding,2026-10-24T08:21:33Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.36922,-84.16733,77,low,
+sam-lo20,Rolling Stop,2026-10-24T08:40:57Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.17325,-84.13228,43,low,https://clips.samsara.example/samsara/mvm5fve0296.mp4
+sam-lj7a,Harsh Braking,2026-10-24T11:35:03Z,PD-111,1FUJGLDR2N0940391,Elena Ortiz,33.03833,-83.80708,48,low,
+sam-lgfl,Speeding,2026-10-24T14:12:27Z,PD-117,4V4NC9EH0N8149943,Omar Haas,35.17827,-81.6105,78,low,
+sam-liqu,Harsh Braking,2026-10-25T00:12:54Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.36855,-84.87087,36,low,
+sam-lk68,Harsh Turn,2026-10-25T08:27:41Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,33.5683,-84.1324,45,low,
+sam-ljmp,Rolling Stop,2026-10-25T09:13:18Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,31.74118,-80.50315,48,low,
+sam-lijn,Speeding,2026-10-25T18:09:04Z,PD-114,1XPBD49XXN7166589,Rosa Park,30.28801,-81.90301,83,low,
+sam-lkeg,Harsh Braking,2026-10-25T18:39:32Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.59708,-85.20812,41,low,
+sam-lh49,Harsh Turn,2026-10-26T09:16:13Z,PD-107,4V4NC9EHXN9492317,Jo Moody,34.82949,-80.41524,47,medium,
+sam-lj03,Mobile Usage,2026-10-26T19:31:45Z,PD-105,3HSDJAPR0N4149707,Ray Dawson,32.67582,-81.28174,32,medium,
+sam-lmll,Harsh Turn,2026-10-27T10:12:38Z,PD-119,1XPBD49X7N0989800,Tyrell Tran,29.79583,-81.98207,32,high,
+sam-ljqt,Harsh Turn,2026-10-27T11:19:58Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,33.19979,-85.03832,43,medium,
+sam-ln43,Mobile Usage,2026-10-27T11:41:05Z,PD-101,1FUJGLDR2N8945706,Marcus Nguyen,34.22353,-83.66397,32,medium,https://clips.samsara.example/samsara/mvqm72w8263.mp4
+sam-lnih,Harsh Turn,2026-10-27T15:46:00Z,PD-114,1XPBD49XXN7166589,Rosa Park,30.47536,-82.13782,56,medium,
+sam-lg8e,Mobile Usage,2026-10-28T06:52:33Z,PD-104,1XPBD49X9N9737641,Tamika Hale,29.56564,-81.88817,51,medium,
+sam-ljil,Harsh Braking,2026-10-28T13:26:09Z,PD-115,3HSDJAPR0N1137235,Hank Shah,32.33093,-81.74861,38,medium,
+sam-li7b,Harsh Braking,2026-10-28T15:52:27Z,PD-102,4V4NC9EH4N0226179,Dana Mills,34.48016,-80.96577,28,medium,
+sam-lfls,Harsh Turn,2026-10-29T07:38:10Z,PD-115,3HSDJAPR0N1137235,Hank Shah,31.43275,-80.62693,61,medium,
+sam-lhns,Speeding,2026-10-29T16:48:58Z,PD-122,4V4NC9EH8N4611771,Dale Kemp,35.37298,-80.02319,81,medium,https://clips.samsara.example/samsara/mvts2q3472.mp4
+sam-lkfh,Harsh Braking,2026-10-30T01:14:44Z,PD-103,1XKYD49XXN2240042,Luis Cole,33.68042,-80.40282,62,low,
+sam-lmuu,Mobile Usage,2026-10-30T14:12:41Z,PD-116,1FUJGLDR6N2788460,Lena Boone,33.5678,-84.93627,61,high,
+sam-lhz3,Harsh Braking,2026-10-30T15:19:08Z,PD-106,1FUJGLDR3N6528199,Priya Stone,33.60429,-84.48941,31,high,
+sam-ljru,Harsh Braking,2026-10-31T13:25:52Z,PD-121,1FUJGLDR7N1509006,Mia Wynn,33.49692,-85.18333,67,low,https://clips.samsara.example/samsara/mvwfp8n4146.mp4
+sam-ll23,Harsh Turn,2026-10-31T15:43:28Z,PD-120,3HSDJAPR3N1225096,Gus Farah,31.34826,-81.42706,39,low,
+sam-lncb,Following Distance,2026-11-01T08:47:52Z,PD-109,1XPBD49X9N2208294,Kim Reyes,30.94141,-82.48979,56,high,
+sam-lmyy,Harsh Braking,2026-11-01T11:53:06Z,PD-107,4V4NC9EHXN9492317,Jo Moody,35.2953,-80.66461,65,low,https://clips.samsara.example/samsara/mvxrtsk0258.mp4
+sam-lljk,Harsh Turn,2026-11-01T14:58:13Z,PD-118,1XKYD49X3N2521745,Beth Brooks,33.61319,-80.23708,33,low,
