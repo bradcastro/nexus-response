@@ -4,7 +4,7 @@ One platform that ingests events from any telematics or camera vendor (Motive, S
 
 ## Live demo
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/bradcastro/nexus-webhook/tree/poc-mantis-demo)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/bradcastro/nexus-response/tree/poc-mantis-demo)
 
 Click the button, sign in to Render, and press **Apply** (free plan). In a few minutes you get a public URL. The launcher at `/` links to the Dispatch, Fleet, Insurer and Onboarding portals. Data lives in memory and reseeds on restart; the free plan sleeps after inactivity, so the first load can take about 30 seconds.
 
@@ -36,8 +36,8 @@ classifies them, and queues them for ops validation and dispatch.
 ## Local Setup
 
 ```bash
-git clone https://github.com/bradcastro/nexus-webhook.git
-cd nexus-webhook
+git clone https://github.com/bradcastro/nexus-response.git
+cd nexus-response
 npm install
 cp .env.example .env
 # Edit .env and add your MOTIVE_WEBHOOK_SECRET
@@ -56,9 +56,9 @@ node server.js
    - **Environment:** Node
 4. Add environment variables in Render dashboard:
    - `MOTIVE_WEBHOOK_SECRET` = your secret from Motive developer portal
-5. Deploy — Render gives you a URL like `https://nexus-webhook.onrender.com`
+5. Deploy — Render gives you a URL like `https://nexus-response.onrender.com`
 6. Paste that URL into Motive developer portal as your webhook destination:
-   `https://nexus-webhook.onrender.com/webhook/motive`
+   `https://nexus-response.onrender.com/webhook/motive`
 
 ---
 
