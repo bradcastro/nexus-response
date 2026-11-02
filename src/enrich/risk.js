@@ -22,6 +22,14 @@ function score(inc) {
   }
   if (inc.warranty && inc.warranty.claimEligible) tags.push('warranty_recoverable');
   if (inc.driver && inc.driver.safetyScore != null && inc.driver.safetyScore < 70) { tags.push('low_driver_score'); s += 6; }
+  const ld = inc.load;
+  if (ld && ld.contents) {
+    if (ld.contents.hazmat) { tags.push('hazmat_load'); s += 8; }
+    if (ld.contents.estimatedValueUsd && ld.contents.estimatedValueUsd[1] >= 50000) { tags.push('high_value_cargo'); s += 3; }
+    if (ld.contents.temperatureSensitive && ld.contents.spoilageRiskHours != null) tags.push('perishable_spoilage_clock');
+    if (ld.overweightRisk) { tags.push('overweight_risk'); s += 4; }
+    if (inc.equipment && inc.equipment.trailer && inc.equipment.trailer.type === 'flatbed' && ld.estimatedWeightLb > 20000 && ['collision', 'rollover', 'harsh_brake', 'harsh_turn'].includes(inc.eventType)) tags.push('shifting_load_risk');
+  }
   const hr = new Date(inc.timestamp).getUTCHours();
   const local = (hr + 24 - 5) % 24; // approx US Eastern/Central
   if (local >= 22 || local < 5) { tags.push('night'); s += 4; }

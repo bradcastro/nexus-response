@@ -52,6 +52,7 @@
     fl.coll = num(pick(f, 'collisionRate'), null);
     fl.cam = num(pick(f, 'cameraCoveragePct'), null);
     fl.ver = num(pick(f, 'verifiedEventPct'), null);
+    fl.cargo = num(f.cargoExposureUsd, null); fl.loadPct = num(f.avgLoadPctOfMax, null);
     fl.ev30 = num(pick(f, 'events30d', 'events'), null);
     if (fl.ev30 == null && fl.ev100 != null) fl.ev30 = Math.round(fl.ev100 * fl.vehicles / 100);
     return fl;
@@ -88,9 +89,11 @@
       ['Events, 30d', fmt.number(T.events30d), 'normalized from all vendors'],
       ['Loss-ratio proxy', lrTxt, 'modelled from verified severity mix']
     ];
+    var cargoTot = F.some(function (f) { return f.cargo != null; }) ? F.reduce(function (a, f) { return a + (f.cargo || 0); }, 0) : null;
+    if (cargoTot != null) kp.splice(4, 0, ['Cargo exposure', fmt.currency(cargoTot), 'est. value of loads in recent events']);
     var hi = F.filter(function (f) { return /high|sev|crit|elev/i.test(f.riskTier || ''); }).length;
     kp.push(['Elevated or higher', String(hi), 'policyholders needing review']);
-    $('#kpis').innerHTML = kp.map(function (k, i) { return '<div class="nx-kpi' + (i === 4 && hi ? ' nx-kpi--accent' : '') + '"><div class="nx-kpi__label">' + esc(k[0]) + '</div><div class="nx-kpi__value">' + esc(k[1]) + '</div><div class="nx-kpi__delta nx-dim">' + esc(k[2]) + '</div></div>'; }).join('');
+    $('#kpis').innerHTML = kp.map(function (k, i) { return '<div class="nx-kpi' + (k[0] === 'Elevated or higher' && hi ? ' nx-kpi--accent' : '') + '"><div class="nx-kpi__label">' + esc(k[0]) + '</div><div class="nx-kpi__value">' + esc(k[1]) + '</div><div class="nx-kpi__delta nx-dim">' + esc(k[2]) + '</div></div>'; }).join('');
     renderScatter(); renderDist(); renderClaims(); renderFilters(); renderTable(); renderVendors();
   }
 
@@ -185,9 +188,9 @@
   }
 
   /* ---------- table ---------- */
-  var COLS = [
+  var ALLCOLS = [
     ['name', 'Policyholder', false], ['vendor', 'Vendor', false], ['vehicles', 'Vehicles', true], ['riskScore', 'Risk score', false], ['riskTier', 'Tier', false],
-    ['ev100', 'Events /100 veh', true], ['coll', 'Collision rate', true], ['cam', 'Camera cov.', true], ['ver', 'Verified', true], ['trend', 'Trend', false], ['factors', 'Top risk factors', false]
+    ['ev100', 'Events /100 veh', true], ['coll', 'Collision rate', true], ['cam', 'Camera cov.', true], ['ver', 'Verified', true], ['cargo', 'Cargo exposure', true], ['loadPct', 'Avg load % max', true], ['trend', 'Trend', false], ['factors', 'Top risk factors', false]
   ];
   function renderFilters() {
     var vs = Array.from(new Set(state.fleets.map(function (f) { return f.vendor; }))), ts = distEntries().map(function (e) { return e[0]; });
@@ -210,10 +213,11 @@
   }
   function renderTable() {
     var rows = visibleFleets(), s = state.sort;
+    var COLS = ALLCOLS.filter(function (c) { return (c[0] !== 'cargo' && c[0] !== 'loadPct') || state.fleets.some(function (f) { return f[c[0]] != null; }); });
     var head = COLS.map(function (c) { return '<th' + (c[2] ? ' class="num"' : '') + ' data-sort="' + c[0] + '"' + (s.key === c[0] ? ' class="is-sorted' + (s.dir > 0 ? ' asc' : '') + (c[2] ? ' num' : '') + '" aria-sort="' + (s.dir > 0 ? 'ascending' : 'descending') + '"' : '') + '>' + c[1] + '</th>'; }).join('');
     var body = rows.map(function (f, i) {
       return '<tr data-fleet="' + esc(f.id) + '" tabindex="0"><td class="name">' + esc(f.name) + '<small>' + (f.region ? esc(f.region) : '') + '</small></td><td>' + vendorChip(f.vendor) + '</td><td class="num">' + fmt.number(f.vehicles) + '</td><td>' + scoreBar(f.riskScore, f.riskTier) + '</td><td>' + tierHTML(f.riskTier, f.riskScore) + '</td>' +
-        '<td class="num">' + (f.ev100 == null ? '—' : f.ev100.toFixed(1)) + '</td><td class="num">' + (f.coll == null ? '—' : f.coll.toFixed(1) + '%') + '</td><td class="num">' + (f.cam == null ? '—' : f.cam.toFixed(0) + '%') + '</td><td class="num">' + (f.ver == null ? '—' : f.ver.toFixed(0) + '%') + '</td><td>' + trendHTML(f.trend) + '</td><td>' + chips(f.topRiskFactors, 3) + '</td></tr>';
+        '<td class="num">' + (f.ev100 == null ? '—' : f.ev100.toFixed(1)) + '</td><td class="num">' + (f.coll == null ? '—' : f.coll.toFixed(1) + '%') + '</td><td class="num">' + (f.cam == null ? '—' : f.cam.toFixed(0) + '%') + '</td><td class="num">' + (f.ver == null ? '—' : f.ver.toFixed(0) + '%') + '</td>' + (COLS.some(function (c) { return c[0] === 'cargo'; }) ? '<td class="num">' + (f.cargo == null ? '—' : fmt.currency(f.cargo)) + '</td><td class="num">' + (f.loadPct == null ? '—' : f.loadPct.toFixed(0) + '%') + '</td>' : '') + '<td>' + trendHTML(f.trend) + '</td><td>' + chips(f.topRiskFactors, 3) + '</td></tr>';
     }).join('');
     $('#table').innerHTML = '<table class="nx-table"><thead><tr>' + head + '</tr></thead><tbody>' + (body || '<tr><td colspan="' + COLS.length + '" class="nx-dim" style="padding:var(--nx-sp-5);text-align:center">No policyholders match these filters.</td></tr>') + '</tbody></table>';
     renderDistActive();
@@ -251,10 +255,10 @@
 
   /* ---------- CSV ---------- */
   function csv() {
-    var cols = ['Policyholder', 'Vendor', 'Vehicles', 'Risk score', 'Tier', 'Events per 100 vehicles (30d)', 'Collision rate %', 'Camera coverage %', 'Verified event %', 'Trend', 'Top risk factors'];
+    var cols = ['Policyholder', 'Vendor', 'Vehicles', 'Risk score', 'Tier', 'Events per 100 vehicles (30d)', 'Collision rate %', 'Camera coverage %', 'Verified event %', 'Cargo exposure USD', 'Avg load % of max', 'Trend', 'Top risk factors'];
     var q = function (v) { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     var lines = [cols.join(',')].concat(visibleFleets().map(function (f) {
-      return [f.name, vName(f.vendor), f.vehicles, f.riskScore, f.riskTier, f.ev100, f.coll, f.cam, f.ver, f.trend, (f.topRiskFactors || []).join('; ')].map(q).join(',');
+      return [f.name, vName(f.vendor), f.vehicles, f.riskScore, f.riskTier, f.ev100, f.coll, f.cam, f.ver, f.cargo, f.loadPct, f.trend, (f.topRiskFactors || []).join('; ')].map(q).join(',');
     }));
     dl('nexus-portfolio-' + new Date().toISOString().slice(0, 10) + '.csv', lines.join('\n'));
     NX.toast('Exported ' + (lines.length - 1) + ' policyholders', 'success');
@@ -291,7 +295,7 @@
       '<div class="ins-note nx-dim">' + esc(fmt.dateTime(i.timestamp)) + (i.address ? ' · ' + esc(i.address) : '') + (i.driver ? ' · ' + esc(i.driver) : '') + (i.vehicle ? ' · ' + esc(i.vehicle) : '') + '</div>' +
       (i.aiVerdict ? '<div style="margin-top:6px;font-size:var(--nx-text-sm)">AI verdict: <b>' + esc(fmt.label(i.aiVerdict)) + '</b>' + (i.confidence != null ? ' at ' + Math.round(i.confidence * 100) + '% confidence' : '') + '</div>' : '') +
       (sig.length ? '<ul class="ins-ev__sig">' + sig.slice(0, 4).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + '</div></div>' +
-      '<div class="ins-ev__meta"><span>Video clip: ' + (i.clip ? 'yes' : 'no') + '</span><span>Snapshot: ' + (i.snapshot ? 'yes' : 'no') + '</span><span>Evidence packet: ' + (i.clip || i.snapshot ? 'available' : 'not available') + '</span></div></div>';
+      '<div class="ins-ev__load" data-load-for="' + esc(i.id) + '">' + loadHTML(i) + '</div><div class="ins-ev__meta"><span>Video clip: ' + (i.clip ? 'yes' : 'no') + '</span><span>Snapshot: ' + (i.snapshot ? 'yes' : 'no') + '</span><span>Evidence packet: ' + (i.clip || i.snapshot ? 'available' : 'not available') + '</span></div></div>';
   }
   function improvements(D, f) {
     var out = [];
@@ -306,6 +310,46 @@
     if (f.cam != null && f.cam < 70) out.push({ action: 'Extend camera coverage beyond ' + f.cam.toFixed(0) + '% of vehicles', detail: 'More events can be verified, so fewer are scored on telematics alone and claims can be backed by footage.', gain: null });
     if (f.ver != null && f.ver < 60) out.push({ action: 'Raise camera-verified event share (now ' + f.ver.toFixed(0) + '%)', detail: 'Unverified events carry less weight in pricing and are harder to defend in a claim.', gain: null });
     return out;
+  }
+
+  function loadHTML(i) {
+    var L = i.load, E = i.equipment, T = E && E.trailer;
+    if (!L && !T) return '';
+    var c = (L && L.contents) || {}, bits = [];
+    var verified = T && T.cameraVerified || (L && L.cameraVisual && L.cameraVisual.cargoVisible);
+    if (T && T.attached !== false && T.type && T.type !== 'none') bits.push('<span><b>Trailer</b> ' + esc(fmt.label(T.type)) + (T.lengthFt ? ' ' + T.lengthFt + ' ft' : '') + '</span>');
+    if (L && L.estimatedWeightLb != null) bits.push('<span><b>Est. load</b> ' + fmt.number(L.estimatedWeightLb) + ' lb' + (L.payloadPctOfMax != null ? ' (' + Math.round(L.payloadPctOfMax) + '% of max)' : '') + '</span>');
+    if (c.label || c.category) bits.push('<span><b>Content</b> ' + esc(c.label || fmt.label(c.category)) + '</span>');
+    if (c.estimatedValueUsd && c.estimatedValueUsd.length) bits.push('<span><b>Value</b> ' + fmt.currency(c.estimatedValueUsd[0]) + '–' + fmt.currency(c.estimatedValueUsd[1]) + '</span>');
+    var flags = (c.hazmat ? NX.badgeHTML('Hazmat', 'danger') : '') + (c.temperatureSensitive ? NX.badgeHTML('Temperature sensitive', 'info') : '') + (L && L.overweightRisk ? NX.badgeHTML('Overweight risk', 'warn') : '') +
+      (verified ? NX.badgeHTML('Trailer/load camera-verified', 'ok') : NX.badgeHTML('Inferred, not camera-verified', 'plain'));
+    var ev = (T && T.cameraBasis) || (L && L.cameraVisual && L.cameraVisual.description) || '';
+    return '<div class="ins-load"><div class="nx-eyebrow">Load and trailer evidence</div><div class="ins-load__bits">' + bits.join('') + '</div><div class="ins-chips" style="margin-top:6px">' + flags + '</div>' +
+      (ev ? '<div class="ins-note nx-dim" style="margin-top:4px">Camera: ' + esc(ev) + '</div>' : '') + (L && L.confidence != null ? '<div class="ins-note nx-faint">Estimate confidence ' + Math.round(L.confidence * 100) + '%' + (L.method ? ' · ' + esc(fmt.label(L.method)) : '') + '</div>' : '') + '</div>';
+  }
+  function hydrateLoads(incs) {
+    incs.slice(0, 6).forEach(function (i) {
+      if (i.load || i.equipment) return;
+      NX.api('/api/incidents/' + encodeURIComponent(i.id) + '/context').then(function (ctx) {
+        if (!ctx || (!ctx.load && !ctx.equipment)) return;
+        i.load = ctx.load; i.equipment = ctx.equipment;
+        var slot = document.querySelector('[data-load-for="' + i.id + '"]'); if (slot) slot.innerHTML = loadHTML(i);
+      }).catch(function () { /* optional */ });
+    });
+  }
+  function cargoSection(D) {
+    var C = D.cargoExposure;
+    var why = '<div class="ins-why"><b>Why load context matters to underwriting.</b> Cargo value and weight drive two separate exposures. Inland-marine and cargo coverage depends on what was being hauled, its value and whether it is temperature sensitive. Liability severity rises with gross weight, hazmat content and shifting-load risk. Nexus infers load from the last stop, trailer type and engine-load and fuel-economy change, then checks it against camera evidence of the trailer and cargo. An independent record of what was on the truck is hard to inflate after the fact, which reduces cargo-claim fraud.</div>';
+    if (!C) return '<section class="nx-card ins-span2"><div class="nx-card__head"><h2 class="nx-card__title">Cargo exposure</h2></div><div class="nx-card__body"><p class="nx-dim">No cargo exposure data reported for this policyholder yet.</p>' + why + '</div></section>';
+    var bc = (C.byContent || []).slice().sort(function (a, b) { return (b.estValueUsd || 0) - (a.estValueUsd || 0); }), max = Math.max.apply(null, bc.map(function (x) { return x.estValueUsd || 0; }).concat([1]));
+    var avgPct = (state.fleets.filter(function (f) { return f.id === (D.fleet && D.fleet.id); })[0] || {}).loadPct;
+    var stat = function (l, v, sub, warn) { return '<div class="ins-stat"><div class="nx-eyebrow">' + l + '</div><div class="ins-stat__v"' + (warn ? ' style="color:var(--nx-sev-high)"' : '') + '>' + v + '</div>' + (sub ? '<div class="ins-stat__s">' + sub + '</div>' : '') + '</div>'; };
+    var over = avgPct != null && avgPct > 90;
+    return '<section class="nx-card ins-span2"><div class="nx-card__head"><h2 class="nx-card__title">Cargo exposure</h2><span class="nx-dim ins-note">Estimated from load inference; see confidence on each incident</span></div><div class="nx-card__body">' +
+      '<div class="ins-claims">' + stat('Est. cargo exposure', fmt.currency(C.totalEstCargoExposureUsd), 'across recent events') + stat('Hazmat events', fmt.number(C.hazmatEvents), 'higher liability severity', C.hazmatEvents > 0) + stat('Perishable events', fmt.number(C.perishableEvents), 'spoilage clock on loss') + stat('High-value events', fmt.number(C.highValueEvents), 'theft and total-loss exposure') + '</div>' +
+      '<div class="ins-claims ins-gap2">' + stat('Average load', C.avgLoadLb != null ? fmt.number(C.avgLoadLb) + ' lb' : '—', avgPct != null ? Math.round(avgPct) + '% of max payload' : '') + stat('Overweight signal', over ? 'Elevated' : avgPct != null ? 'Normal' : '—', over ? 'Average load above 90% of max payload' : 'Average load within payload limits', over) + '</div>' +
+      '<h3 class="nx-eyebrow" style="margin:var(--nx-sp-4) 0 var(--nx-sp-2)">Exposure by cargo type</h3>' +
+      (bc.length ? '<div class="ins-bars">' + bc.map(function (x) { return '<div class="ins-bar ins-bar--wide"><span>' + esc(fmt.label(x.category)) + '</span><span class="ins-bar__track"><span class="ins-bar__fill" style="width:' + ((x.estValueUsd || 0) / max * 100) + '%;--c:' + (/hazmat/.test(x.category) ? 'var(--nx-sev-critical)' : 'var(--nx-accent)') + '"></span></span><span class="nx-mono" style="text-align:right">' + fmt.currency(x.estValueUsd) + '<span class="nx-faint"> · ' + x.incidents + ' ev</span></span></div>'; }).join('') + '</div>' : '<span class="nx-dim">No load content identified.</span>') + why + '</div></section>';
   }
   function renderDive(id, D) {
     var base = state.fleets.filter(function (x) { return x.id === id; })[0] || {};
@@ -338,6 +382,7 @@
       (dims.length ? '<div class="ins-radar-wrap">' + radar(dims) + '<div class="ins-bars">' + dims.map(function (d) {
         return '<div><div class="ins-bar"><span>' + esc(d.label) + '</span><span class="ins-bar__track"><span class="ins-bar__fill" style="width:' + d.value + '%;--c:' + tierColor('', d.value * 0.7) + '"></span></span><span class="nx-mono" style="text-align:right">' + d.value.toFixed(0) + '</span></div><div class="nx-dim ins-note" style="margin-top:2px">' + d.b.ratePer100Veh + ' vs portfolio ' + d.b.portfolioRatePer100Veh + ' per 100 vehicles · ' + Math.round(d.b.weight * 100) + '% weight · adds ' + d.b.contribution + ' pts</div></div>';
       }).join('') + '</div></div>' : '<span class="nx-dim">No breakdown reported.</span>') + '</div></section>';
+    h += cargoSection(D);
     h += '<section class="nx-card ins-span2"><div class="nx-card__head"><h2 class="nx-card__title">Camera-verified incidents</h2><span class="nx-dim ins-note">' + incs.length + ' most recent</span></div><div class="nx-card__body">' +
       '<div class="ins-fraud"><b>Claims-fraud-resistant evidence.</b> Each event below was independently confirmed by camera AI with video or snapshots, GPS trail and sensor signals. Staged, inflated or unrelated losses can be checked against what the camera recorded.</div>' +
       (incs.length ? '<div class="ins-ev">' + incs.slice(0, 6).map(incidentHTML).join('') + '</div>' : '<span class="nx-dim">No recent verified incidents.</span>') + '</div></section>';
@@ -350,7 +395,7 @@
         return '<li><span class="gain">' + (m.gain == null ? '•' : '−' + Math.max(1, Math.round(m.gain))) + '</span><span>' + esc(m.action) + '<br><span class="nx-dim ins-note">' + esc(m.detail) + '</span></span></li>';
       }).join('') + '</ul><p class="nx-faint ins-note" style="margin:var(--nx-sp-3) 0 0">Point estimates assume the component moves to the portfolio rate.</p>' : '<p class="nx-dim">No component is above the portfolio rate. Maintain current practice.</p>') + '</div></section>';
     h += '</div><p class="ins-print-only nx-faint ins-note" style="margin-top:16px">Generated by Nexus Response · ' + esc(fmt.dateTime(new Date())) + '</p>';
-    $('#view-dive').innerHTML = h; document.title = f.name + ' — Nexus Response Insurer';
+    $('#view-dive').innerHTML = h; document.title = f.name + ' — Nexus Response Insurer'; hydrateLoads(incs);
   }
 
   /* ---------- events ---------- */

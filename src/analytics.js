@@ -9,6 +9,23 @@ const HARSH = ['harsh_brake', 'harsh_accel', 'harsh_turn'];
 const DISTRACT = ['distracted', 'following_distance'];
 const MAINT = ['fault_code', 'breakdown', 'tire', 'battery'];
 const isFP = (i) => i.camera && i.camera.aiVerdict === 'false_positive';
+const midVal = (i) => (i.load && i.load.contents && i.load.contents.estimatedValueUsd ? (i.load.contents.estimatedValueUsd[0] + i.load.contents.estimatedValueUsd[1]) / 2 : 0);
+const CARGO_EVENTS = ['collision', 'rollover', 'breakdown'];
+function cargoExposure(incs) {
+  const withLoad = incs.filter((i) => i.load && !isFP(i) && i.load.estimatedWeightLb > 300);
+  const exp = withLoad.filter((i) => CARGO_EVENTS.includes(i.eventType));
+  const by = {};
+  exp.forEach((i) => { const c = i.load.contents.category; const e = (by[c] = by[c] || { category: c, incidents: 0, estValueUsd: 0 }); e.incidents++; e.estValueUsd += Math.round(midVal(i)); });
+  const pct = withLoad.filter((i) => i.load.payloadPctOfMax != null);
+  return {
+    avgLoadLb: withLoad.length ? Math.round(withLoad.reduce((s, i) => s + i.load.estimatedWeightLb, 0) / withLoad.length) : 0,
+    avgLoadPctOfMax: pct.length ? Math.round(pct.reduce((s, i) => s + i.load.payloadPctOfMax, 0) / pct.length) : 0,
+    byContent: Object.values(by).sort((a, b) => b.estValueUsd - a.estValueUsd),
+    hazmatEvents: exp.filter((i) => i.load.contents.hazmat).length, perishableEvents: exp.filter((i) => i.load.contents.temperatureSensitive).length,
+    highValueEvents: exp.filter((i) => i.load.contents.estimatedValueUsd[1] >= 50000).length, overweightEvents: withLoad.filter((i) => i.load.overweightRisk).length,
+    incidentsWithLoadContext: withLoad.length, totalEstCargoExposureUsd: Math.round(exp.reduce((s, i) => s + midVal(i), 0)),
+  };
+}
 const mins = (a, b) => (new Date(b) - new Date(a)) / 60000;
 
 const COMPONENTS = [
@@ -72,7 +89,7 @@ function fleetMetrics(fleet, incs, now = Date.now()) {
   return {
     id: fleet.id, name: fleet.name, vendor: fleet.vendor, vehicles: nVeh, riskScore, riskTier: tierOf(riskScore), components: comps,
     events30d: mine.length, events30dPer100veh: per100(mine.length), collisionRate: comps[0].rate, trend, cameraCoveragePct, verifiedEventPct,
-    falsePositivesFiltered: mine.length - real.length, estLossUsd: Math.round(estLoss), estMonthlyPremiumUsd: Math.round(premiumMonthly),
+    falsePositivesFiltered: mine.length - real.length, estLossUsd: Math.round(estLoss), estMonthlyPremiumUsd: Math.round(premiumMonthly), cargo: cargoExposure(mine),
   };
 }
 
@@ -90,7 +107,7 @@ async function portfolio() {
   for (const c of COMPONENTS) avgByKey[c.key] = round(metrics.reduce((s, m) => s + m.components.find((x) => x.key === c.key).rate, 0) / metrics.length, 1);
   const fleets = metrics.map((m) => ({
     id: m.id, name: m.name, vendor: m.vendor, vehicles: m.vehicles, riskScore: m.riskScore, riskTier: m.riskTier, events30dPer100veh: m.events30dPer100veh,
-    collisionRate: m.collisionRate, topRiskFactors: topFactors(m, avgByKey), trend: m.trend, cameraCoveragePct: m.cameraCoveragePct, verifiedEventPct: m.verifiedEventPct,
+    collisionRate: m.collisionRate, avgLoadPctOfMax: m.cargo.avgLoadPctOfMax, cargoExposureUsd: m.cargo.totalEstCargoExposureUsd, topRiskFactors: topFactors(m, avgByKey), trend: m.trend, cameraCoveragePct: m.cameraCoveragePct, verifiedEventPct: m.verifiedEventPct,
   }));
   const totalVeh = metrics.reduce((s, m) => s + m.vehicles, 0);
   const loss = metrics.reduce((s, m) => s + m.estLossUsd, 0), prem = metrics.reduce((s, m) => s + m.estMonthlyPremiumUsd, 0);
@@ -142,6 +159,7 @@ async function fleetDeepDive(fleetId) {
     riskScore: m.riskScore, riskTier: m.riskTier, trend: m.trend, weights: COMPONENTS.map((c) => ({ key: c.key, weight: c.weight })),
     scoreBreakdown: m.components.map((c) => ({ key: c.key, label: c.label, score: c.score, weight: c.weight, contribution: round(c.score * c.weight, 1), count: c.count, ratePer100Veh: c.rate, portfolioRatePer100Veh: avgByKey[c.key], detail: c.unit })),
     kpis: { events30d: m.events30d, events30dPer100veh: m.events30dPer100veh, collisionRate: m.collisionRate, cameraCoveragePct: m.cameraCoveragePct, verifiedEventPct: m.verifiedEventPct, falsePositivesFiltered: m.falsePositivesFiltered, openMaintenanceItems: openDtc },
+    cargoExposure: (() => { const c = m.cargo; return { avgLoadLb: c.avgLoadLb, avgLoadPctOfMax: c.avgLoadPctOfMax, byContent: c.byContent, hazmatEvents: c.hazmatEvents, perishableEvents: c.perishableEvents, highValueEvents: c.highValueEvents, overweightEvents: c.overweightEvents, incidentsWithLoadContext: c.incidentsWithLoadContext, totalEstCargoExposureUsd: c.totalEstCargoExposureUsd }; })(),
     driversRanked: drivers.slice(0, 12), recentVerifiedIncidents: verified, weeklyTrend: weekly,
     pricingSignal: {
       suggestedPremiumAdjustmentPct: adj, direction: adj > 1 ? 'surcharge' : adj < -1 ? 'credit' : 'neutral',
@@ -179,9 +197,11 @@ async function fleetSummary(fleetId) {
     kpis: {
       openIncidents: open.length, mttrMin: mttr, eventsLast30d: incs.length, roadsideCalls: incs.filter((i) => i.roadside && i.roadside.needed && i.roadside.assignedProvider).length,
       warrantyRecoveredUsd: Math.round(recovered), warrantyPendingUsd: Math.round(pendingClaims.reduce((s, i) => s + i.warranty.claimPacket.estimatedValueUsd, 0)), warrantyClaimsPending: pendingClaims.length,
+      cargoAtRiskUsd: Math.round(open.filter((i) => !isFP(i) && CARGO_EVENTS.includes(i.eventType)).reduce((s, i) => s + midVal(i), 0)), incidentsWithLoadContext: incs.filter((i) => i.load).length,
       safetyScore: fleetScore, cameraVerifiedPct: incs.length ? Math.round((100 * incs.filter((i) => i.camera.verified).length) / incs.length) : 0,
     },
     trend, byType,
+    byContent: (() => { const b = {}; incs.filter((i) => i.load && !isFP(i) && i.load.estimatedWeightLb > 300).forEach((i) => { const c = i.load.contents.category; b[c] = (b[c] || 0) + 1; }); return b; })(),
     topDrivers: [...rows].sort((a, b) => a.safetyScore - b.safetyScore).slice(0, 5),
     bestDrivers: [...rows].sort((a, b) => b.safetyScore - a.safetyScore).slice(0, 5),
     vehicles: fleet.vehicles.map((v) => {

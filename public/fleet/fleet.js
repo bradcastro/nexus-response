@@ -49,7 +49,7 @@
     $('fleet-sub').textContent = fmt.number(S.fleet.vehicles) + ' vehicles · ' + fmt.number(S.fleet.drivers) + ' drivers';
     renderSource();
     S.summary = null; S.incidents = [];
-    ['overview', 'incidents', 'warranty', 'drivers', 'vehicles'].forEach(function (v) { $('v-' + v).innerHTML = ''; $('v-' + v).appendChild(NX.skeleton(4)); });
+    ['overview', 'incidents', 'warranty', 'drivers', 'vehicles', 'loads'].forEach(function (v) { $('v-' + v).innerHTML = ''; $('v-' + v).appendChild(NX.skeleton(4)); });
     $('error').classList.add('nx-hide');
     load().catch(fatal);
     if (S.sse) S.sse.close();
@@ -80,12 +80,12 @@
     if (fresh) S.incidents.unshift(inc); else S.incidents[idx] = inc;
     sortIncidents();
     S.flash = fresh ? inc.id : null;
-    renderCounts(); renderIncidentsTables();
+    renderCounts(); renderIncidentsTables(); renderLoads();
     if (S.openId === inc.id) renderDrawer(inc);
     if (fresh) NX.toast(typeLabel(inc.eventType) + ' · ' + ((inc.vehicle && inc.vehicle.plate) || 'vehicle') + ' (' + inc.severity + ')', inc.severity === 'critical' ? 'critical' : 'info');
     clearTimeout(S.timer);
     S.timer = setTimeout(function () {
-      NX.api('/api/fleets/' + encodeURIComponent(S.fleet.id) + '/summary').then(function (s) { S.summary = s; renderKpis(); renderTrend(); renderTypes(); renderMarkers(); renderVehicles(); renderDrivers(); renderWarranty(); }).catch(function () { /* keep stale */ });
+      NX.api('/api/fleets/' + encodeURIComponent(S.fleet.id) + '/summary').then(function (s) { S.summary = s; renderKpis(); renderTrend(); renderTypes(); renderMarkers(); renderVehicles(); renderDrivers(); renderWarranty(); renderLoads(); renderCargo(); }).catch(function () { /* keep stale */ });
     }, 600);
   }
 
@@ -107,17 +107,19 @@
     $('cnt-inc').textContent = S.incidents.filter(isOpen).length;
     $('cnt-war').textContent = claims().length;
     $('cnt-drv').textContent = drivers().length;
+    $('cnt-load').textContent = loads().length;
     $('cnt-veh').textContent = ((S.summary && S.summary.vehicles) || []).length;
   }
   function renderAll() {
     renderCounts();
     $('v-overview').innerHTML = overviewHTML();
-    renderKpis(); renderTrend(); renderTypes(); renderSources(); initMap(); renderMarkers();
+    renderKpis(); renderTrend(); renderTypes(); renderCargo(); renderSources(); initMap(); renderMarkers();
     $('v-incidents').innerHTML = '<div id="inc-filters"></div><div id="inc-table"></div>';
     $('v-warranty').innerHTML = '<div id="war-body"></div>';
     $('v-drivers').innerHTML = '<div id="drv-body"></div>';
     $('v-vehicles').innerHTML = '<div id="veh-body"></div>';
-    renderIncidentsTables(); renderWarranty(); renderDrivers(); renderVehicles();
+    $('v-loads').innerHTML = '<div id="load-body"></div>';
+    renderIncidentsTables(); renderWarranty(); renderDrivers(); renderVehicles(); renderLoads();
     if (S.view === 'overview' && S.map) setTimeout(function () { S.map.invalidateSize(); }, 50);
     var m = location.hash.match(/^#incident=(.+)$/); if (m) openIncident(decodeURIComponent(m[1]));
   }
@@ -129,6 +131,7 @@
       '<div class="nx-card"><div class="nx-card__head"><h3 class="nx-card__title">Events by type</h3></div><div class="nx-card__body" id="types"></div></div></div>' +
       '<div class="nx-card" style="margin-bottom:16px"><div class="nx-card__head"><h3 class="nx-card__title">Live fleet map</h3><span class="nx-dim nx-mono" id="map-sum"></span></div><div class="fl-map" id="map"></div>' +
       '<div class="fl-legend"><span><i style="--c:var(--nx-ok)"></i>Rolling / healthy</span><span><i style="--c:var(--nx-text-faint)"></i>Idle / stopped</span><span><i style="--c:var(--nx-sev-medium)"></i>Open trouble codes</span><span><i style="--c:var(--nx-danger)"></i>Down / incident</span><span class="nx-faint">Badge number = open trouble codes</span></div></div>' +
+      '<div class="nx-card" style="margin-bottom:16px"><div class="nx-card__head"><h3 class="nx-card__title">Cargo exposure by content</h3><span class="nx-dim nx-mono">estimated</span></div><div class="nx-card__body" id="cargo"></div></div>' +
       '<div class="fl-grid fl-grid--even"><div class="nx-card"><div class="nx-card__head"><h3 class="nx-card__title">Recent incidents</h3><button class="nx-btn nx-btn--sm nx-btn--ghost" data-go="incidents">View all</button></div><div class="nx-card__body nx-card--flush" id="recent"></div></div>' +
       '<div class="nx-card"><div class="nx-card__head"><h3 class="nx-card__title">Data sources</h3></div><div class="nx-card__body" id="sources"></div></div></div>';
   }
@@ -141,7 +144,8 @@
       ['Events, last 30d', fmt.number(k.eventsLast30d), '', 'all event types'],
       ['Roadside calls', fmt.number(k.roadsideCalls), '', 'dispatched by Nexus'],
       ['Warranty recovered', fmt.currency(k.warrantyRecoveredUsd), 'nx-kpi--ok', 'OEM claims'],
-      ['Fleet safety score', sc == null ? '—' : fmt.number(sc, 0), '', 'out of 100']
+      ['Fleet safety score', sc == null ? '—' : fmt.number(sc, 0), '', 'out of 100'],
+      ['Cargo at risk', k.cargoAtRiskUsd == null ? '—' : fmt.currency(k.cargoAtRiskUsd), (k.cargoAtRiskUsd ? 'nx-kpi--critical' : ''), (k.incidentsWithLoadContext != null ? k.incidentsWithLoadContext + ' incidents with load context' : 'estimated, open incidents')]
     ];
     $('kpis').innerHTML = items.map(function (i) { return '<div class="nx-kpi ' + i[2] + '"><div class="nx-kpi__label">' + i[0] + '</div><div class="nx-kpi__value">' + esc(i[1]) + '</div><div class="nx-kpi__delta">' + i[3] + '</div></div>'; }).join('');
     $('main').querySelectorAll('[data-go]').forEach(function (b) { b.onclick = function () { show(b.dataset.go); }; });
@@ -312,6 +316,8 @@
     h += sec('What Nexus did', '', '<div class="fl-steps">' + steps.map(function (s, i) { return '<div class="fl-step' + (s.done ? ' done' : '') + (i === firstOpen ? ' now' : '') + '">' + s.k + '<small>' + (s.t ? fmt.time(s.t) : (s.done ? '' : (i === firstOpen ? 'in progress' : 'pending'))) + '</small></div>'; }).join('') + '</div>' +
       ((inc.timeline && inc.timeline.length) ? '<ul class="nx-timeline" style="margin-top:16px">' + inc.timeline.slice().sort(function (a, b) { return new Date(a.t) - new Date(b.t); }).map(function (e, i, arr) { return '<li class="nx-timeline__item is-' + esc(e.actor || 'system') + (i === arr.length - 1 ? ' is-latest' : '') + '"><div class="nx-timeline__time">' + esc(fmt.dateTime(e.t)) + ' · ' + esc(e.actor || 'system') + '</div><div class="nx-timeline__action">' + esc(fmt.label(e.action)) + '</div>' + (e.note ? '<div class="nx-timeline__note">' + esc(e.note) + '</div>' : '') + '</li>'; }).join('') + '</ul>' : ''));
 
+    h += contextSection(inc);
+
     if (c) {
       var conf = c.confidence == null ? null : Math.round(c.confidence * 100);
       var media = (c.snapshots || []).map(function (s) { return mediaTile('img', s.url, 'Snapshot' + (s.type ? ' · ' + s.type : '')); }).concat((c.clips || []).map(function (s) { return mediaTile('video', s.url, (s.type === 'driver' ? 'Driver-facing' : 'Road-facing') + ' clip' + (s.durationSec ? ' · ' + s.durationSec + 's' : '')); }));
@@ -357,6 +363,130 @@
     var asImg = kind === 'img' || /\.(svg|png|jpe?g|webp|gif)(\?|$)/i.test(url || '');
     var inner = url ? (asImg ? '<img src="' + esc(url) + '" alt="' + esc(label) + '" loading="lazy">' : '<video src="' + esc(url) + '" controls preload="none" muted></video>') : '';
     return '<div class="tile">' + inner + '<span class="lbl">' + (kind === 'video' ? '▶ ' : '') + esc(label) + '</span></div>';
+  }
+
+
+  /* ---------------- load / context helpers ---------------- */
+  var CATS = { perishable_food: 'Perishable food', frozen_food: 'Frozen food', dry_grocery: 'Dry grocery', beverage: 'Beverage', building_materials: 'Building materials', steel: 'Steel', lumber: 'Lumber', machinery: 'Machinery', vehicles: 'Vehicles', fuel_liquid: 'Liquid fuel', hazmat: 'Hazmat', aggregate: 'Aggregate', parcel: 'Parcel', unknown: 'Unknown' };
+  var catLabel = function (c) { return CATS[c] || fmt.label(c || 'unknown'); };
+  var PLACES = { food_distributor: 'Food distributor', grocery_dc: 'Grocery DC', cold_storage: 'Cold storage', steel_yard: 'Steel yard', lumber_yard: 'Lumber yard', building_supply: 'Building supply', fuel_stop: 'Fuel stop', truck_stop: 'Truck stop', port: 'Port', manufacturer: 'Manufacturer', farm: 'Farm', quarry: 'Quarry', retail_dc: 'Retail DC', parcel_hub: 'Parcel hub', unknown: 'Stop' };
+  var lb = function (n) { return n == null ? '—' : fmt.number(n) + ' lb'; };
+  var usdRange = function (a) { return !a ? '—' : Array.isArray(a) ? (a[0] === a[1] ? fmt.currency(a[0]) : fmt.currency(a[0]) + ' – ' + fmt.currency(a[1])) : fmt.currency(a); };
+  var usdMid = function (a) { return !a ? 0 : Array.isArray(a) ? (num(a[0], 0) + num(a[1], 0)) / 2 : num(a, 0); };
+  function shiftRisk(i) {
+    var t = i.equipment && i.equipment.trailer && i.equipment.trailer.type, c = i.load && i.load.contents && i.load.contents.category;
+    return ['flatbed', 'lowboy', 'car_hauler'].indexOf(t) > -1 || ['steel', 'lumber', 'machinery', 'vehicles'].indexOf(c) > -1;
+  }
+  function spoilLeft(i) { // hours left on spoilage clock from incident time
+    var c = i.load && i.load.contents; if (!c || c.spoilageRiskHours == null) return null;
+    return c.spoilageRiskHours - (Date.now() - new Date(i.timestamp)) / 3600000;
+  }
+  function loads() { return S.incidents.filter(function (i) { return i.load && i.load.estimatedWeightLb != null; }); }
+  function spark(series, key, color, label, unit) {
+    var pts = (series || []).filter(function (p) { return p[key] != null; });
+    if (pts.length < 2) return '';
+    var W = 240, H = 56, mn = Math.min.apply(null, pts.map(function (p) { return p[key]; })), mx = Math.max.apply(null, pts.map(function (p) { return p[key]; }));
+    if (mx === mn) { mx += 1; mn -= 1; }
+    var d = pts.map(function (p, i) { return (i * W / (pts.length - 1)).toFixed(1) + ',' + (H - 4 - (p[key] - mn) / (mx - mn) * (H - 8)).toFixed(1); }).join(' ');
+    return '<div class="fl-spark"><div class="fl-spark__l"><span>' + label + '</span><b class="nx-mono">' + pts[pts.length - 1][key].toFixed(key === 'fuelMpg' ? 1 : 0) + unit + '</b></div><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="' + label + ' over time"><polyline points="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></div>';
+  }
+  function delta(v, unit, goodDown) { if (v == null) return ''; var up = v > 0; return '<span class="' + ((goodDown ? !up : up) ? 'fl-d-ok' : 'fl-d-bad') + ' nx-mono">' + (up ? '+' : '') + Number(v).toFixed(1) + unit + '</span>'; }
+
+  function contextSection(inc) {
+    var tr = inc.trip, eq = inc.equipment, ld = inc.load, wd = inc.warrantyDealer, rs = inc.roadside;
+    if (!tr && !eq && !ld && !wd) return '';
+    var h = '';
+    if (tr && tr.lastStop) {
+      var ls = tr.lastStop;
+      h += '<div class="fl-ctx"><div class="fl-ctx__t">Last stop</div><b>' + esc(ls.businessName || ls.name) + '</b> <span class="nx-dim">' + esc(PLACES[ls.placeType] || fmt.label(ls.placeType)) + '</span><div class="nx-dim" style="font-size:12px">' +
+        [ls.dwellMin != null ? ls.dwellMin + ' min dwell' : '', ls.minutesBeforeIncident != null ? ls.minutesBeforeIncident + ' min before event' : '', ls.milesSinceStop != null ? fmt.number(ls.milesSinceStop, 1) + ' mi since' : ''].filter(Boolean).join(' · ') + '</div>' +
+        (ls.address ? '<div class="nx-faint" style="font-size:12px">' + esc(ls.address) + '</div>' : '') + '</div>';
+    }
+    var te = tr && tr.telemetry;
+    if (te) {
+      var b = te.before || {}, a = te.after || {};
+      h += '<div class="fl-ctx"><div class="fl-ctx__t">Engine load and fuel economy around the stop</div><div class="fl-spark-wrap">' + spark(te.series, 'engineLoadPct', 'var(--nx-accent)', 'Engine load', '%') + spark(te.series, 'fuelMpg', 'var(--nx-info)', 'Fuel economy', ' mpg') + '</div>' +
+        '<div class="fl-kvs" style="margin-top:8px"><div><span>Before stop</span><b class="nx-mono" style="font-size:12px">' + (b.avgEngineLoadPct != null ? Math.round(b.avgEngineLoadPct) + '% load' : '—') + ' · ' + (b.avgFuelMpg != null ? Number(b.avgFuelMpg).toFixed(1) + ' mpg' : '—') + '</b></div><div><span>After departure</span><b class="nx-mono" style="font-size:12px">' + (a.avgEngineLoadPct != null ? Math.round(a.avgEngineLoadPct) + '% load' : '—') + ' · ' + (a.avgFuelMpg != null ? Number(a.avgFuelMpg).toFixed(1) + ' mpg' : '—') + '</b></div><div><span>Load change</span><b>' + (delta(te.deltaEngineLoadPct, '%', false) || '—') + '</b></div><div><span>Fuel economy change</span><b>' + (delta(te.deltaFuelMpg, ' mpg', false) || '—') + '</b></div></div></div>';
+    }
+    var t = eq && eq.trailer;
+    if (t || (eq && eq.tractor)) {
+      var tc = eq.tractor || {};
+      h += '<div class="fl-ctx"><div class="fl-ctx__t">Trailer</div>' + (t && t.attached !== false && t.type !== 'none' ?
+        '<b>' + esc(fmt.label(t.type)) + '</b>' + (t.lengthFt ? ' <span class="nx-dim">' + t.lengthFt + ' ft</span>' : '') + ' ' + (t.cameraVerified ? NX.badgeHTML('Camera verified', 'ok') : NX.badgeHTML('Inferred', 'plain')) +
+        '<div class="nx-dim" style="font-size:12px;margin-top:4px">' + (t.cameraBasis ? esc(t.cameraBasis) : 'Detected by ' + esc(fmt.label(t.detectedBy || 'inferred'))) + (t.maxPayloadLb ? ' · max payload ' + lb(t.maxPayloadLb) : '') + '</div>' +
+        (t.reefer ? '<div style="font-size:13px;margin-top:4px">Reefer ' + (t.reefer.unitRunning ? 'running' : 'off') + (t.reefer.setpointF != null ? ' · setpoint ' + t.reefer.setpointF + 'F' : '') + (t.reefer.returnAirF != null ? ' · return air ' + t.reefer.returnAirF + 'F' : '') + (t.reefer.fuelPct != null ? ' · fuel ' + t.reefer.fuelPct + '%' : '') + '</div>' : '')
+        : '<span class="nx-dim">No trailer attached (' + esc(fmt.label(tc.class || 'straight truck')) + ')</span>') + '</div>';
+    }
+    if (ld) {
+      var c = ld.contents || {}, pct = ld.payloadPctOfMax, sl = spoilLeft(inc), open = isOpen(inc);
+      h += '<div class="fl-ctx"><div class="fl-ctx__t">Estimated load <span class="nx-faint">· estimate, not scale weight</span></div>' +
+        '<div class="nx-row" style="justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><div><span class="fl-big">' + lb(ld.estimatedWeightLb) + '</span>' + (ld.weightRangeLb ? ' <span class="nx-dim nx-mono" style="font-size:11px">range ' + fmt.number(ld.weightRangeLb[0]) + '–' + fmt.number(ld.weightRangeLb[1]) + '</span>' : '') + '</div><div>' + (ld.overweightRisk ? NX.badgeHTML('Overweight risk', 'danger') : NX.badgeHTML('Within limits', 'ok')) + '</div></div>' +
+        (pct != null ? '<div class="nx-meter" style="margin:8px 0 4px"><i style="width:' + Math.min(100, pct) + '%;--c:' + (pct > 100 ? 'var(--nx-danger)' : pct > 90 ? 'var(--nx-sev-medium)' : 'var(--nx-ok)') + '"></i></div><div class="nx-dim nx-mono" style="font-size:11px">' + Math.round(pct) + '% of max payload' + (ld.grossVehicleWeightLb ? ' · GVW ' + lb(ld.grossVehicleWeightLb) : '') + '</div>' : '') +
+        '<div style="margin-top:10px"><b>' + esc(c.label || catLabel(c.category)) + '</b> ' + (c.hazmat ? NX.badgeHTML('Hazmat', 'danger') : '') + (c.temperatureSensitive ? NX.badgeHTML('Temperature sensitive', 'info') : '') + (shiftRisk(inc) ? NX.badgeHTML('Shifting-load risk', 'warn') : '') + '</div>' +
+        (c.examples && c.examples.length ? '<div class="nx-dim" style="font-size:12px">e.g. ' + esc(c.examples.join(', ')) + '</div>' : '') +
+        (c.estimatedValueUsd ? '<div style="font-size:13px;margin-top:4px">Cargo value ' + usdRange(c.estimatedValueUsd) + '</div>' : '') +
+        (sl != null && c.spoilageRiskHours != null ? '<div class="fl-clock ' + (sl < 0 ? 'bad' : sl < 2 ? 'warn' : '') + '">' + (open ? (sl <= 0 ? 'Spoilage window passed' : 'Spoilage clock: about ' + (sl < 1 ? Math.round(sl * 60) + ' min' : sl.toFixed(1) + ' h') + ' left') : 'Spoilage window was ' + c.spoilageRiskHours + ' h') + '</div>' : '') +
+        (ld.cameraVisual && ld.cameraVisual.description ? '<div class="fl-note" style="margin-top:8px">Camera sees: ' + esc(ld.cameraVisual.description) + (ld.cameraVisual.confidence != null ? ' (' + Math.round(ld.cameraVisual.confidence * 100) + '%)' : '') + '</div>' : '') +
+        ((ld.basis && ld.basis.length) ? '<details class="fl-how"' + '><summary>How we know' + (ld.confidence != null ? ' · ' + Math.round(ld.confidence * 100) + '% confidence' : '') + '</summary><ul>' + ld.basis.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' + (ld.method ? '<div class="nx-faint nx-mono" style="font-size:10.5px">Method: ' + esc(fmt.label(ld.method)) + '</div>' : '') + '</details>' : '') + '</div>';
+    }
+    if (rs && rs.towDestination) { var td = rs.towDestination; h += '<div class="fl-ctx"><div class="fl-ctx__t">Tow destination</div><b>' + esc(td.name) + '</b> <span class="nx-dim">' + esc(fmt.label(td.kind)) + '</span><div class="nx-dim" style="font-size:12px">' + esc(td.address || '') + (td.distanceMi != null ? ' · ' + fmt.number(td.distanceMi, 1) + ' mi' : '') + '</div></div>'; }
+    if (wd && wd.nearest) {
+      var n = wd.nearest;
+      h += '<div class="fl-ctx"><div class="fl-ctx__t">OEM warranty dealer · ' + esc(wd.oem || '') + '</div><b>' + esc(n.name) + '</b> ' + (n.open24x7 ? NX.badgeHTML('Open 24/7', 'ok') : '') + (n.heavyDutyBays ? NX.badgeHTML('Heavy-duty bays', 'info') : '') + (n.hasPartsInStock ? NX.badgeHTML('Parts in stock', 'ok') : '') +
+        '<div class="nx-dim" style="font-size:12px">' + esc(n.address || '') + '</div><div class="fl-kvs" style="margin-top:6px"><div><span>Distance / drive</span><b>' + (n.distanceMi != null ? fmt.number(n.distanceMi, 1) + ' mi' : '—') + (n.driveEtaMin != null ? ' · ' + n.driveEtaMin + ' min' : '') + '</b></div><div><span>Phone</span><b class="nx-mono" style="font-size:12px">' + esc(n.phone || '—') + '</b></div><div><span>Hours</span><b>' + esc(n.hours || '—') + '</b></div><div><span>Pre-authorization</span><b>' + (wd.authorizationRequired ? esc(wd.preAuthNumber || 'Required') : 'Not required') + '</b></div></div>' +
+        (wd.reason ? '<div class="nx-dim" style="font-size:12px;margin-top:6px">' + esc(wd.reason) + '</div>' : '') +
+        ((wd.alternates && wd.alternates.length) ? '<div class="nx-faint" style="font-size:12px;margin-top:6px">Alternates: ' + wd.alternates.map(function (x) { return esc(x.name) + (x.distanceMi != null ? ' (' + fmt.number(x.distanceMi, 0) + ' mi)' : ''); }).join(' · ') + '</div>' : '') + '</div>';
+    }
+    return sec('What was happening', '', h);
+  }
+
+  /* ---------------- cargo overview ---------------- */
+  function renderCargo() {
+    var host = $('cargo'); if (!host) return;
+    var bc = S.summary && S.summary.byContent, rows = [];
+    if (Array.isArray(bc)) rows = bc.map(function (r) { return { cat: r.category || r.content || r.name, n: num(r.incidents != null ? r.incidents : r.count, 0), usd: usdMid(r.estValueUsd != null ? r.estValueUsd : r.valueUsd) }; });
+    else if (bc && typeof bc === 'object') rows = Object.keys(bc).map(function (k) { var v = bc[k]; return typeof v === 'object' ? { cat: k, n: num(v.incidents != null ? v.incidents : v.count, 0), usd: usdMid(v.estValueUsd != null ? v.estValueUsd : v.valueUsd) } : { cat: k, n: num(v, 0), usd: 0 }; });
+    else { var m = {}; loads().forEach(function (i) { var c = (i.load.contents || {}); var k = c.category || 'unknown'; m[k] = m[k] || { cat: k, n: 0, usd: 0 }; m[k].n++; m[k].usd += usdMid(c.estimatedValueUsd); }); rows = Object.keys(m).map(function (k) { return m[k]; }); }
+    rows = rows.filter(function (r) { return r.cat; }).sort(function (a, b) { return b.usd - a.usd || b.n - a.n; });
+    if (!rows.length) { host.innerHTML = ''; host.appendChild(NX.empty('No load context yet', 'Cargo estimates appear when incidents include trip and load data.')); return; }
+    var max = Math.max.apply(null, rows.map(function (r) { return r.usd || r.n; })) || 1;
+    host.innerHTML = '<div class="fl-bars">' + rows.slice(0, 8).map(function (r) {
+      return '<div class="fl-bar fl-bar--wide"><span title="' + esc(catLabel(r.cat)) + '">' + esc(catLabel(r.cat)) + '</span><div class="nx-meter"><i style="width:' + ((r.usd || r.n) / max * 100) + '%"></i></div><span class="fl-bar__n">' + (r.usd ? fmt.currency(r.usd) : '') + ' · ' + r.n + '</span></div>';
+    }).join('') + '</div><p class="fl-note">Values are estimates from stop type, trailer and load inference; open incidents drive the cargo-at-risk total.</p>';
+  }
+
+  /* ---------------- loads view ---------------- */
+  function renderLoads() {
+    var host = $('load-body'); if (!host) return;
+    var ls = loads();
+    if (!ls.length) { host.innerHTML = ''; host.appendChild(NX.empty('No load context yet', 'Estimated payload appears here once Nexus can place a vehicle at a pickup stop.')); return; }
+    var f = S.loadFilter || 'all';
+    var ow = ls.filter(function (i) { return i.load.overweightRisk; }), per = ls.filter(function (i) { var c = i.load.contents || {}; return c.temperatureSensitive || c.spoilageRiskHours != null; }), sh = ls.filter(shiftRisk), hz = ls.filter(function (i) { return i.load.contents && i.load.contents.hazmat; });
+    var avg = ls.filter(function (i) { return i.load.payloadPctOfMax != null; });
+    var avgPct = avg.length ? avg.reduce(function (a, i) { return a + i.load.payloadPctOfMax; }, 0) / avg.length : null;
+    var clocks = per.filter(function (i) { var l = spoilLeft(i); return isOpen(i) && l != null && l > 0; });
+    var sets = { all: ls, over: ow, perish: per, shift: sh, hazmat: hz };
+    var rows = sets[f] || ls;
+    var html = '<div class="nx-kpis"><div class="nx-kpi"><div class="nx-kpi__label">Loaded incidents</div><div class="nx-kpi__value">' + ls.length + '</div><div class="nx-kpi__delta">with estimated payload</div></div>' +
+      '<div class="nx-kpi ' + (ow.length ? 'nx-kpi--critical' : '') + '"><div class="nx-kpi__label">Overweight risk</div><div class="nx-kpi__value">' + ow.length + '</div><div class="nx-kpi__delta">over payload or GVW margin</div></div>' +
+      '<div class="nx-kpi ' + (clocks.length ? 'nx-kpi--accent' : '') + '"><div class="nx-kpi__label">Spoilage clocks running</div><div class="nx-kpi__value">' + clocks.length + '</div><div class="nx-kpi__delta">open perishable loads</div></div>' +
+      '<div class="nx-kpi"><div class="nx-kpi__label">Shifting-load risk</div><div class="nx-kpi__value">' + sh.length + '</div><div class="nx-kpi__delta">flatbed / steel / lumber</div></div>' +
+      '<div class="nx-kpi"><div class="nx-kpi__label">Avg payload of max</div><div class="nx-kpi__value">' + (avgPct == null ? '—' : Math.round(avgPct) + '%') + '</div><div class="nx-kpi__delta">' + hz.length + ' hazmat</div></div></div>' +
+      '<div class="fl-filters"><div class="fl-pills nx-chips">' + [['all', 'All', ls], ['over', 'Overweight', ow], ['perish', 'Perishable', per], ['shift', 'Shifting load', sh], ['hazmat', 'Hazmat', hz]].map(function (t) { return '<button class="nx-chip' + (f === t[0] ? ' is-active' : '') + '" data-f="' + t[0] + '">' + t[1] + ' ' + t[2].length + '</button>'; }).join('') + '</div></div>';
+    html += rows.length ? '<div class="nx-card nx-card--flush"><div class="nx-table-wrap"><table class="nx-table"><thead><tr><th>Vehicle</th><th>Event</th><th>Content</th><th class="num">Est. weight</th><th>Payload of max</th><th>Risk flags</th><th>Cargo value</th><th>When</th></tr></thead><tbody>' + rows.slice(0, 150).map(function (i) {
+      var c = i.load.contents || {}, pct = i.load.payloadPctOfMax, sl = spoilLeft(i), fl = [];
+      if (i.load.overweightRisk) fl.push(NX.badgeHTML('Overweight', 'danger'));
+      if (c.hazmat) fl.push(NX.badgeHTML('Hazmat', 'danger'));
+      if (shiftRisk(i)) fl.push(NX.badgeHTML('Shifting load', 'warn'));
+      if (sl != null && isOpen(i)) fl.push(NX.badgeHTML(sl > 0 ? (sl < 1 ? Math.round(sl * 60) + ' min' : sl.toFixed(1) + ' h') + ' to spoil' : 'Spoilage passed', sl > 2 ? 'info' : 'warn'));
+      else if (c.temperatureSensitive) fl.push(NX.badgeHTML('Temp sensitive', 'info'));
+      return '<tr class="fl-row-click" data-id="' + esc(i.id) + '"><td>' + esc(vehLabel(i)) + '<span class="sub">' + esc(vehSub(i)) + '</span></td><td>' + esc(typeLabel(i.eventType)) + '<span class="sub">' + NX.badgeHTML(i.severity) + '</span></td><td>' + esc(c.label || catLabel(c.category)) + '<span class="sub">' + esc(i.equipment && i.equipment.trailer ? fmt.label(i.equipment.trailer.type) : '') + '</span></td><td class="num">' + lb(i.load.estimatedWeightLb) + '<span class="sub">' + (i.load.confidence != null ? Math.round(i.load.confidence * 100) + '% conf.' : '') + '</span></td><td style="min-width:130px">' + (pct == null ? '—' : '<div class="nx-meter"><i style="width:' + Math.min(100, pct) + '%;--c:' + (pct > 100 ? 'var(--nx-danger)' : pct > 90 ? 'var(--nx-sev-medium)' : 'var(--nx-ok)') + '"></i></div><span class="sub nx-mono">' + Math.round(pct) + '%</span>') + '</td><td class="wrap">' + (fl.join(' ') || '<span class="nx-faint">None</span>') + '</td><td>' + usdRange(c.estimatedValueUsd) + '</td><td class="dim nx-mono">' + fmt.ago(i.timestamp) + '</td></tr>';
+    }).join('') + '</tbody></table></div></div>' : '';
+    host.innerHTML = html;
+    if (!rows.length) host.appendChild(NX.empty('Nothing flagged', 'No loads match this filter.'));
+    host.querySelectorAll('[data-f]').forEach(function (b) { b.onclick = function () { S.loadFilter = b.dataset.f; renderLoads(); }; });
+    bindRows(host);
+    var n = $('cnt-load'); if (n) n.textContent = ls.length;
   }
 
   /* ---------------- warranty ---------------- */

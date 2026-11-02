@@ -80,3 +80,15 @@ Fleet portal needs no brand changes. Used: nx-kpis, nx-card, nx-table, nx-chip, 
 
 ## [insurer -> backend] Insurer API response shapes (follow-up)
 Status: DONE. Verified against live backend (docs/API.md shapes); insurer portal now reads the real shapes with no placeholders. Remaining notes (optional, no action required): portfolio `topRiskFactors` are long sentences (portal shows the text before ":" as a chip and the full text as a tooltip); `claims` totals (time-to-first-notice, evidence packets) are derived client-side from `/api/incidents`.
+
+## [dispatch -> backend] Tow-to-dealer action (ADDENDUM v2)
+Status: OPEN
+Dispatch's "Tow to <dealer>" button POSTs `/api/incidents/:id/dispatch` with `{providerId, note, towDestination:{kind:'oem_dealer',name,address,lat,lng,distanceMi}}`. Please persist `towDestination` into `roadside.towDestination` (and add a timeline entry) on dispatch, or tell dispatch the endpoint you prefer. Until then the UI keeps the destination client-side after the call succeeds.
+Also expected in embedded incident: `trip`, `equipment`, `load`, `warrantyDealer` (per addendum); dispatch falls back to `GET /api/incidents/:id/context` if all four keys are undefined. Acceptance: simulate `warranty_dealer_breakdown`, click Tow to dealer, reload; the dealer still shows as tow destination.
+
+## [backend -> dispatch, fleet, insurer] ADDENDUM v2 shipped (trip/equipment/load/dealer)
+status: DONE (field names exactly as the addendum; docs/API.md has shapes, docs/INFERENCE.md has the model)
+- Embedded on every incident (null only for auto-dismissed false positives): `trip`, `equipment`, `load`, `warrantyDealer`; plus `GET /api/incidents/:id/context`, `GET /api/dealers?oem=&lat=&lng=&limit=`, `GET /api/places?lat=&lng=&radiusMi=&type=`; `roadside.towDestination` when roadside is needed.
+- Small additions beyond the addendum (all optional): `trip.recentStops[0]` is the last stop; `load.contents.confidence`; `trailer.type:"none"` for vans/box trucks (trailer object always present); `cargoExposure.overweightEvents/avgLoadPctOfMax/incidentsWithLoadContext`; fleet summary top-level `byContent:{category:n}`; claim packet JSON has `context{}` and HTML print view has a context section.
+- New simulate scenarios: `reefer_collision`, `flatbed_steel_collision`, `warranty_dealer_breakdown`, `hazmat_tanker_rollover`.
+- Telemetry `series` uses fuelMpg 0 while stopped. Seeded fleets: Bluegrass = milk tankers + reefers, Gulf Coast = mixed (reefer/dry/flatbed/tanker/dump), Piedmont = dry van/reefer/flatbed, Goodyear = wreckers/lowboy, Summit = parcel vans (~1-4k lb).

@@ -98,7 +98,7 @@ function scenarioSpec(name, rng, o = {}) {
   let v = o.vehicleId ? roster.getVehicle(o.vehicleId) : null;
   if (v) fleet = roster.getFleet(v.fleetId);
   if (name === 'random') {
-    name = weighted(rng, [['collision_camera', 2], ['dtc_breakdown', 2], ['warranty_failure', 1], ['false_positive', 1], ['speeding', 1.2], ['harsh_brake', 1.5], ['harsh_turn', 0.6], ['distracted', 1.2], ['following_distance', 0.8], ['tire', 0.7], ['battery', 0.5]]);
+    name = weighted(rng, [['collision_camera', 2], ['dtc_breakdown', 2], ['warranty_failure', 1], ['false_positive', 1], ['reefer_collision', 0.8], ['flatbed_steel_collision', 0.6], ['warranty_dealer_breakdown', 0.8], ['hazmat_tanker_rollover', 0.3], ['speeding', 1.2], ['harsh_brake', 1.5], ['harsh_turn', 0.6], ['distracted', 1.2], ['following_distance', 0.8], ['tire', 0.7], ['battery', 0.5]]);
   }
   switch (name) {
     case 'collision_camera': {
@@ -128,6 +128,30 @@ function scenarioSpec(name, rng, o = {}) {
       const coll = rng() < 0.6;
       return { name, fleet, spec: makeSpec(rng, fleet, v, coll ? 'collision' : 'harsh_brake', { timestamp: ts, hasCamera: true, gForce: coll ? round(range(rng, 1.0, 1.6), 1) : 0.22, airbag: false, aiLabel: 'false_positive', aiConfidence: round(range(rng, 0.9, 0.96), 2), roadSurface: sample(rng, ['railroad crossing', 'pothole', 'speed bump']), speed: int(rng, 28, 55) }) };
     }
+    case 'reefer_collision': case 'flatbed_steel_collision': case 'hazmat_tanker_rollover': {
+      const wantFleets = name === 'hazmat_tanker_rollover' ? ['fleet_gulfcoast'] : name === 'reefer_collision' ? ['fleet_gulfcoast', 'fleet_piedmont', 'fleet_bluegrass'] : ['fleet_gulfcoast', 'fleet_piedmont'];
+      const sleeperKeys = ['fcascadia', 'vnl', 'p579', 'kt680'];
+      if (!v) {
+        if (!fleet || !wantFleets.includes(fleet.id)) fleet = roster.getFleet(sample(rng, wantFleets));
+        const pool = fleet.vehicles.filter((x) => sleeperKeys.includes(x.modelKey) && (name === 'hazmat_tanker_rollover' || x.hasCamera));
+        v = pool.length ? sample(rng, pool) : sample(rng, fleet.vehicles.filter((x) => x.cls === 'heavy'));
+      }
+      const fleetProfile = { reefer_collision: fleet.id === 'fleet_bluegrass' ? 'reefer_dairy' : 'reefer_perishable', flatbed_steel_collision: 'flatbed_steel', hazmat_tanker_rollover: 'tanker_fuel' }[name];
+      const hint = { profile: fleetProfile, tripKind: 'pickup', cameraTrailer: name !== 'hazmat_tanker_rollover', payloadLb: name === 'reefer_collision' ? int(rng, 38000, 44000) : name === 'flatbed_steel_collision' ? int(rng, 40500, 44500) : int(rng, 40000, 45000) };
+      const isRoll = name === 'hazmat_tanker_rollover';
+      const spec = makeSpec(rng, fleet, v, isRoll ? 'rollover' : 'collision', { timestamp: ts, hasCamera: v.hasCamera, gForce: round(range(rng, isRoll ? 4.8 : 4.0, isRoll ? 6.2 : 5.6), 1), airbag: isRoll || rng() < 0.6, aiLabel: 'collision', aiConfidence: round(range(rng, 0.9, 0.97), 2), speed: int(rng, isRoll ? 38 : 50, isRoll ? 56 : 66), facingForward: true });
+      return { name, fleet, spec, contextHint: hint };
+    }
+    case 'warranty_dealer_breakdown': {
+      if (!v) {
+        const pool = [];
+        for (const f of fleets) if (!o.fleetId || f.id === o.fleetId) for (const x of f.vehicles) if (['Freightliner', 'Volvo'].includes(x.oem) && x.cls === 'heavy' && inWarrantyFor(x, 'emissions') && inWarrantyFor(x, 'powertrain')) pool.push(x);
+        v = pool.length ? sample(rng, pool) : sample(rng, fleets[0].vehicles.filter((x) => x.oem === 'Freightliner'));
+      }
+      fleet = roster.getFleet(v.fleetId);
+      const dtcs = rng() < 0.5 ? [{ spn: 102, fmi: 1 }, { spn: 100, fmi: 1 }] : [{ spn: 4364, fmi: 18 }, { spn: 5246, fmi: 0 }, { spn: 3251, fmi: 0 }];
+      return { name, fleet, spec: makeSpec(rng, fleet, v, 'fault_code', { timestamp: ts, dtcs, speed: int(rng, 30, 55), hasCamera: false, odometer_mi: Math.min(v.odometer_mi, 120000) }), contextHint: { tripKind: 'pickup' } };
+    }
     default: {
       const type = ['speeding', 'harsh_brake', 'harsh_turn', 'harsh_accel', 'distracted', 'following_distance', 'tire', 'battery', 'collision', 'fault_code', 'breakdown'].includes(name) ? name : 'harsh_brake';
       v = v || choose();
@@ -136,4 +160,4 @@ function scenarioSpec(name, rng, o = {}) {
   }
 }
 
-module.exports = { makeSpec, scenarioSpec, pickType, pickLoc, pickDtcs, SCENARIOS: ['collision_camera', 'dtc_breakdown', 'warranty_failure', 'false_positive', 'random'] };
+module.exports = { makeSpec, scenarioSpec, pickType, pickLoc, pickDtcs, SCENARIOS: ['collision_camera', 'dtc_breakdown', 'warranty_failure', 'false_positive', 'reefer_collision', 'flatbed_steel_collision', 'warranty_dealer_breakdown', 'hazmat_tanker_rollover', 'random'] };

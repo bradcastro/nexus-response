@@ -30,8 +30,23 @@ Provider ids: `motive | samsara | geotab | lytx | generic`. Fleet ids: `fleet_gu
              claimPacket: null | { status:"draft|ready|submitted", summary, evidence:[str], estimatedValueUsd, laborParts:[{code,parts,estimateUsd}], towEstimateUsd } },
   risk:{ eventScore:0-100, tags:[...] },
   timeline:[ {t, actor:"system|dispatcher|fleet|provider", action, note} ],
-  raw: <original vendor payload> }
+  raw: <original vendor payload>,
+  // --- v2 context (null for dismissed false positives; see docs/INFERENCE.md) ---
+  trip: { tripId, startedAt, startLocation:{lat,lng,address}, distanceMi, durationMin, idleMin,
+          lastStop:{name,placeType,businessName,lat,lng,address,arrivedAt,departedAt,dwellMin,minutesBeforeIncident,milesSinceStop,contentHint},
+          recentStops:[{name,placeType,arrivedAt,departedAt,dwellMin,businessName}],   // most recent first, [0] = lastStop
+          timeline:[{t,kind:"drive|stop|idle|event",label}],
+          telemetry:{ before:{avgEngineLoadPct,avgFuelMpg,avgSpeedMph,avgRpm,sampleCount}, after:{...}, deltaEngineLoadPct, deltaFuelMpg, series:[{t,engineLoadPct,fuelMpg,speedMph}] x60 } },
+  equipment: { tractor:{class,make,model,year,engine,gvwrLb,tareLb,axles,fuelType},
+               trailer:{attached,type,lengthFt,unitId,tareLb,maxPayloadLb,reefer:{setpointF,returnAirF,unitRunning,fuelPct}|null,detectedBy,cameraVerified,cameraBasis} },  // type "none" for vans/box trucks
+  load: { estimatedWeightLb, weightRangeLb:[lo,hi], payloadPctOfMax, grossVehicleWeightLb, overweightRisk, method, confidence, basis:[str],
+          contents:{category,label,examples,estimatedValueUsd:[lo,hi],hazmat,temperatureSensitive,spoilageRiskHours,confidence},
+          cameraVisual:{cargoVisible,description,confidence}|null },
+  warrantyDealer: null | { oem, coverage, nearest:{id,name,brand,type,address,lat,lng,distanceMi,driveEtaMin,phone,hours,open24x7,heavyDutyBays,hasPartsInStock}, alternates:[...], authorizationRequired, preAuthNumber|null, reason },
+  roadside.towDestination?: { kind:"oem_dealer|nearest_shop|fleet_yard", name, address, lat, lng, distanceMi }
+}
 ```
+`risk.tags` additionally may include `hazmat_load`, `high_value_cargo`, `perishable_spoilage_clock`, `overweight_risk`, `shifting_load_risk`.
 Notes: false-positive camera verdicts (confidence >= 0.8) are auto-dismissed (`status:"dismissed"`, timeline `auto_dismissed`). `fault_code` events whose codes are non-drivable become `breakdown`. `warranty` is null only when the VIN can't be decoded.
 
 ## Ingest
@@ -47,7 +62,10 @@ curl -s -XPOST $BASE/webhook/samsara -H 'content-type: application/json' -d @/tm
 **GET /api/incidents?fleetId=&status=&category=&provider=&since=&limit=** (status may be comma list; default limit 100, max 1000; newest first by event timestamp) -> `{incidents:[Incident]}`
 `curl "$BASE/api/incidents?fleetId=fleet_piedmont&status=pending,dispatched&limit=20"`
 
-**GET /api/incidents/:id** -> Incident (404 `{error}`). **GET /api/incidents/:id/raw** -> `{id,provider,raw,clips,snapshots}`.
+**GET /api/incidents/:id** -> Incident (404 `{error}`). **GET /api/incidents/:id/context** -> `{trip, equipment, load, warrantyDealer}` (same objects embedded in the incident; fields null when absent).
+`curl $BASE/api/incidents/NX-10151/context`
+
+**GET /api/incidents/:id/raw** -> `{id,provider,raw,clips,snapshots}`.
 
 Mutations return the updated Incident, append to `timeline`, and push an SSE `incident` event:
 - **POST /api/incidents/:id/dispatch** `{providerId?, note?, actor?}` -> sets `roadside.assignedProvider` (given provider, else recommended), `status:"dispatched"`.
@@ -65,18 +83,23 @@ Add `?format=html` for a print-styled page (open in a new tab). 404 if the VIN c
 **GET /api/providers?lat=&lng=&service=&limit=** -> bare array sorted by distance: `[{id,name,city,st,lat,lng,heavy,services[],rating,phone,distanceMi,etaMin}]` (21 providers across AL/GA/FL/NC/SC/KY/TN/MS). `service` filters by capability (tow_heavy, tow_light, tire, jump_start, fuel, mobile_mechanic). Without lat/lng, distance/eta are null.
 `curl "$BASE/api/providers?lat=31.32&lng=-85.85&service=tow_heavy&limit=3"`
 
+## Dealers and places
+**GET /api/dealers?oem=&lat=&lng=&limit=&heavy=1** -> bare array of OEM dealers/service centers (144; Freightliner, Peterbilt, Kenworth, Volvo, International, Mack, Ford, Mercedes-Benz; AL/FL/GA/NC/SC/KY/TN/MS/LA) sorted by distance: `[{id,name,brand,type:"dealer|service_center|mobile_service",address,lat,lng,phone,hours,open24x7,heavyDutyBays,hasPartsInStock,distanceMi,driveEtaMin}]`.
+`curl "$BASE/api/dealers?oem=Volvo&lat=33.8&lng=-84.4&limit=3"`
+**GET /api/places?lat=&lng=&radiusMi=&type=** -> bare array of known business stops (70 invented businesses): `[{id,name,businessName,placeType,city,st,lat,lng,address,contentHint,distanceMi}]`.
+
 ## Fleets (fleet portal)
 **GET /api/fleets** -> `[{id,name,vendor,vehicles,drivers,region,home,cameraCoveragePct}]`
-**GET /api/fleets/:id/summary** -> `{fleet, kpis:{openIncidents,mttrMin,eventsLast30d,roadsideCalls,warrantyRecoveredUsd,warrantyPendingUsd,warrantyClaimsPending,safetyScore,cameraVerifiedPct}, trend:[{date,count}x30], byType:{eventType:n}, topDrivers:[driverRow x5 lowest score], bestDrivers:[...], vehicles:[{id,unit,plate,year,make,model,status:"ok|attention|incident",lat,lng,speed_mph,openDtcs,openIncidents,hasCamera,driverId}]}`
+**GET /api/fleets/:id/summary** -> `{fleet, kpis:{cargoAtRiskUsd,incidentsWithLoadContext,openIncidents,mttrMin,eventsLast30d,roadsideCalls,warrantyRecoveredUsd,warrantyPendingUsd,warrantyClaimsPending,safetyScore,cameraVerifiedPct}, trend:[{date,count}x30], byType:{eventType:n}, byContent:{category:n}, topDrivers:[driverRow x5 lowest score], bestDrivers:[...], vehicles:[{id,unit,plate,year,make,model,status:"ok|attention|incident",lat,lng,speed_mph,openDtcs,openIncidents,hasCamera,driverId}]}`
 driverRow = `{id,name,vehicleId,safetyScore,events30d,collisions30d,topBehavior}`
 **GET /api/fleets/:id/vehicles[?trail=1]** -> roster `[{id,unit,vin,plate,year,make,model,oem,engine,odometer_mi,hasCamera,driverId,position:{lat,lng,speed_mph,heading,road,city,status},trail?:[{lat,lng,t,speed_mph}]}]`
 **GET /api/fleets/:id/drivers** -> `[driverRow]` (all drivers, 30d stats).
 `curl $BASE/api/fleets/fleet_summit/summary`
 
 ## Insurer portal
-**GET /api/insurer/portfolio** -> `{totals:{fleets,vehicles,events30d,lossRatioProxy,avgRiskScore,verifiedEventPct,falsePositivesFiltered,estLossUsd,vendors}, fleets:[{id,name,vendor,vehicles,riskScore,riskTier:"low|moderate|elevated|high",events30dPer100veh,collisionRate,topRiskFactors[str],trend:"up|down|flat",cameraCoveragePct,verifiedEventPct}], byVendor:[{vendor,fleets,vehicles,avgRisk}], distribution:{low,moderate,elevated,high}, portfolioAvgByComponent:{...}}`
+**GET /api/insurer/portfolio** -> `{totals:{fleets,vehicles,events30d,lossRatioProxy,avgRiskScore,verifiedEventPct,falsePositivesFiltered,estLossUsd,vendors}, fleets:[{id,name,vendor,vehicles,riskScore,riskTier:"low|moderate|elevated|high",events30dPer100veh,collisionRate,topRiskFactors[str],trend:"up|down|flat",cameraCoveragePct,verifiedEventPct,avgLoadPctOfMax,cargoExposureUsd}], byVendor:[{vendor,fleets,vehicles,avgRisk}], distribution:{low,moderate,elevated,high}, portfolioAvgByComponent:{...}}`
 Risk score 0-100 (higher = riskier): weighted components collisions 35%, harsh events 20%, speeding 15%, distraction 15%, maintenance/DTC 15%, from per-100-vehicle 30-day rates; camera-identified false positives excluded. Tiers: <30 low, <44 moderate, <60 elevated, else high.
-**GET /api/insurer/fleets/:id** -> `{fleet, riskScore, riskTier, trend, weights, scoreBreakdown:[{key,label,score,weight,contribution,count,ratePer100Veh,portfolioRatePer100Veh,detail}], kpis, driversRanked:[driverRow], recentVerifiedIncidents:[{id,timestamp,eventType,severity,driver,vehicle,address,aiVerdict,confidence,signals,clip,snapshot,eventScore}], weeklyTrend:[{weekStart,events,collisions,avgEventRisk}], pricingSignal:{suggestedPremiumAdjustmentPct,direction,confidence,rationale[],estMonthlyPremiumUsd,estAdjustmentUsdPerMonth}, benchmark:{portfolioAvgRiskScore,riskScoreDelta,riskRank,of,metrics:[{key,label,fleet,portfolio,deltaPct,percentileLowerIsBetter}]}}`
+**GET /api/insurer/fleets/:id** -> `{fleet, riskScore, riskTier, trend, weights, scoreBreakdown:[{key,label,score,weight,contribution,count,ratePer100Veh,portfolioRatePer100Veh,detail}], kpis, driversRanked:[driverRow], recentVerifiedIncidents:[{id,timestamp,eventType,severity,driver,vehicle,address,aiVerdict,confidence,signals,clip,snapshot,eventScore}], weeklyTrend:[{weekStart,events,collisions,avgEventRisk}], cargoExposure:{avgLoadLb,avgLoadPctOfMax,byContent:[{category,incidents,estValueUsd}],hazmatEvents,perishableEvents,highValueEvents,overweightEvents,incidentsWithLoadContext,totalEstCargoExposureUsd}, pricingSignal:{suggestedPremiumAdjustmentPct,direction,confidence,rationale[],estMonthlyPremiumUsd,estAdjustmentUsdPerMonth}, benchmark:{portfolioAvgRiskScore,riskScoreDelta,riskRank,of,metrics:[{key,label,fleet,portfolio,deltaPct,percentileLowerIsBetter}]}}`
 `curl $BASE/api/insurer/fleets/fleet_piedmont`
 
 ## Live stream
@@ -84,7 +107,7 @@ Risk score 0-100 (higher = riskier): weighted components collisions 35%, harsh e
 `curl -N $BASE/api/stream`; browser: `new EventSource('/api/stream').addEventListener('incident', e => JSON.parse(e.data))`
 
 ## Demo controls
-**POST /api/demo/simulate** `{scenario, fleetId?, vehicleId?, provider?}` - scenarios: `collision_camera`, `dtc_breakdown`, `warranty_failure`, `false_positive`, `random` (also: speeding, harsh_brake, harsh_turn, distracted, following_distance, tire, battery). Builds a vendor-shaped payload for the fleet's vendor and sends it through the real adapter. Returns `{scenario, provider, incident, payload}` (`payload` = the raw vendor JSON, handy for a "before/after normalization" view).
+**POST /api/demo/simulate** `{scenario, fleetId?, vehicleId?, provider?}` - scenarios: `collision_camera`, `dtc_breakdown`, `warranty_failure`, `false_positive`, `reefer_collision` (reefer after a food distributor, camera-verified box, ~38-44k lb perishable), `flatbed_steel_collision` (camera sees steel coils, ~42k lb), `warranty_dealer_breakdown` (in-warranty Freightliner/Volvo fault => nearest OEM dealer + `towDestination`), `hazmat_tanker_rollover` (critical rollover, fuel tanker, `hazmat_load`), `random` (also: speeding, harsh_brake, harsh_turn, distracted, following_distance, tire, battery). Builds a vendor-shaped payload for the fleet's vendor and sends it through the real adapter. Returns `{scenario, provider, incident, payload}` (`payload` = the raw vendor JSON, handy for a "before/after normalization" view).
 `curl -XPOST $BASE/api/demo/simulate -H 'content-type: application/json' -d '{"scenario":"collision_camera"}'`
 **POST /api/demo/seed?reset=1** -> `{ok,fleets,incidents,skipped}` (without reset it is a no-op when data exists). **GET /api/demo/scenarios**.
 

@@ -17,7 +17,9 @@ const packet = require('./src/packet');
 const media = require('./src/media');
 const scenarios = require('./src/scenarios');
 const fixtures = require('./src/fixtures');
-const { rngFrom } = require('./src/util');
+const { rngFrom, haversineMi, round } = require('./src/util');
+const dealersMod = require('./src/context/dealers');
+const { PLACES } = require('./src/context/places');
 const { startPoller } = require('./motive-poller');
 const { startSamsaraPoller } = require('./samsara-poller');
 
@@ -76,6 +78,12 @@ app.get('/api/incidents/:id', wrap(async (req, res) => {
   const inc = await db.getIncident(req.params.id);
   if (!inc) return res.status(404).json({ error: 'Incident not found' });
   res.json(inc);
+}));
+
+app.get('/api/incidents/:id/context', wrap(async (req, res) => {
+  const inc = await db.getIncident(req.params.id);
+  if (!inc) return res.status(404).json({ error: 'Incident not found' });
+  res.json({ trip: inc.trip || null, equipment: inc.equipment || null, load: inc.load || null, warrantyDealer: inc.warrantyDealer || null });
 }));
 
 app.get('/api/incidents/:id/raw', wrap(async (req, res) => {
@@ -153,6 +161,20 @@ app.get('/api/providers', (req, res) => {
   res.json(list);
 });
 
+app.get('/api/dealers', (req, res) => {
+  const lat = req.query.lat != null ? parseFloat(req.query.lat) : null, lng = req.query.lng != null ? parseFloat(req.query.lng) : null;
+  res.json(dealersMod.list({ oem: req.query.oem, lat, lng, limit: req.query.limit ? parseInt(req.query.limit, 10) : undefined, heavyOnly: req.query.heavy === '1' }));
+});
+app.get('/api/places', (req, res) => {
+  const lat = req.query.lat != null ? parseFloat(req.query.lat) : null, lng = req.query.lng != null ? parseFloat(req.query.lng) : null;
+  const r = req.query.radiusMi ? parseFloat(req.query.radiusMi) : null;
+  let rows = PLACES.map((p) => ({ ...p, distanceMi: lat != null && lng != null ? round(haversineMi(lat, lng, p.lat, p.lng), 1) : null }));
+  if (req.query.type) rows = rows.filter((p) => p.placeType === req.query.type);
+  if (r != null && lat != null) rows = rows.filter((p) => p.distanceMi <= r);
+  rows.sort((a, b) => (a.distanceMi ?? 1e9) - (b.distanceMi ?? 1e9));
+  res.json(rows);
+});
+
 app.get('/api/fleets', (req, res) => res.json(roster.all().map(roster.publicFleet)));
 app.get('/api/fleets/:id/summary', wrap(async (req, res) => {
   const s = await analytics.fleetSummary(req.params.id);
@@ -200,7 +222,7 @@ app.post('/api/demo/simulate', wrap(async (req, res) => {
   const sc = scenarios.scenarioSpec(name, rng, { fleetId: b.fleetId, vehicleId: b.vehicleId, timestamp: new Date().toISOString() });
   const provider = b.provider && adapters[b.provider] ? b.provider : sc.fleet.vendor;
   const payload = fixtures.build(provider, sc.spec);
-  const incident = await pipeline.ingest(provider, payload);
+  const incident = await pipeline.ingest(provider, payload, { contextHint: sc.contextHint });
   console.log(`[NEXUS] simulate ${sc.name} -> ${incident.id} ${provider} ${incident.fleetName}`);
   res.json({ scenario: sc.name, provider, incident, payload });
 }));
@@ -213,7 +235,7 @@ app.get('/api/demo/scenarios', (req, res) => res.json({ scenarios: scenarios.SCE
 // Legacy test trigger (kept): now fires a random scenario through the real adapters.
 app.post('/test/trigger-event', wrap(async (req, res) => {
   const sc = scenarios.scenarioSpec('random', Math.random, { timestamp: new Date().toISOString() });
-  const incident = await pipeline.ingest(sc.fleet.vendor, fixtures.build(sc.fleet.vendor, sc.spec));
+  const incident = await pipeline.ingest(sc.fleet.vendor, fixtures.build(sc.fleet.vendor, sc.spec), { contextHint: sc.contextHint });
   res.json({ success: true, incident });
 }));
 

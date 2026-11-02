@@ -18,7 +18,7 @@
     pick: null,              // picked providerId
     loading: true, error: null,
     sound: true, follow: false,
-    noteDraft: {}, busy: {}, camTab: 'road',
+    noteDraft: {}, busy: {}, camTab: 'road', coll: { 'oem-warranty': 1, 'vehicle-driver': 1, equipment: 0 }, dealerPick: null, towLocal: {},
     newIds: new Set()
   };
   try { S.sound = localStorage.getItem('nx-dispatch-sound') !== '0'; } catch (e) {}
@@ -46,7 +46,8 @@
   var clock = NX.el('div.tb-clock', NX.el('span#clk-t', '--:--:--'), NX.el('small#clk-d', ''));
   var soundBtn = NX.el('button.nx-icon-btn', { title: 'Alert sound', 'aria-label': 'Toggle alert sound', onclick: function () { S.sound = !S.sound; try { localStorage.setItem('nx-dispatch-sound', S.sound ? '1' : '0'); } catch (e) {} paintSound(); if (S.sound) beep(1); } }, '');
   var helpBtn = NX.el('button.nx-icon-btn.tb-hide-tablet', { title: 'Keyboard shortcuts (?)', onclick: showHelp }, '?');
-  NX.topbar('Dispatch', { sidebar: false, right: [clock, soundBtn, helpBtn] });
+  var demoBtn = NX.el('button.nx-btn.nx-btn--sm.tb-hide-tablet', { title: 'Fire a simulated live event', onclick: showDemo }, 'Demo');
+  NX.topbar('Dispatch', { sidebar: false, right: [demoBtn, clock, soundBtn, helpBtn] });
   function paintSound() { soundBtn.textContent = S.sound ? '♪' : 'Ø'; soundBtn.style.color = S.sound ? 'var(--nx-accent)' : ''; soundBtn.title = 'Alert sound ' + (S.sound ? 'on' : 'off'); }
   paintSound();
   function tick() {
@@ -220,6 +221,27 @@
       m.addTo(provLayer);
       if (isRec) { L.polyline([[p.lat, p.lng], [i.location.lat, i.location.lng]], { color: getComputedStyle(document.documentElement).getPropertyValue('--nx-accent').trim(), weight: 2, dashArray: '6 8', opacity: .9 }).addTo(provLayer); bounds.push([p.lat, p.lng]); }
     });
+    // context: last stop + route, warranty dealers
+    var acc = getComputedStyle(document.documentElement).getPropertyValue('--nx-accent').trim();
+    var sq = function (cls, txt, ll, tip, perm) { var m = L.marker(ll, { icon: L.divIcon({ className: '', iconSize: [24, 24], iconAnchor: [12, 12], html: '<div class="mk-sq ' + cls + '"><i>' + txt + '</i></div>' }) }); m.bindTooltip(tip, { className: 'nx-tip', direction: 'top', offset: [0, -10], permanent: !!perm }); m.addTo(provLayer); return m; };
+    var st = i.trip && i.trip.lastStop;
+    if (st && st.lat != null) {
+      var sp = [st.lat, st.lng];
+      sq('stop-mk', 'S', sp, esc((st.businessName || st.name || 'Last stop') + ' \u00b7 ' + (st.minutesBeforeIncident != null ? st.minutesBeforeIncident + ' min before event' : '')), true);
+      var route = tr.length > 1 ? [sp].concat(tr.map(function (p) { return [p.lat, p.lng]; })) : [sp, [i.location.lat, i.location.lng]];
+      L.polyline(route, { color: acc, weight: 2, dashArray: '2 7', opacity: .8 }).addTo(provLayer);
+      bounds.push(sp);
+    }
+    var wd = i.warrantyDealer;
+    if (wd && wd.nearest) {
+      [wd.nearest].concat(wd.alternates || []).forEach(function (x, k) {
+        if (x.lat == null) return;
+        var picked = (S.dealerPick || wd.nearest.id) === x.id;
+        var m = sq('dealer-mk', 'D', [x.lat, x.lng], esc(x.name) + (x.driveEtaMin != null ? ' \u00b7 ' + Math.round(x.driveEtaMin) + ' min' : ''), picked);
+        m.on('click', function () { S.dealerPick = x.id; renderDetail(); drawSelection(); });
+        if (picked) { L.polyline([[i.location.lat, i.location.lng], [x.lat, x.lng]], { color: getComputedStyle(document.documentElement).getPropertyValue('--nx-info').trim(), weight: 3, opacity: .9 }).addTo(provLayer); bounds.push([x.lat, x.lng]); }
+      });
+    }
     S._bounds = bounds;
   }
   function focusSelection() {
@@ -240,7 +262,7 @@
     S.sel = id; S._scrollSel = true;
     if (!o.noHash) { try { history.replaceState(null, '', '#' + encodeURIComponent(id)); } catch (e) {} }
     var cached = S.inc.get(id);
-    S.pick = null; S.providers = []; S.provFor = null; S.camTab = 'road';
+    S.pick = null; S.providers = []; S.provFor = null; S.camTab = 'road'; S.dealerPick = null; S.ctxFor = null;
     renderQueue(); renderDetail(); syncMarkers();
     if (cached) { afterSelect(cached); }
     if (o.view && window.innerWidth <= 1100) setView(o.view);
@@ -254,6 +276,10 @@
   }
   function afterSelect(i) {
     drawSelection(); focusSelection();
+    if (i.trip === undefined && i.equipment === undefined && i.load === undefined && S.ctxFor !== i.id) {
+      S.ctxFor = i.id;
+      api('/api/incidents/' + encodeURIComponent(i.id) + '/context').then(function (c) { if (!c) return; var cur = S.inc.get(i.id); if (!cur) return; ['trip', 'equipment', 'load', 'warrantyDealer'].forEach(function (k) { if (cur[k] === undefined) cur[k] = c[k] || null; }); if (S.sel === i.id) { renderDetail(); drawSelection(); focusSelection(); } }).catch(function () {});
+    }
     if (i.location && i.location.lat != null && S.provFor !== i.id) {
       S.provFor = i.id;
       api('/api/providers', { query: { lat: i.location.lat, lng: i.location.lng, service: (i.roadside && i.roadside.serviceType && i.roadside.serviceType !== 'none') ? i.roadside.serviceType : '', limit: 8 } }).then(function (d) {
@@ -333,6 +359,16 @@
     var p = S.providers.find(function (x) { return x.id === pid; }) || (i.roadside || {}).recommendedProvider || {};
     act('dispatch', '/dispatch', { providerId: pid, note: 'Dispatched via console' }, 'Dispatched ' + (p.name || 'provider') + (p.etaMin != null ? ' · ETA ' + Math.round(p.etaMin) + ' min' : ''));
   }
+  function towToDealer() {
+    var i = S.inc.get(S.sel); if (!i || !i.warrantyDealer) return;
+    var d = i.warrantyDealer, x = [d.nearest].concat(d.alternates || []).find(function (y) { return y.id === S.dealerPick; }) || d.nearest;
+    var dest = { kind: 'oem_dealer', name: x.name, address: x.address, lat: x.lat, lng: x.lng, distanceMi: x.distanceMi };
+    var pid = S.pick || ((i.roadside || {}).recommendedProvider || {}).id;
+    act('tow', '/dispatch', { providerId: pid, towDestination: dest, note: 'Tow destination: ' + x.name + (d.preAuthNumber ? ' (pre-auth ' + d.preAuthNumber + ')' : '') }, 'Tow destination set: ' + x.name).then(function (r) {
+      var cur = S.inc.get(S.sel); // backend may not persist towDestination yet: keep it locally so UI stays truthful
+      if (cur && cur.roadside && !cur.roadside.towDestination) { cur.roadside.towDestination = dest; renderDetail(); }
+    });
+  }
   function doDismiss(reason) {
     var i = S.inc.get(S.sel); if (!i) return;
     if (reason) return act('dismiss', '/dismiss', { reason: reason }, 'Incident dismissed');
@@ -343,6 +379,18 @@
     m = NX.modal('Dismiss ' + i.id, NX.el('div.nx-stack', NX.el('p.nx-dim', 'Removes it from the active queue. The record is retained.'), ta), { footer: [NX.el('button.nx-btn.nx-btn--ghost', { onclick: function () { m.close(); } }, 'Cancel'), ok] });
     setTimeout(function () { ta.focus(); ta.select(); }, 30);
   }
+  var SCEN = [['collision_camera', 'Collision, camera verified', 'Headline scenario'], ['reefer_collision', 'Reefer collision after food distributor', 'Load estimate, perishable, spoilage clock'], ['flatbed_steel_collision', 'Flatbed steel collision', 'Camera sees coils, shifting-load risk'], ['hazmat_tanker_rollover', 'Hazmat tanker rollover', 'Critical, spill risk'], ['warranty_dealer_breakdown', 'In-warranty breakdown', 'Nearest OEM dealer and tow destination'], ['dtc_breakdown', 'Breakdown with trouble codes', 'Roadside pre-staging'], ['warranty_failure', 'Warranty failure', 'OEM claim packet'], ['false_positive', 'Camera false positive', 'AI rules it out'], ['random', 'Random event', '']];
+  function showDemo() {
+    var m, box = NX.el('div.demo-menu', SCEN.map(function (s) {
+      return NX.el('button.nx-btn', { onclick: function (e) {
+        var b = e.currentTarget; b.classList.add('is-loading');
+        api('/api/demo/simulate', { method: 'POST', body: { scenario: s[0] } }).then(function (r) {
+          m.close(); var inc = r && (r.incident || r); if (inc && inc.id) { upsert(inc, true); select(inc.id, { view: 'detail' }); }
+        }).catch(function (err) { b.classList.remove('is-loading'); NX.toast(err.message, 'error'); });
+      } }, NX.el('span', s[1]), s[2] && NX.el('small', s[2]));
+    }));
+    m = NX.modal('Simulate live event', box);
+  }
   function showHelp() {
     var rows = [['j / k', 'Next / previous incident'], ['d', 'Dispatch selected provider'], ['x', 'Dismiss incident'], ['1 / 2 / 3', 'Mark en route / on scene / resolved'], ['n', 'Add note'], ['/', 'Search queue'], ['f', 'Fit map to all'], ['Esc', 'Clear selection / close']];
     NX.modal('Keyboard shortcuts', NX.el('div.help-grid', rows.map(function (r) { return [NX.el('kbd', r[0]), NX.el('span', r[1])]; })));
@@ -351,7 +399,11 @@
   /* ---------- detail ---------- */
   var detailEl = $('#detail');
   function btn(label, cls, a, extra, k) { return '<button class="nx-btn ' + cls + (S.busy[k || a] ? ' is-loading' : '') + '" data-act="' + a + '"' + (extra || '') + '>' + label + '</button>'; }
-  function panel(t, right, body, id) { return '<section class="pc"' + (id ? ' id="' + id + '"' : '') + '><div class="pc-h"><h4>' + t + '</h4>' + (right || '') + '</div><div class="pc-b">' + body + '</div></section>'; }
+  function panel(t, right, body, id) {
+    var key = id || String(t).replace(/&amp;/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    var col = !!S.coll[key];
+    return '<section class="pc' + (col ? ' is-collapsed' : '') + '" data-key="' + key + '"><div class="pc-h is-toggle" data-toggle="' + key + '"><h4>' + t + '</h4>' + (right || '') + '</div><div class="pc-b">' + body + '</div></section>';
+  }
   var CAM_SVG = '<svg viewBox="0 0 200 100" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M20 100 L85 20 M180 100 L115 20 M100 100 L100 62 M100 50 L100 38" /><rect x="68" y="58" width="64" height="26" rx="3" stroke-dasharray="3 3"/><path d="M62 54 v-8 h8 M138 54 v-8 h-8 M62 88 v8 h8 M138 88 v8 h-8"/></svg>';
 
   function v0(c) { return c && c.aiVerdict; }
@@ -461,14 +513,21 @@
       '<h2 class="d-title">' + esc(title(i)) + ' &middot; ' + esc(unit(i)) + '</h2><div class="d-sub">' + esc(addr(i)) + '</div>' +
       '<div class="d-actions">' + (closed ? '' : btn('Dispatch <kbd>d</kbd>', 'nx-btn--primary nx-btn--sm', 'dispatch') + btn('Dismiss <kbd>x</kbd>', 'nx-btn--sm', 'dismissopen', '', 'dismiss')) +
       '<button class="nx-btn nx-btn--sm nx-btn--ghost" data-act="center">Center map</button></div></header>';
-    var sections = [camHTML(i), dtcHTML(i), roadsideHTML(i), warrantyHTML(i), vehicleHTML(i), timelineHTML(i)];
-    if (fp) sections = [sections[0], sections[5], sections[4], sections[1], sections[2], sections[3]]; // false positive: prioritise camera + timeline
+    var C = window.NXCtx, cam = camHTML(i), dtc = dtcHTML(i), road = roadsideHTML(i), war = warrantyHTML(i), veh = vehicleHTML(i), tl = timelineHTML(i);
+    var load = C.load(i, panel), dealer = C.dealer(i, panel, btn, S), eq = C.equipment(i, panel), trip = C.trip(i, panel), tele = C.telemetry(i, panel);
+    var haz = !!(i.load && i.load.contents && i.load.contents.hazmat);
+    // triage order: hazmat/severity context first, then verification, what is on the truck, how to respond, then history
+    var sections = fp ? [cam, tl, veh, dtc, road, war] : haz ? [load, cam, road, dealer, dtc, eq, trip, tele, war, veh, tl] : [cam, load, dealer, road, dtc, eq, trip, tele, war, veh, tl];
+    head = head.replace('</header>', C.chips(i) + '</header>');
+    sections.unshift(C.hazBanner(i));
     detailEl.innerHTML = head + '<div class="d-body">' + riskHTML(i) + sections.join('') + '</div>';
     detailEl.scrollTop = keepScroll;
     if (focusNote) { var n = $('#note-in'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   }
 
   detailEl.addEventListener('click', function (e) {
+    var tg = e.target.closest('[data-toggle]'); if (tg && !e.target.closest('a,button')) { S.coll[tg.dataset.toggle] = S.coll[tg.dataset.toggle] ? 0 : 1; tg.parentNode.classList.toggle('is-collapsed'); return; }
+    var dl = e.target.closest('[data-dealer]'); if (dl) { S.dealerPick = dl.dataset.dealer; renderDetail(); drawSelection(); return; }
     var cam = e.target.closest('[data-cam]'); if (cam) { S.camTab = cam.dataset.cam; return renderDetail(); }
     var pv = e.target.closest('[data-prov]'); if (pv) { S.pick = pv.dataset.prov; renderDetail(); drawSelection(); return; }
     var b = e.target.closest('[data-act]'); if (!b) return;
@@ -479,6 +538,7 @@
     else if (a === 'center') { focusSelection(); if (window.innerWidth <= 1100) setView('map'); }
     else if (a === 'status') setStatus(b.dataset.st);
     else if (a === 'note') addNote();
+    else if (a === 'towdealer') towToDealer();
   });
   detailEl.addEventListener('keydown', function (e) { if (e.target.id === 'note-in' && e.key === 'Enter') { e.preventDefault(); addNote(); } });
   function setStatus(st) { act('st_' + st, '/status', { status: st, note: 'Status set by dispatcher' }, 'Status: ' + fmt.label(st)); }

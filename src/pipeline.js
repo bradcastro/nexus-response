@@ -2,6 +2,7 @@
 const adapters = require('./adapters');
 const roster = require('./roster');
 const { enrich } = require('./enrich');
+const context = require('./context');
 const db = require('../db');
 const stream = require('./stream');
 const { rngFrom, round } = require('./util');
@@ -72,6 +73,7 @@ async function processIncident(inc, opts = {}) {
   localizeMedia(inc);
   inc.trail = inc.trail && inc.trail.length ? inc.trail : makeTrail(inc, rngFrom(inc.id));
   await enrich(inc, opts);
+  await context.attach(inc, opts);
 
   // --- timeline + status ---
   const t0 = new Date(inc.receivedAt).getTime();
@@ -84,6 +86,8 @@ async function processIncident(inc, opts = {}) {
   if (inc.diagnostics) tl.push({ t: T(4), actor: 'system', action: 'dtc_decoded', note: `${inc.diagnostics.dtcs.length} fault code(s): ${inc.diagnostics.dtcs.map((d) => d.code).join(', ')}; drivable: ${inc.diagnostics.drivable}` });
   if (inc.roadside.needed) tl.push({ t: T(5), actor: 'system', action: 'roadside_recommended', note: `${inc.roadside.serviceType}${inc.roadside.recommendedProvider ? ` via ${inc.roadside.recommendedProvider.name}, ETA ${inc.roadside.etaMin} min` : ''}` });
   if (inc.warranty && inc.warranty.claimPacket) tl.push({ t: T(6), actor: 'system', action: 'warranty_packet', note: `${inc.warranty.coverage} claim packet ${inc.warranty.claimPacket.status}; est. $${inc.warranty.claimPacket.estimatedValueUsd}` });
+  if (inc.load) tl.push({ t: T(6.5), actor: 'system', action: 'context_inferred', note: `Trip & load context: ${inc.load.estimatedWeightLb > 300 ? `~${inc.load.estimatedWeightLb.toLocaleString('en-US')} lb ${inc.load.contents.label.replace(' (likely)', '')}` : 'trailer appears empty'} (${Math.round(inc.load.confidence * 100)}% confidence); last stop ${inc.trip.lastStop.businessName}` });
+  if (inc.warrantyDealer) tl.push({ t: T(6.8), actor: 'system', action: 'warranty_dealer', note: `Nearest ${inc.warrantyDealer.oem} dealer: ${inc.warrantyDealer.nearest.name}, ${inc.warrantyDealer.nearest.distanceMi} mi` });
   inc.timeline = tl;
   inc.status = 'pending';
   if (inc.camera.aiVerdict === 'false_positive' && inc.camera.confidence >= 0.8) {

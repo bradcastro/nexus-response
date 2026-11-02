@@ -79,3 +79,64 @@ Name: Nexus Response. Tagline: "Every event, resolved." Feel: mission-control / 
 ## Collaboration protocol
 Agents coordinate through `docs/HANDOFFS.md` (append-only). Format:
 `## [from -> to] short title` / status `OPEN|DONE` / what you need / acceptance check. Before finishing, every agent reads HANDOFFS.md for items addressed to them, does them if in their files, and appends new requests for others. The orchestrator runs follow-up rounds from OPEN items.
+
+---
+# ADDENDUM v2 — Incident Context Intelligence (trip, load, trailer, dealer)
+
+Goal: when an incident happens, Nexus already knows **what the truck was doing and what it was hauling**. All of this is *inferred/estimated* and MUST be labeled with `confidence` (0-1) and `basis` (list of human-readable evidence strings) so the UI can show "how we know".
+
+## New optional fields on Incident (all objects may be null for vehicles with no data)
+```
+trip: {
+  tripId, startedAt, startLocation:{lat,lng,address}, distanceMi, durationMin, idleMin,
+  lastStop: { name, placeType: "food_distributor|grocery_dc|cold_storage|steel_yard|lumber_yard|building_supply|fuel_stop|truck_stop|port|manufacturer|farm|quarry|retail_dc|parcel_hub|unknown",
+              businessName, lat, lng, address, arrivedAt, departedAt, dwellMin, minutesBeforeIncident, milesSinceStop },
+  recentStops: [ {name, placeType, arrivedAt, departedAt, dwellMin} ],   // last 3-5
+  timeline: [ {t, kind:"drive|stop|idle|event", label} ],
+  telemetry: {                               // 10-15 min windows around last stop departure
+    before: { avgEngineLoadPct, avgFuelMpg, avgSpeedMph, avgRpm, sampleCount },   // last stop-approach window
+    after:  { avgEngineLoadPct, avgFuelMpg, avgSpeedMph, avgRpm, sampleCount },   // post-departure window
+    deltaEngineLoadPct, deltaFuelMpg, series:[ {t, engineLoadPct, fuelMpg, speedMph} ]   // ~60 pts spanning the stop and the incident
+  }
+} | null
+
+equipment: {   // tractor + trailer
+  tractor: { class: "class8_sleeper|class8_day_cab|class6_boxtruck|class3_pickup|van", make, model, year, engine, gvwrLb, tareLb, axles, fuelType },
+  trailer: { attached: bool, type: "reefer|dry_van|flatbed|tanker|lowboy|dump|car_hauler|container_chassis|none", lengthFt, unitId, tareLb, maxPayloadLb,
+             reefer: { setpointF, returnAirF, unitRunning: bool, fuelPct } | null,
+             detectedBy: "camera|gps_pairing|telematics_aux|manual|inferred",
+             cameraVerified: bool, cameraBasis: "string e.g. 'Rear/road cam sees 53ft reefer box with TK unit'" } | null
+} | null
+
+load: {
+  estimatedWeightLb, weightRangeLb:[lo,hi], payloadPctOfMax, grossVehicleWeightLb, overweightRisk: bool,
+  method: "engine_load_delta|fuel_economy_delta|mpg_vs_empty_baseline|camera_flatbed_visual|combined",
+  contents: { category: "perishable_food|frozen_food|dry_grocery|beverage|building_materials|steel|lumber|machinery|vehicles|fuel_liquid|hazmat|aggregate|parcel|unknown",
+              label: "Perishable foods (likely)", examples:["Dairy","Produce"], estimatedValueUsd:[lo,hi], hazmat: bool, temperatureSensitive: bool,
+              spoilageRiskHours: number|null },
+  confidence, basis: [ "Reefer unit running at 34F", "Last stop: Sysco Foodservice (food_distributor) 41 min before event", "Engine load +27% and fuel economy -2.1 mpg after departure => ~38-44k lb added" ],
+  cameraVisual: { cargoVisible: bool, description: "e.g. 'Flatbed with 3 steel coils visible'", confidence }|null
+} | null
+
+warrantyDealer: {   // only when warranty.inWarranty && an OEM-coverable fault; recommended OEM service location
+  oem, coverage, nearest: { id, name, brand, type:"dealer|service_center|mobile_service", address, lat, lng, distanceMi, driveEtaMin, phone, hours, open24x7: bool, heavyDutyBays: bool, hasPartsInStock: bool|null },
+  alternates: [ same shape x2-3 ],
+  authorizationRequired: bool, preAuthNumber: string|null, reason: "short string why this dealer"
+} | null
+
+// Add to roadside when applicable (no change to existing keys): roadside.towDestination: {kind:"oem_dealer|nearest_shop|fleet_yard", name, address, lat, lng, distanceMi}
+```
+Contents must also feed `risk.tags` (e.g. "hazmat_load", "high_value_cargo", "perishable_spoilage_clock") and the claim/packet (`warranty.claimPacket.evidence` adds trip + load context; cargo loss exposure added to packet summary).
+
+## New endpoints
+- `GET /api/incidents/:id/context` -> `{trip, equipment, load, warrantyDealer}` (same objects as embedded; embedded too in GET /api/incidents/:id).
+- `GET /api/dealers?oem=&lat=&lng=&limit=` -> bare array of OEM dealers/service centers (seeded for FL/AL/GA/NC/SC/KY/TN/MS/LA; Freightliner, Peterbilt, Kenworth, Volvo, Ford, Mercedes, International, Mack) sorted by distance with driveEtaMin.
+- `GET /api/places?lat=&lng=&radiusMi=` (optional) -> known business stops used by the inference (seed ~60: Sysco/US Foods style food distributors (use generic invented-but-plausible names like "Gulf Foodservice Distribution Center", NOT real brand names), cold storage, steel yards, lumber yards, ports, quarries, parcel hubs, truck stops).
+- `POST /api/demo/simulate` gains scenarios: `reefer_collision` (reefer trailer after food distributor, camera verified reefer box, ~38-44k lb perishable), `flatbed_steel_collision` (camera sees steel coils on flatbed, ~42k lb, high-value, shifting-load risk), `warranty_dealer_breakdown` (in-warranty DEF/aftertreatment or turbo fault on Freightliner/Volvo => nearest OEM dealer with distance/ETA + tow destination), `hazmat_tanker_rollover` (critical; hazmat flag, spill risk).
+- Insurer: `GET /api/insurer/fleets/:id` adds `cargoExposure:{ avgLoadLb, byContent:[{category,incidents,estValueUsd}], hazmatEvents, perishableEvents, highValueEvents, totalEstCargoExposureUsd }` and portfolio fleets get `avgLoadPctOfMax`, `cargoExposureUsd`.
+- Fleet: `GET /api/fleets/:id/summary` kpis add `cargoAtRiskUsd`, `incidentsWithLoadContext`; `byContent` breakdown.
+
+## Inference model (backend; deterministic & explainable; document in docs/INFERENCE.md)
+Weight estimate: combine (a) engine-load delta before/after the last stop, (b) fuel-economy delta vs. empty baseline for that tractor class (empty class 8 ~ 8.0-8.5 mpg tractor+53ft box; loaded 80k lb ~ 5.5-6.5), (c) trailer type tare/max payload, (d) camera visual for flatbeds. Content type from last-stop placeType + trailer type + reefer state + camera. Pickup stops with dwell > 15 min and load increase imply a pickup; delivery drops imply decrease. Always output basis strings and confidence; low-confidence = wider range.
+
+## Ownership (unchanged) — backend: src/**, server.js, db.js; dispatch/fleet/insurer: their folders. Backend finishes first on shapes; UI agents code to this addendum and verify when backend lands (check periodically; backend writes docs/API.md update).
