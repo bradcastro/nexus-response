@@ -188,4 +188,20 @@ router.put('/api/onboarding/fleets/:id/alerts', async (req, res) => {
   res.json({ alertConfig: f.alertConfig });
 });
 
+// Remove an onboarded/imported (custom or prospect) fleet and everything hanging off it. Seeded demo fleets are protected.
+router.delete('/api/onboarding/fleets/:id', async (req, res) => {
+  const f = getFleetOr404(req, res); if (!f) return;
+  if (!f.custom && !f.prospect) return res.status(409).json({ error: 'protected_fleet', message: 'Seeded demo fleets cannot be removed; only onboarded or imported fleets.' });
+  const out = { deleted: true, id: f.id, assessments: 0, reports: 0, importJobs: 0, apiKeys: 0 };
+  await db.deleteIncidentsByFleet(f.id);
+  for (const kind of ['assessment', 'report', 'import_job', 'api_key', 'alert', 'job']) {
+    const rows = await db.list(kind, { fleetId: f.id, limit: 100000 });
+    for (const r of rows) await db.del(kind, r.id);
+    const k = { assessment: 'assessments', report: 'reports', import_job: 'importJobs', api_key: 'apiKeys' }[kind]; if (k) out[k] = rows.length;
+  }
+  await db.del('fleet', f.id);
+  roster.removeFleet(f.id);
+  res.json(out);
+});
+
 module.exports = { router, loadPersisted, persistFleet, newFleet, upsertRoster, checklist, prov };

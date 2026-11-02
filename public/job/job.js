@@ -32,6 +32,9 @@
       provider: pick(j, 'providerName', 'provider.name'), simulated: true, hazardsIn: j.hazards || null, tags: (inc.risk && inc.risk.tags) || j.tags || [], sev: pick(j, 'severity') || inc.severity,
       equipmentNeeded: pick(j, 'equipmentNeeded', 'whatToBring', 'equipmentClass'), warranty: wd, dtcs: (inc.diagnostics && inc.diagnostics.dtcs) || j.dtcs || null, drivable: pick(j, 'drivable') || (inc.diagnostics && inc.diagnostics.drivable) || null
     };
+    // server job status stays 'accepted' after an ETA post and uses 'arrived'; derive the stages this page shows
+    if (out.status === 'arrived') out.status = 'on_scene';
+    if (out.status === 'accepted' && (j.events || []).some(function (e) { return e.action === 'eta'; })) out.status = 'en_route';
     return out;
   }
   function hazards(j) {

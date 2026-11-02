@@ -192,6 +192,12 @@ async function deleteIncidentsByJob(jobId) {
   for (const [id, i] of mem.incidents) if (i.import && i.import.jobId === jobId) { mem.incidents.delete(id); if (i.providerEventId) mem.byEvent.delete(evKey(i.provider, i.providerEventId)); }
 }
 
+async function deleteIncidentsByFleet(fleetId) {
+  const p = await ready();
+  if (p) { await p.query('DELETE FROM incidents_v2 WHERE fleet_id=$1', [fleetId]); return; }
+  for (const [id, i] of mem.incidents) if (i.fleetId === fleetId) { mem.incidents.delete(id); if (i.providerEventId) mem.byEvent.delete(evKey(i.provider, i.providerEventId)); }
+}
+
 // ---- generic documents ----
 const tsOf = (d) => d.createdAt || d.receivedAt || d.generatedAt || new Date().toISOString();
 async function put(kind, doc, { ukey } = {}) {
@@ -256,6 +262,6 @@ async function updateIncidentStatus(id, status) { await updateIncident(id, (i) =
 const usingPostgres = () => !!process.env.DATABASE_URL;
 
 module.exports = {
-  saveIncident, saveIncidentsBulk, getIncident, findByProviderEvent, listIncidents, updateIncident, addTimeline, countIncidents, clearIncidents, deleteIncidentsByJob,
+  saveIncident, saveIncidentsBulk, getIncident, findByProviderEvent, listIncidents, updateIncident, addTimeline, countIncidents, clearIncidents, deleteIncidentsByJob, deleteIncidentsByFleet,
   put, get, list, del, findByKey, clearKind, saveFleet, listFleets, saveProvider, listProviders, getIncidents, updateIncidentStatus, usingPostgres, KINDS,
 };

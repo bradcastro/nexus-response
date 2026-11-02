@@ -6,6 +6,7 @@
   function num(v) { v = Number(v); return isNaN(v) ? null : v; }
   function signed(v) { v = num(v); return v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%'; }
   function money(v) { return v == null ? '—' : fmt.currency(v); }
+  function redact(t) { return String(t).replace(/\+?\d[\d\-\s().]{8,}\d/g, '[phone hidden]'); }
   function lbl(s) { return fmt.label(s); }
   function list(a) { a = (a || []).map(function (x) { return typeof x === 'string' ? x : pick(x, 'text', 'headline', 'label', 'note', 'name', 'why') || ''; }).filter(Boolean); return a.length ? '<ul class="rp-list">' + a.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '<span class="nx-dim">None.</span>'; }
   function K(l, v, s) { return '<div class="rp-k"><div class="l">' + esc(l) + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; }
@@ -25,6 +26,7 @@
       if (d.recentVerifiedIncidents) h += C('Camera-verified incidents', evidence(d.recentVerifiedIncidents), true);
       if (d.driversRanked) h += C('Highest-risk drivers', drivers(d.driversRanked));
       if (d.topImprovementLevers) h += C('How to improve', list(d.topImprovementLevers.map(function (x) { return x.label + (x.potentialSavingsUsd ? ' (potential saving ' + money(x.potentialSavingsUsd) + ' / yr)' : ''); })));
+      if (d.usageNote) h += '<p class="nx-dim" style="font-size:12px;margin-top:12px">' + esc(d.usageNote) + '.</p>';
       return h + '</div>';
     },
     assessment: function (d) {
@@ -37,11 +39,11 @@
       h += '<div class="rp-grid">' + C('Vehicle and driver', '<ul class="rp-list"><li>' + esc([v.year, v.make, v.model].filter(Boolean).join(' ')) + (v.plate ? ' · ' + esc(v.plate) : '') + '</li>' + (v.vin ? '<li class="nx-mono">VIN ' + esc(v.vin) + '</li>' : '') + (dr.name ? '<li>Driver: ' + esc(dr.name) + '</li>' : '') + '</ul>') +
         C('Camera evidence', (c.signals && c.signals.length ? list(c.signals) : '<span class="nx-dim">No signals.</span>') + (c.snapshots && c.snapshots[0] ? '<div class="rp-ev"><div><img alt="Camera frame" src="' + esc(c.snapshots[0].url) + '"></div></div>' : ''));
       if (ld) h += C('Load context', '<ul class="rp-list"><li>Estimated load ' + fmt.number(ld.estimatedWeightLb) + ' lb' + (ld.payloadPctOfMax != null ? ' (' + Math.round(ld.payloadPctOfMax) + '% of max)' : '') + '</li>' + (ld.contents ? '<li>' + esc(ld.contents.label || lbl(ld.contents.category)) + '</li>' : '') + '</ul>');
-      if (d.timeline && d.timeline.length) h += C('Timeline', '<ul class="rp-list">' + d.timeline.map(function (t) { return '<li><span class="nx-mono nx-dim">' + esc(fmt.dateTime(t.t)) + '</span> ' + esc(t.action || '') + (t.note ? ': ' + esc(t.note) : '') + '</li>'; }).join('') + '</ul>', true);
+      if (d.timeline && d.timeline.length) h += C('Timeline', '<ul class="rp-list">' + d.timeline.map(function (t) { return '<li><span class="nx-mono nx-dim">' + esc(fmt.dateTime(t.t)) + '</span> ' + esc(t.action || '') + (t.note ? ': ' + esc(redact(t.note)) : '') + '</li>'; }).join('') + '</ul>', true);
       return h + '</div>';
     },
     digest: function (d) {
-      var it = function (x) { return typeof x === 'string' ? x : [pick(x, 'name', 'fleetName'), pick(x, 'headline', 'why', 'label', 'text')].filter(Boolean).join(': '); };
+      var it = function (x) { return typeof x === 'string' ? x : [pick(x, 'name', 'fleetName'), pick(x, 'headline', 'why', 'label', 'text', 'summary', 'detail')].filter(Boolean).join(': '); };
       return '<div class="rp-headline">' + esc(d.headline || 'No exceptions this period.') + '</div><div class="rp-kpis" style="margin-top:16px">' + K('Needing attention', String((d.fleetsNeedingAttention || []).length)) + K('High-severity events', String((d.newHighSeverity || []).length)) + K('Improvements', String((d.notableImprovements || []).length)) + K('Claims opened', fmt.number(d.claimsOpened)) + K('FNOLs sent', fmt.number(d.fnolsSent)) + '</div><div class="rp-grid">' + C('Fleets needing attention', list((d.fleetsNeedingAttention || []).map(it))) + C('New high-severity events', list((d.newHighSeverity || []).map(it))) + C('Notable improvements', list((d.notableImprovements || []).map(it))) + C('Recommended actions', list(d.recommendedActions)) + '</div>';
     }
   };
@@ -57,8 +59,9 @@
     return r.json();
   }).then(function (r) {
     var d = r.snapshot || r.data || r.payload || r.report || r, kind = r.kind || d.kind || (d.headline && 'digest') || (d.eventType && 'incident') || (d.confidence != null && d.dataQualityScore != null && 'assessment') || 'fleet';
+    if (d && d.deepDive) { var ub = d.usageBased || {}; d = Object.assign({}, d.deepDive, { driveScore: ub.driveScore, topImprovementLevers: ub.topImprovementLevers, usageNote: ub.pricing && ub.pricing.note }); }
     var exp = r.expiresAt ? new Date(r.expiresAt) : null, days = exp ? Math.ceil((exp - Date.now()) / 864e5) : null;
-    var name = (d.fleet && d.fleet.name) || d.fleetName || d.name || (kind === 'incident' ? d.id : '') || '';
+    var name = (d.fleet && d.fleet.name) || d.fleetName || d.name || (kind === 'incident' ? d.id : kind === 'digest' ? d.periodLabel : '') || '';
     var titles = { fleet: 'Policyholder risk report', assessment: 'Underwriting assessment', incident: 'Incident report', digest: 'Weekly digest' };
     document.title = (titles[kind] || 'Report') + (name ? ' — ' + name : '') + ' — Nexus Response';
     var h = '<div class="rp-eyebrow">' + esc(titles[kind] || 'Shared report') + '</div><h1 class="rp-h">' + esc(name || titles[kind] || 'Report') + '</h1><p class="rp-sub">' + (r.createdAt ? 'Snapshot taken ' + esc(fmt.dateTime(r.createdAt)) : '') + (d.fleet && d.fleet.vendor ? ' · ' + esc(lbl(d.fleet.vendor)) : '') + '</p>';

@@ -69,9 +69,17 @@ async function run({ fleetId, jobId }) {
   if (m.cameraCoverage < 50 || m.cameraCoveragePct < 50) programs.push({ key: 'camera_first', label: 'Camera-first telematics rollout (e.g. Mantis) for driver-facing signals + AI verification', expectedRiskReductionPct: 15, rationale: `Only ${m.cameraCoveragePct}% camera coverage; camera-verified fleets show higher prediction confidence and faster claim triage` });
   // pricing
   const base = avgAll != null ? avgAll : 45;
-  const adj = clamp(round((m.riskScore - base) * 0.4, 1), -15, 25);
-  const conf = round(clamp(0.3 + 0.4 * (dq.qualityScore / 100) + 0.3 * Math.min(1, real.length / 150), 0.2, 0.95), 2);
-  const pricing = { suggestedPremiumAdjustmentPct: adj, direction: adj > 1 ? 'surcharge' : adj < -1 ? 'credit' : 'neutral', baselineRiskScore: round(base, 1), rationale: [`Risk score ${m.riskScore} vs portfolio baseline ${round(base, 1)}`, `${real.length} events over ${windowDays} days across ${nVeh} vehicles`, ...(m.falsePositivesFiltered ? [`${m.falsePositivesFiltered} camera-identified false positives excluded`] : []), `Data quality ${dq.qualityScore}/100 limits confidence to ${Math.round(conf * 100)}%`] };
+  const rawAdj = clamp(round((m.riskScore - base) * 0.4, 1), -15, 25);
+  // credibility: short histories / very few events cannot support a confident price signal
+  const lowReasons = [];
+  if (days < 30) lowReasons.push(`only ${days} day${days === 1 ? '' : 's'} of history (under 30)`);
+  if (real.length < 15) lowReasons.push(`only ${real.length} event${real.length === 1 ? '' : 's'} (under 15)`);
+  const lowConfidence = lowReasons.length > 0;
+  const cred = lowConfidence ? Math.min(1, days / 30, real.length / 15) : 1;
+  const adj = lowConfidence ? round(rawAdj * cred * cred, 1) : rawAdj;
+  const conf0 = round(clamp(0.3 + 0.4 * (dq.qualityScore / 100) + 0.3 * Math.min(1, real.length / 150), 0.2, 0.95), 2);
+  const conf = lowConfidence ? Math.min(conf0, 0.35) : conf0;
+  const pricing = { suggestedPremiumAdjustmentPct: adj, direction: adj > 1 ? 'surcharge' : adj < -1 ? 'credit' : 'neutral', baselineRiskScore: round(base, 1), indicative: lowConfidence, lowConfidence, confidenceLabel: lowConfidence ? 'low' : conf >= 0.7 ? 'high' : 'moderate', ...(lowConfidence ? { unclampedAdjustmentPct: rawAdj, lowConfidenceReasons: lowReasons } : {}), rationale: [...(lowConfidence ? [`INDICATIVE ONLY: ${lowReasons.join(' and ')}. The adjustment is damped toward 0% (unadjusted signal ${rawAdj}%) and should not be used for pricing.`] : []), `Risk score ${m.riskScore} vs portfolio baseline ${round(base, 1)}`, `${real.length} events over ${windowDays} days across ${nVeh} vehicles`, ...(m.falsePositivesFiltered ? [`${m.falsePositivesFiltered} camera-identified false positives excluded`] : []), `Data quality ${dq.qualityScore}/100 limits confidence to ${Math.round(conf * 100)}%`] };
   // projection
   let projection = null;
   try { const pr = require('./predict'); if (pr && typeof pr.fleetProjection === 'function') projection = await pr.fleetProjection(fleetId); } catch (e) { /* predict module optional */ }
@@ -93,14 +101,15 @@ async function run({ fleetId, jobId }) {
   if (days < 60) limitations.push(`Only ${days} days of history: seasonality and trend cannot be assessed reliably.`);
   if (noDriverPct > 30) limitations.push(`${noDriverPct}% of events have no driver attribution: driver-level distribution is incomplete.`);
   if (dq.qualityScore < 60) limitations.push('Data quality score is below 60: treat the score as indicative only.');
+  if (lowConfidence) limitations.unshift(`Low confidence: ${lowReasons.join(' and ')}. Pricing adjustment is indicative only and damped toward 0%.`);
   limitations.push('Scores are demo-calibrated and not actuarial; pricing adjustment is a signal, not a rate filing.');
   const a = {
     id: 'asm_' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'), fleetId, fleetName: fleet.name, vendor: fleet.vendor, jobId: jobId || null, createdAt: new Date().toISOString(),
     window: { from: new Date(Math.max(start, end - windowDays * DAY)).toISOString().slice(0, 10), to: new Date(end).toISOString().slice(0, 10), days: windowDays }, events: real.length, vehicles: nVeh,
-    riskScore: m.riskScore, riskTier: m.riskTier, trend: m.trend, confidence: conf, dataQualityScore: dq.qualityScore, dataQuality: dq,
+    riskScore: m.riskScore, riskTier: m.riskTier, trend: m.trend, confidence: conf, lowConfidence, indicative: lowConfidence, lowConfidenceReasons: lowReasons, dataQualityScore: dq.qualityScore, dataQuality: dq,
     eventsPerMillionMiles: epmm, exposure: { milesTotal, basis }, collisionRate: m.collisionRate, cameraCoveragePct: m.cameraCoveragePct, verifiedEventPct: m.verifiedEventPct,
     scoreBreakdown: m.components.map((c) => ({ key: c.key, label: c.label, score: c.score, weight: c.weight, contribution: round(c.score * c.weight, 1), count: c.count, ratePer100Veh: c.rate })),
-    topRiskFactors: A.topFactors(m, null), driverRiskDistribution: { ...dist, unattributedEventsPct: noDriverPct },
+    topRiskFactors: A.topFactors(m, null), driverRiskDistribution: { ...dist }, unattributedEventsPct: noDriverPct,
     benchmark: { vsPortfolio: { portfolioAvgRiskScore: avgAll != null ? round(avgAll, 1) : null, delta: avgAll != null ? round(m.riskScore - avgAll, 1) : null, percentileRiskier: pctile, peers: peers.length }, vsVendorPeers: { vendor: fleet.vendor, peerAvgRiskScore: peerVendorAvg != null ? round(peerVendorAvg, 1) : null, delta: peerVendorAvg != null ? round(m.riskScore - peerVendorAvg, 1) : null, peers: vendorPeers.length } },
     pricing, projection, preAccidentIndicators: ind, recommendedPrograms: programs, limitations,
   };
@@ -118,7 +127,7 @@ table{border-collapse:collapse;width:100%}td,th{border:1px solid #d0d5dd;padding
 <p><span class="big">${a.riskScore}</span> / 100 &nbsp; <b>${e(a.riskTier.toUpperCase())}</b> &nbsp; confidence ${Math.round(a.confidence * 100)}% &nbsp; data quality ${a.dataQualityScore}/100</p>
 <p>Events per million miles: <b>${a.eventsPerMillionMiles == null ? 'n/a' : a.eventsPerMillionMiles}</b> (${e(a.exposure.basis)} exposure, ${a.exposure.milesTotal.toLocaleString('en-US')} mi). Collision rate ${a.collisionRate} per 100 vehicles / 30d.</p>
 <h2>Score breakdown</h2><table><tr><th>Factor</th><th>Rate /100 veh</th><th>Score</th><th>Weight</th></tr>${a.scoreBreakdown.map((c) => `<tr><td>${e(c.label)}</td><td>${c.ratePer100Veh}</td><td>${c.score}</td><td>${Math.round(c.weight * 100)}%</td></tr>`).join('')}</table>
-<h2>Pricing signal</h2><p><b>${a.pricing.suggestedPremiumAdjustmentPct > 0 ? '+' : ''}${a.pricing.suggestedPremiumAdjustmentPct}%</b> (${e(a.pricing.direction)})</p><ul>${li(a.pricing.rationale)}</ul>
+<h2>Pricing signal</h2>${a.pricing.indicative ? '<p style="background:#fff4e5;border:1px solid #ff6a1a;padding:6px 10px"><b>Indicative only - low confidence.</b> Insufficient history to support a pricing adjustment.</p>' : ''}<p><b>${a.pricing.suggestedPremiumAdjustmentPct > 0 ? '+' : ''}${a.pricing.suggestedPremiumAdjustmentPct}%</b> (${e(a.pricing.direction)})</p><ul>${li(a.pricing.rationale)}</ul>
 <h2>Projection (90 days)</h2><p>Risk ${a.projection.risk.current} now, ${a.projection.risk.projected30d} in 30d, ${a.projection.risk.projected90d} in 90d (band ${a.projection.risk.band90d.join('-')}), direction <b>${e(a.projection.risk.direction)}</b>. Expected collisions/30d: ${a.projection.expected ? a.projection.expected.collisions30d : 'n/a'}.</p>
 <h2>Pre-accident indicators</h2><ul>${li(a.preAccidentIndicators) || '<li>None detected</li>'}</ul>
 <h2>Recommended programs</h2><ul>${a.recommendedPrograms.map((p) => `<li>${e(p.label)} - est. -${p.expectedRiskReductionPct}% risk (${e(p.rationale)})</li>`).join('')}</ul>
@@ -131,11 +140,20 @@ router.post('/api/insurer/assessments', async (req, res) => {
   try { const a = await run({ fleetId: req.body && req.body.fleetId, jobId: req.body && req.body.jobId }); res.status(201).json(a); }
   catch (e) { res.status(e.status || 422).json({ error: 'assessment_failed', message: e.message }); }
 });
-router.get('/api/insurer/assessments', async (req, res) => res.json({ assessments: (await db.list('assessment', { fleetId: req.query.fleetId, limit: 200 })).map(({ projection, scoreBreakdown, preAccidentIndicators, recommendedPrograms, limitations, dataQuality, pricing, benchmark, driverRiskDistribution, topRiskFactors, ...s }) => ({ ...s, pricing: { suggestedPremiumAdjustmentPct: pricing.suggestedPremiumAdjustmentPct } })) }));
+router.get('/api/insurer/assessments', async (req, res) => res.json({ assessments: (await db.list('assessment', { fleetId: req.query.fleetId, limit: 200 })).map(({ projection, scoreBreakdown, preAccidentIndicators, recommendedPrograms, limitations, dataQuality, pricing, benchmark, driverRiskDistribution, topRiskFactors, ...s }) => ({ ...s, pricing: { suggestedPremiumAdjustmentPct: pricing.suggestedPremiumAdjustmentPct, indicative: !!pricing.indicative } })) }));
 router.get('/api/insurer/assessments/:id', async (req, res) => {
   const a = await db.get('assessment', req.params.id);
   if (!a) return res.status(404).json({ error: 'Assessment not found' });
   if (req.query.format === 'html') return res.type('html').send(html(a));
   res.json(a);
 });
+router.delete('/api/insurer/assessments/:id', async (req, res) => {
+  const a = await db.get('assessment', req.params.id);
+  if (!a) return res.status(404).json({ error: 'Assessment not found' });
+  await db.del('assessment', a.id);
+  let revoked = 0;
+  for (const r of await db.list('report', { limit: 100000 })) if (r.kind === 'assessment' && r.refId === a.id) { await db.del('report', r.id); revoked++; }
+  res.json({ deleted: true, id: a.id, reportsDeleted: revoked });
+});
+
 module.exports = { run, router };

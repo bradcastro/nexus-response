@@ -6,7 +6,7 @@ const roster = require('./roster');
 const A = require('./analytics');
 const D = require('./data/ops');
 const ingestLog = require('./ingest/log');
-const { round, clamp, hashStr } = require('./util');
+const { round, clamp, hashStr, redactPII } = require('./util');
 
 const DAY = 86400000;
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -167,7 +167,7 @@ router.post('/api/insurer/reports', wrap(async (req, res) => {
   else { data = await digest({ carrier: refId, period: (req.body.period) || 'weekly' }); title = 'Exceptions digest'; }
   const token = crypto.randomBytes(12).toString('hex');
   const now = Date.now();
-  const doc = { id: token, token, kind, refId: refId || null, fleetId, title, createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 30 * DAY).toISOString(), status: 'active', snapshot: data };
+  const doc = { id: token, token, kind, refId: refId || null, fleetId, title, createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 30 * DAY).toISOString(), status: 'active', snapshot: redactPII(data) };
   await db.put('report', doc);
   res.status(201).json({ token, url: '/report/' + token, apiUrl: '/api/reports/' + token, title, kind, expiresAt: doc.expiresAt });
 }));
@@ -176,7 +176,7 @@ router.get('/api/reports/:token', wrap(async (req, res) => {
   const r = await db.get('report', req.params.token);
   if (!r || r.status === 'revoked') return res.status(404).json({ error: 'Report not found' });
   if (new Date(r.expiresAt) < new Date()) return res.status(410).json({ error: 'Report link expired' });
-  res.set('Cache-Control', 'private, max-age=60').json({ token: r.token, kind: r.kind, title: r.title, createdAt: r.createdAt, expiresAt: r.expiresAt, readOnly: true, data: r.snapshot });
+  res.set('Cache-Control', 'private, max-age=60').json({ token: r.token, kind: r.kind, title: r.title, createdAt: r.createdAt, expiresAt: r.expiresAt, readOnly: true, data: redactPII(r.snapshot) });
 }));
 router.delete('/api/insurer/reports/:token', wrap(async (req, res) => { const r = await db.get('report', req.params.token); if (!r) return res.status(404).json({ error: 'Report not found' }); r.status = 'revoked'; await db.put('report', r); res.json({ revoked: true }); }));
 

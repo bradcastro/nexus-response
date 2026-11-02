@@ -88,11 +88,13 @@
       driver: 'Nexus Response: help is on the way' + (v.provider ? ' (' + v.provider + (v.eta != null ? ', ETA ' + Math.round(v.eta) + ' min' : '') + ')' : '') + '. Stay in a safe place, keep hazards on, and reply with any change.'
     }[kind] || base;
   }
-  function getTemplate(kind, i) {
+  function getTemplate(kind, i, prefer) {
     return api('/api/comms/templates', { query: { kind: kind, incidentId: i.id } }).then(function (d) {
-      var l = list(d, 'templates'), t = Array.isArray(d) || (d && d.templates) ? l[0] : d;
-      var txt = t && (t.body || t.text || t.message || (typeof t === 'string' ? t : ''));
-      return txt ? { text: render(txt, i), subject: t.subject ? render(t.subject, i) : null, name: t.name || t.key } : null;
+      var l = list(d, 'templates'), isList = Array.isArray(d) || (d && d.templates);
+      var t = isList ? ((prefer && l.filter(function (x) { return prefer.test(x.key || x.name || ''); })[0]) || l[0]) : d;
+      // the server already renders {{vars}} for this incident (renderedBody); only fall back to the local renderer on the raw body
+      var txt = t && (t.renderedBody || t.body || t.text || t.message || (typeof t === 'string' ? t : ''));
+      return txt ? { text: t.renderedBody ? txt : render(txt, i), subject: t.renderedSubject || (t.subject ? render(t.subject, i) : null), name: t.name || t.key } : null;
     }).catch(function () { return null; });
   }
   function contact(i, kind) {
@@ -107,23 +109,24 @@
     return [NX.el('span.sim-note', { html: SIM }), NX.el('button.nx-btn.nx-btn--ghost', { onclick: function () { m.close(); } }, 'Cancel'), NX.el('button.nx-btn.nx-btn--primary', { onclick: function (e) { e.currentTarget.classList.add('is-loading'); onSend(e.currentTarget); } }, label)];
   }
 
-  function notifyModal(kind, title, label) {
+  function notifyModal(kind, title, label, prefer) {
     var i = inc(); if (!i) return;
     var c = contact(i, kind), ta = NX.el('textarea.nx-textarea', { rows: 6 }), chan = NX.el('select.nx-select', {}, ['sms', 'email', 'call', 'push'].map(function (x) { return NX.el('option', { value: x }, x.toUpperCase()); }));
     var who = NX.el('select.nx-select', {}, c.list.length ? c.list.map(function (p, k) { return NX.el('option', { value: k }, (p.name || 'Contact') + (p.role ? ' (' + p.role + ')' : '') + (p.phone ? ' ' + p.phone : '')); }) : [NX.el('option', { value: -1 }, 'No contact on file')]);
     ta.value = fallbackMsg(kind, i);
-    getTemplate(kind, i).then(function (t) { if (t && !ta.dataset.edited) ta.value = t.text; });
+    var tplKey;
+    getTemplate(kind, i, prefer).then(function (t) { if (t && !ta.dataset.edited) { ta.value = t.text; tplKey = t.name; } });
     ta.addEventListener('input', function () { ta.dataset.edited = 1; });
     var m = NX.modal(title, NX.el('div.nx-stack', NX.el('div.two', NX.el('div', NX.el('label.nx-label', 'Recipient'), who), NX.el('div', NX.el('label.nx-label', 'Channel'), chan)), NX.el('label.nx-label', 'Message (editable template)'), ta), {
       footer: footer(null, label, function (btn) {
         var p = c.list[+who.value] || {};
-        send(i, { channel: chan.value, to: { type: c.type, id: p.id, name: p.name, phone: p.phone, email: p.email }, message: ta.value, template: kind, actor: 'dispatcher' }, btn).then(function (ok) { if (ok) m.close(); else btn.classList.remove('is-loading'); });
+        send(i, { channel: chan.value, to: { type: c.type, id: p.id, name: p.name, phone: p.phone, email: p.email }, message: ta.value, template: ta.dataset.edited ? undefined : tplKey, actor: 'dispatcher' }, btn).then(function (ok) { if (ok) m.close(); else btn.classList.remove('is-loading'); });
       })
     });
     // footer cancel needs the modal handle
     m.el.querySelector('.nx-modal__foot').replaceChildren.apply(m.el.querySelector('.nx-modal__foot'), footer(m, label, function (btn) {
       var p = c.list[+who.value] || {};
-      send(i, { channel: chan.value, to: { type: c.type, id: p.id, name: p.name, phone: p.phone, email: p.email }, message: ta.value, template: kind, actor: 'dispatcher' }, btn).then(function (ok) { if (ok) m.close(); else btn.classList.remove('is-loading'); });
+      send(i, { channel: chan.value, to: { type: c.type, id: p.id, name: p.name, phone: p.phone, email: p.email }, message: ta.value, template: ta.dataset.edited ? undefined : tplKey, actor: 'dispatcher' }, btn).then(function (ok) { if (ok) m.close(); else btn.classList.remove('is-loading'); });
     }));
     setTimeout(function () { ta.focus(); }, 50);
   }
@@ -195,6 +198,7 @@
   }
   function claimStage(p) {
     var s = p && p.status; if (!s) return -1;
+    if (s === 'paid') return OEM_STEPS.length; // final step complete
     if (DECISIONS[s]) return 4; var k = OEM_STEPS.indexOf(s); return k;
   }
   function oemHTML(i, panel) {
@@ -226,14 +230,13 @@
   }
   function simOem(outcome) {
     var i = inc(); if (!i || !outcome) return;
-    api('/api/incidents/' + encodeURIComponent(i.id) + '/warranty/oem-response', { method: 'POST', body: { outcome: outcome, status: outcome, actor: 'oem_simulator' } }).then(function (r) { NX.toast(NX.el('span', { html: 'OEM replied: ' + fmt.label(outcome) + ' ' + SIM }), 'info'); refreshIncident(i.id); afterAction(i.id); })
-      .catch(function (e) {
-        if (e.status !== 404) return NX.toast(e.message, 'error');
-        // endpoint not available yet: reflect locally and log on the timeline so the demo still flows
-        var pk = i.warranty && i.warranty.claimPacket; if (pk) { pk.status = outcome; D.renderDetail(); }
-        api('/api/incidents/' + encodeURIComponent(i.id) + '/notes', { method: 'POST', body: { actor: 'provider', note: 'OEM warranty desk (simulated): claim ' + fmt.label(outcome).toLowerCase() } }).then(function (x) { if (x && x.id) D.upsert(x); }).catch(function () {});
-        NX.toast('OEM response simulated locally (backend endpoint not available)', 'warn');
-      });
+    var url = '/api/incidents/' + encodeURIComponent(i.id) + '/warranty/status';
+    function ok() { NX.toast(NX.el('span', { html: 'OEM replied: ' + fmt.label(outcome) + ' ' + SIM }), 'info'); refreshIncident(i.id); afterAction(i.id); }
+    // documented endpoint: POST .../warranty/status {status}. An illegal jump (409) retries as a simulated next step toward the outcome.
+    api(url, { method: 'POST', body: { status: outcome, actor: 'oem' } }).then(ok).catch(function (e) {
+      if (e.status === 409 || e.status === 400 || e.status === 422) return api(url, { method: 'POST', body: { simulate: true, outcome: outcome, actor: 'oem' } }).then(ok).catch(function (e2) { NX.toast(e2.message || e.message, 'warn'); });
+      NX.toast(e.message, 'error');
+    });
   }
   var oemPoll;
   function pollClaim() {
@@ -318,7 +321,7 @@
       case 'fnol': return fnol();
       case 'oem': return submitOem();
       case 'cargo': return notifyModal('cargo_owner', 'Notify cargo owner', 'Send message');
-      case 'eta': return notifyModal('driver', 'Share ETA with driver', 'Send ETA');
+      case 'eta': return notifyModal('driver', 'Share ETA with driver', 'Send ETA', /eta/i);
     }
   }
   function onClick(e) {

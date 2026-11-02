@@ -240,7 +240,7 @@
       var n = num(v.openDtcs, 0);
       var icon = L.divIcon({ className: '', iconSize: [22, 22], iconAnchor: [11, 11], html: '<div class="fl-pin" style="--c:' + pinColor(v) + '">' + (n ? '<em>' + n + '</em>' : '') + '</div>' });
       var m = L.marker([v.lat, v.lng], { icon: icon, title: v.plate || v.id });
-      m.bindPopup('<b>' + esc(v.unit || v.plate || v.id) + '</b> · ' + esc([v.make, v.model].filter(Boolean).join(' ')) + '<br>' + (v.speed_mph != null ? Math.round(v.speed_mph) + ' mph · ' : '') + + esc(fmt.label(v.status || 'unknown')) + (n ? '<br>' + n + ' open trouble code' + (n > 1 ? 's' : '') : '<br>No open trouble codes') + '<br><a href="#" data-veh="' + esc(v.id) + '">View incidents</a>');
+      m.bindPopup('<b>' + esc(v.unit || v.plate || v.id) + '</b> · ' + esc([v.make, v.model].filter(Boolean).join(' ')) + '<br>' + (v.speed_mph != null ? Math.round(v.speed_mph) + ' mph · ' : '') + esc(fmt.label(v.status || 'unknown')) + (n ? '<br>' + n + ' open trouble code' + (n > 1 ? 's' : '') : '<br>No open trouble codes') + '<br><a href="#" data-veh="' + esc(v.id) + '">View incidents</a>');
       m.on('popupopen', function (e) { var a = e.popup.getElement().querySelector('[data-veh]'); if (a) a.onclick = function (ev) { ev.preventDefault(); S.vehFocus = v.id; var inc = S.incidents.filter(function (i) { return i.vehicle && i.vehicle.id === v.id; })[0]; if (inc) openIncident(inc.id); else NX.toast('No incidents on file for ' + (v.plate || v.id), 'info'); }; });
       S.markers.addLayer(m); pts.push([v.lat, v.lng]);
     });
@@ -699,7 +699,7 @@
       var cm = S.comms[i.id] || [], veh = vehLabel(i);
       cm.forEach(function (c) { var to = c.to && (c.to.name || c.to.type) || 'contact'; rows.push({ t: c.at || c.t, icon: { sms: 'SMS', email: 'MAIL', call: 'CALL', push: 'PUSH' }[c.channel] || 'MSG', title: (VERB[c.channel] || 'Contacted') + ' ' + to, text: (c.subject || c.body || '') + ' · ' + veh, id: i.id, sim: true }); });
       (i.timeline || []).forEach(function (e) {
-        if (e.actor === 'fleet' || !TL_RE.test(e.action || '')) return;
+        if ((e.actor === 'fleet' && !/warranty|claim|submitted/i.test(e.action || '')) || !TL_RE.test(e.action || '')) return;
         if (cm.length && /notif|sms|call|email/i.test(e.action || '')) return;
         var a = String(e.action || '');
         rows.push({ t: e.t, icon: /warranty|claim|submitted/i.test(a) ? 'CLAIM' : /dispatch|tow|roadside/i.test(a) ? 'TOW' : 'NX', title: fmt.label(a), text: (e.note || '') + ' · ' + veh, id: i.id, sim: /warranty|claim|submitted|fnol|notif|call/i.test(a) });
@@ -744,7 +744,7 @@
       return NX.api('/api/incidents', { query: { fleetId: S.fleet.id, limit: 500 } }).then(function (r) { S.incidents = (r && r.incidents) || r || []; sortIncidents(); refreshClaims(); renderIncidentsTables(); });
     }).catch(function (e) { btn.disabled = false; btn.classList.remove('is-loading'); NX.toast(e.message, 'error'); });
   }
-  function refreshClaims() { renderWarranty(); renderAttention(); renderCounts(); }
+  function refreshClaims() { renderWarranty(); renderAttention(); renderCounts(); S.comms = {}; loadFeed(); }
   function renderWarranty() {
     var host = $('war-body'); if (!host) return;
     var cs = claims();

@@ -335,3 +335,14 @@ kbd { background: var(--nx-surface-3); border: 1px solid var(--nx-border-strong)
 .hn { padding: 8px 10px; border: 1px solid var(--nx-border); border-radius: var(--nx-radius); }
 @media (max-width: 1100px) { .dc { min-height: 0; } }
 @media (max-width: 640px) { .act-strip { grid-template-columns: repeat(2, 1fr); } .shift-bar { gap: 10px; } }
+
+/* ---------- Print: the selected incident's detail only, full width, light, paginated ---------- */
+@media print {
+  .nx-app--fill, .nx-app--nosidebar { height: auto !important; display: block !important; }
+  .shift-bar, .pane-queue, .pane-map, .view-tabs, .map-tools, .map-hud, .q-alert, .pro-actions, .d-mini, .act-strip button, .nx-toasts { display: none !important; }
+  .dc, .dc[data-view] { display: block !important; height: auto !important; min-height: 0 !important; }
+  .pane-detail, .dc[data-view] .pane-detail { display: block !important; overflow: visible !important; border: 0 !important; height: auto !important; width: 100% !important; }
+  .nx-main, .nx-main--flush { overflow: visible !important; height: auto !important; }
+  .act-strip { display: none !important; }
+  .nx-card, .panel, .verif { break-inside: avoid; }
+}

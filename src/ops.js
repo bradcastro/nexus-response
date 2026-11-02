@@ -127,6 +127,8 @@ function varsFor(inc, req) {
     vehicle: `${inc.vehicle.year || ''} ${inc.vehicle.make || ''} ${inc.vehicle.model || ''} (${inc.vehicle.plate})`.replace(/\s+/g, ' ').trim(), unit: inc.vehicle.unit,
     city: place(inc).city, driver: inc.driver.name, driverFirst: first(inc.driver.name), driverPhone: inc.driver.phone, location: inc.location.address, road: p.road, time: new Date(inc.timestamp).toISOString().replace('T', ' ').slice(0, 16) + ' UTC',
     speed: inc.location.speed_mph, eta: rs.etaMin ? `${rs.etaMin} min` : 'TBD', provider: prov ? prov.name : '(provider TBD)', serviceType: (rs.serviceType || 'service').replace(/_/g, ' '),
+    helpLine: rs.assignedProvider ? `${rs.assignedProvider.name} is en route, ETA ${rs.etaMin ? rs.etaMin + ' min' : 'TBD'}.` : 'recovery is being arranged; we will text you the provider and ETA as soon as it is confirmed.',
+    recoveryLine: rs.assignedProvider ? `A recovery provider is en route (ETA ${rs.etaMin ? rs.etaMin + ' min' : 'TBD'}).` : 'Recovery is being arranged; we will confirm the provider and ETA shortly.',
     camera: inc.camera.verified ? `Camera-verified (${inc.camera.aiVerdict.replace(/_/g, ' ')}, ${Math.round(inc.camera.confidence * 100)}%).` : 'No camera confirmation.',
     cargo: ld && ld.contents && ld.estimatedWeightLb > 300 ? `~${ld.estimatedWeightLb.toLocaleString('en-US')} lb ${ld.contents.label.replace(' (likely)', '').toLowerCase()}` : 'none / empty', cargoOwner: c.cargoOwner ? c.cargoOwner.name : 'shipper',
     response: rs.needed ? `${(rs.serviceType || '').replace(/_/g, ' ')} via ${prov ? prov.name : 'TBD'}, ETA ${rs.etaMin || 'TBD'} min` : 'monitoring; no roadside needed',
@@ -426,7 +428,7 @@ router.get('/api/jobs/:token', wrap(async (req, res) => { const { job, inc } = a
 const JOB_ACTIONS = {
   accept: { job: 'accepted', inc: 'en_route', action: 'en_route', note: (b) => `Provider accepted the job${b.etaMin ? `, ETA ${b.etaMin} min` : ''}` },
   decline: { job: 'declined', inc: 'pending', action: 'provider_declined', note: (b) => `Provider declined the job${b.note ? ': ' + b.note : ''}` },
-  eta: { job: null, inc: null, action: 'eta_updated', note: (b) => `Provider updated ETA to ${b.etaMin} min` },
+  eta: { job: 'en_route', inc: 'en_route', action: 'eta_updated', note: (b) => `Provider updated ETA to ${b.etaMin} min` },
   arrived: { job: 'arrived', inc: 'on_scene', action: 'on_scene', note: () => 'Provider arrived on scene' },
   complete: { job: 'completed', inc: 'resolved', action: 'resolved', note: (b) => `Provider marked job complete${b.note ? ': ' + b.note : ''}` },
 };
@@ -437,13 +439,13 @@ router.post('/api/jobs/:token/:action', wrap(async (req, res) => {
   if (['accept', 'eta'].includes(req.params.action) || b.etaMin != null) { if (b.etaMin != null && !(Number.isFinite(+b.etaMin) && +b.etaMin >= 1 && +b.etaMin <= 1440)) return res.status(422).json({ error: 'validation_failed', message: 'etaMin must be 1-1440' }); if (req.params.action === 'eta' && b.etaMin == null) return res.status(422).json({ error: 'validation_failed', message: 'etaMin is required' }); }
   if (['declined', 'completed'].includes(job.status)) return res.status(409).json({ error: 'job_closed', message: `Job already ${job.status}` });
   const t = new Date().toISOString();
-  if (A.job) job.status = A.job;
+  if (A.job && !(req.params.action === 'eta' && job.status === 'arrived')) job.status = A.job;
   job.events.push({ t, status: A.job || job.status, action: req.params.action, etaMin: b.etaMin != null ? +b.etaMin : undefined, note: b.note || null });
   await db.put('job', job);
   const out = await db.updateIncident(inc.id, (i) => {
     const rs = i.roadside = i.roadside || {};
     if (b.etaMin != null) { rs.etaMin = +b.etaMin; if (rs.assignedProvider) rs.assignedProvider.etaMin = +b.etaMin; }
-    if (A.inc) { i.status = A.inc; if (A.inc === 'resolved') i.resolvedAt = t; }
+    if (A.inc && !(req.params.action === 'eta' && ['on_scene', 'resolved'].includes(i.status))) { i.status = A.inc; if (A.inc === 'resolved') i.resolvedAt = t; }
     if (req.params.action === 'decline') rs.assignedProvider = null;
     i.timeline.push({ t, actor: 'provider', action: A.action, note: A.note(b) + ` (${job.providerName}, via job link)`, meta: { jobToken: job.token } });
   });

@@ -34,4 +34,17 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const iso = (d) => new Date(d).toISOString();
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-module.exports = { mulberry32, hashStr, rngFrom, pick, int, range, weighted, haversineMi, round, clamp, iso, clone, sleep };
+// Public-snapshot redaction: drop contact-ish keys and mask phone-like strings anywhere in the tree.
+const PHONE_KEY = /phone|fnolline|warrantydesk|callback|^email$|mobile|^raw$/i;
+const PHONE_RE = /(?<![\w.-])(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]\d{4}(?![\w-])|(?<![\w.-])\d{3}[-.]\d{4}(?![\w-])|(?<![\w.-])\+\d{10,14}(?![\w-])/g;
+function redactPII(v) {
+  if (typeof v === 'string') return v.replace(PHONE_RE, '[phone removed]');
+  if (Array.isArray(v)) return v.map(redactPII);
+  if (v && typeof v === 'object') {
+    const o = {};
+    for (const [k, x] of Object.entries(v)) { if (PHONE_KEY.test(k) || k === 'contacts') continue; o[k] = redactPII(x); }
+    return o;
+  }
+  return v;
+}
+module.exports = { redactPII, mulberry32, hashStr, rngFrom, pick, int, range, weighted, haversineMi, round, clamp, iso, clone, sleep };

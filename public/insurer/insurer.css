@@ -176,3 +176,7 @@
 .ins-ring .rl { font: 10px var(--nx-font-mono); fill: var(--nx-text-dim); }
 .ins-ringrow { display: flex; gap: var(--nx-sp-4); align-items: center; flex-wrap: wrap; }
 .ins-chg li { list-style: none; } .ins-chg { padding-left: 0; }
+
+/* Mobile: sticky table headers made the page layout viewport expand to table width; contain paint keeps scrolling inside the wrapper. */
+.nx-table-wrap { contain: paint; max-width: 100%; }
+.ins-demo { font-size: var(--nx-text-xs, 12px); margin: 0 0 var(--nx-sp-3, 12px); }

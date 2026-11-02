@@ -155,6 +155,7 @@
     var el = box.querySelector('.is-selected'); if (el && S._scrollSel) { el.scrollIntoView({ block: 'nearest' }); S._scrollSel = false; }
   }
   function renderHud() {
+    if (window.NXAct && NXAct.shift) NXAct.shift();
     var o = [], crit = 0, un = 0, act = 0;
     S.inc.forEach(function (i) { if (isHist(i) || isClosed(i)) return; o.push(i); if (i.severity === 'critical') crit++; if (i.status === 'pending' || i.status === 'validating') un++; else act++; });
     $('#hud-stats').innerHTML = [['Open', o.length], ['Critical', crit], ['Unassigned', un], ['In progress', act], ['Watch', '<span id="hud-watch">' + (S.alerts ? Array.from(S.alerts.values()).filter(function (a) { return a.status === 'open'; }).length : 0) + '</span>']].map(function (x) { return '<div class="hud-stat"><b' + (x[0] === 'Critical' && x[1] ? ' style="color:var(--nx-sev-critical)"' : '') + '>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
@@ -567,11 +568,13 @@
   $('#btn-follow').addEventListener('click', function (e) { S.follow = !S.follow; e.target.setAttribute('aria-pressed', S.follow); if (S.follow) focusSelection(); });
   document.querySelectorAll('.view-tabs button').forEach(function (b) { b.addEventListener('click', function () { setView(b.dataset.view); }); });
   window.addEventListener('hashchange', function () { var h = decodeURIComponent(location.hash.slice(1)); if (h && h !== S.sel) select(h, { noHash: true, view: 'detail' }); });
+  var modalAtKey = false; // Esc that closes a modal must not also clear the selected incident
+  document.addEventListener('keydown', function () { modalAtKey = !!document.querySelector('.nx-modal-backdrop'); }, true);
   document.addEventListener('keydown', function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
     if (document.querySelector('.nx-modal-backdrop') && e.key !== 'Escape') return;
-    if (e.key === 'Escape') { if (typing) { t.blur(); return; } if (S.sel) { S.sel = null; S.providers = []; history.replaceState(null, '', location.pathname); renderQueue(); renderDetail(); drawSelection(); syncMarkers(); } return; }
+    if (e.key === 'Escape') { if (modalAtKey) return; if (typing) { t.blur(); return; } if (S.sel) { S.sel = null; S.providers = []; history.replaceState(null, '', location.pathname); renderQueue(); renderDetail(); drawSelection(); syncMarkers(); } return; }
     if (typing) return;
     var k = e.key;
     if (S.mode === 'proactive') { if (k === '/') return; if (NXPro.key(k)) { e.preventDefault(); return; } if (k === 'm') return setMode('live'); }
@@ -583,7 +586,7 @@
     else if (k === 'x') doDismiss();
     else if (k === '1' || k === '2' || k === '3') { var i = S.inc.get(S.sel); if (i && !isClosed(i)) setStatus(['en_route', 'on_scene', 'resolved'][+k - 1]); }
     else if (k === 'n') { var n = $('#note-in'); if (n) { e.preventDefault(); n.focus(); } }
-    else if (k === '/') { e.preventDefault(); $('#f-q').focus(); }
+    else if (k === '/') { e.preventDefault(); setView('queue'); $('#f-q').focus(); }
     else if (k === 'z') fitAll();
     else if (k === '?') showHelp();
   });

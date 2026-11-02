@@ -541,13 +541,14 @@
       var fl = { vin: 'VIN', driver: 'Driver', gps: 'GPS location', speed: 'Speed', video: 'Video', dtc: 'Fault codes', load: 'Load data' };
       var covBox = el('div'); Object.keys(cov).forEach(function (k) { var v = Math.round(frac ? cov[k] * 100 : cov[k]); covBox.appendChild(el('div.ob-cov', el('span', fl[k] || fmt.label(k)), el('div.nx-meter', el('i', { style: 'width:' + v + '%;--c:' + (v >= 80 ? 'var(--nx-ok)' : v >= 40 ? 'var(--nx-warn)' : 'var(--nx-sev-high)') })), el('span.nx-num', { style: { textAlign: 'right' } }, v + '%'))); });
       var dr = dq.dateRange || {};
+      function dOnly(x) { var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(x || '')); return fmt.date(m ? new Date(+m[1], +m[2] - 1, +m[3]) : x); } // date-only strings: avoid UTC shift to the previous day
       var errs = j.errors || [];
       body.appendChild(el('div.ob-callout.ob-callout--ok', { style: { marginBottom: '16px' } }, el('div', el('b', 'Import complete. '), fmt.number(j.rowsOk) + ' of ' + fmt.number(j.rowsTotal) + ' rows imported' + (j.rowsSkipped ? ', ' + fmt.number(j.rowsSkipped) + ' skipped' : '') + '.')));
       body.appendChild(card('Data quality report', el('div.nx-stack',
         el('div.nx-row', { style: { gap: '24px', flexWrap: 'wrap', alignItems: 'center' } },
           el('div.ob-score', { style: '--c:' + qc }, el('div', qs != null ? Math.round(qs) : '—', el('small', 'OF 100'))),
           el('div.nx-grow', { style: { minWidth: '220px' } }, el('h3', { style: { margin: '0 0 6px', font: '600 var(--nx-text-lg)/1 var(--nx-font-display)', textTransform: 'uppercase', letterSpacing: '.03em' } }, qlabel),
-            el('div.ob-bignum', [['Date range', dr.from ? fmt.date(dr.from) + ' to ' + fmt.date(dr.to) : '—'], ['Days', fmt.number(dq.days)], ['Vehicles', fmt.number(dq.vehicles)], ['Drivers', fmt.number(dq.drivers)], ['Duplicates', fmt.number(dq.duplicates)]].map(function (k) { return el('div', el('b', k[1]), el('span', k[0])); })))),
+            el('div.ob-bignum', [['Date range', dr.from ? dOnly(dr.from) + ' to ' + dOnly(dr.to) : '—'], ['Days', fmt.number(dq.days)], ['Vehicles', fmt.number(dq.vehicles)], ['Drivers', fmt.number(dq.drivers)], ['Duplicates', fmt.number(dq.duplicates)]].map(function (k) { return el('div', el('b', k[1]), el('span', k[0])); })))),
         Object.keys(cov).length ? el('div', el('label.nx-label', 'Field coverage'), covBox) : null,
         (dq.notes && dq.notes.length) ? el('div', el('label.nx-label', 'Notes'), el('ul', { style: { margin: 0, paddingLeft: '18px', fontSize: 'var(--nx-text-sm)' } }, dq.notes.map(function (n) { return el('li', n); }))) : null)));
       if (errs.length) {

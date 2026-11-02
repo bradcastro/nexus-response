@@ -418,6 +418,7 @@ code, kbd, .nx-mono { font-family: var(--nx-font-mono); font-size: .92em; }
   .nx-modal-backdrop { align-items: end; padding: 0; }
   .nx-modal { border-radius: var(--nx-radius-lg) var(--nx-radius-lg) 0 0; max-height: 92vh; }
 }
+@media (max-width: 480px) { .nx-live { display: none; } .nx-switcher a { padding: 5px 5px; } }
 
 /* ---------- Motion preference ---------- */
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }

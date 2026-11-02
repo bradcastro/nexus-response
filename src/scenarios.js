@@ -135,6 +135,7 @@ function scenarioSpec(name, rng, o = {}) {
         const pool = [];
         for (const f of fleets) if (!o.fleetId || f.id === o.fleetId) for (const x of f.vehicles) if (inWarrantyFor(x, 'emissions') && inWarrantyFor(x, 'powertrain')) pool.push(x);
         const pref = pool.filter((x) => x.cls === 'heavy');
+        if (!pool.length && o.fleetId && fleet) return sample(rng, fleet.vehicles);
         return sample(rng, pref.length ? pref : pool.length ? pool : fleets[0].vehicles);
       })();
       fleet = roster.getFleet(v.fleetId);
@@ -151,9 +152,10 @@ function scenarioSpec(name, rng, o = {}) {
       const wantFleets = name === 'hazmat_tanker_rollover' ? ['fleet_gulfcoast'] : name === 'reefer_collision' ? ['fleet_gulfcoast', 'fleet_piedmont', 'fleet_bluegrass'] : ['fleet_gulfcoast', 'fleet_piedmont'];
       const sleeperKeys = ['fcascadia', 'vnl', 'p579', 'kt680'];
       if (!v) {
-        if (!fleet || !wantFleets.includes(fleet.id)) fleet = roster.getFleet(sample(rng, wantFleets));
+        if (!fleet || (!o.fleetId && !wantFleets.includes(fleet.id))) fleet = roster.getFleet(sample(rng, wantFleets));
         const pool = fleet.vehicles.filter((x) => sleeperKeys.includes(x.modelKey) && (name === 'hazmat_tanker_rollover' || x.hasCamera));
-        v = pool.length ? sample(rng, pool) : sample(rng, fleet.vehicles.filter((x) => x.cls === 'heavy'));
+        const heavy = fleet.vehicles.filter((x) => x.cls === 'heavy');
+        v = pool.length ? sample(rng, pool) : sample(rng, heavy.length ? heavy : fleet.vehicles);
       }
       const fleetProfile = { reefer_collision: fleet.id === 'fleet_bluegrass' ? 'reefer_dairy' : 'reefer_perishable', flatbed_steel_collision: 'flatbed_steel', hazmat_tanker_rollover: 'tanker_fuel' }[name];
       const hint = { profile: fleetProfile, tripKind: 'pickup', cameraTrailer: name !== 'hazmat_tanker_rollover', payloadLb: name === 'reefer_collision' ? int(rng, 38000, 44000) : name === 'flatbed_steel_collision' ? int(rng, 40500, 44500) : int(rng, 40000, 45000) };
