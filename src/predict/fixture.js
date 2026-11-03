@@ -5,7 +5,7 @@ const DAY = 86400000;
 
 const FLEETS = [
   { id: 'fleet_gulfcoast', name: 'Gulf Coast Freight', vendor: 'motive', n: 38, cam: 0.82, haz: 1.0, base: [30.69, -88.04] },
-  { id: 'fleet_goodyear', name: 'Goodyear Towing', vendor: 'motive', n: 22, cam: 0.9, haz: 0.8, base: [31.31, -85.85] },
+  { id: 'fleet_elite', name: 'Elite Towing', vendor: 'motive', n: 22, cam: 0.9, haz: 0.8, base: [31.31, -85.85] },
   { id: 'fleet_piedmont', name: 'Piedmont Logistics', vendor: 'samsara', n: 54, cam: 0.74, haz: 1.5, base: [35.22, -80.84] },
   { id: 'fleet_bluegrass', name: 'Bluegrass Dairy Transport', vendor: 'geotab', n: 31, cam: 0.4, haz: 0.8, base: [38.04, -84.5] },
   { id: 'fleet_summit', name: 'Summit Last-Mile Delivery', vendor: 'lytx', n: 67, cam: 1.0, haz: 1.2, base: [33.75, -84.39] },

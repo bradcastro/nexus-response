@@ -30,7 +30,7 @@ const PROFILES = {
 };
 const FLEET_MIX = {
   fleet_gulfcoast: { class8: [['reefer_perishable', 3], ['reefer_frozen', 0.8], ['dry_grocery', 3], ['dry_beverage', 1], ['flatbed_steel', 2], ['flatbed_lumber', 2], ['flatbed_building', 1], ['tanker_fuel', 1.2], ['dump_aggregate', 1]], box: [['box_grocery', 3], ['box_building', 2]] },
-  fleet_goodyear: { class8: [['lowboy_equipment', 2], ['car_hauler', 3]], box: [['tow_vehicle', 1]] },
+  fleet_elite: { class8: [['lowboy_equipment', 2], ['car_hauler', 3]], box: [['tow_vehicle', 1]] },
   fleet_piedmont: { class8: [['dry_general', 3], ['reefer_perishable', 2], ['reefer_frozen', 0.7], ['flatbed_lumber', 1.2], ['flatbed_steel', 1], ['dry_machinery', 1.2], ['dry_grocery', 1.5]], box: [['box_grocery', 1]] },
   fleet_bluegrass: { class8: [['tanker_milk', 4], ['reefer_dairy', 3], ['reefer_frozen', 0.8]], box: [['box_grocery', 1]] },
   fleet_redline: { class8: [['dry_general', 3], ['reefer_perishable', 2], ['flatbed_steel', 1], ['dry_machinery', 1.5], ['dry_grocery', 1.5]], box: [['box_grocery', 1]] },

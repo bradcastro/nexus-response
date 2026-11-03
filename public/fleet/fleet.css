@@ -161,3 +161,7 @@
   .fl-feed__row { padding: 10px 12px; flex-wrap: wrap; }
 }
 #feed { max-height: 560px; overflow: auto; }
+
+.fl-d-tabs .fl-hist { margin: auto 0 auto auto; }
+.fl-histlink { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.fl-navlink { text-decoration: none; display: block; }

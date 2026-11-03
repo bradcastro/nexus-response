@@ -269,7 +269,7 @@
         <div class="sidebar-label">Incident Feed</div>
         <div class="ftabs">
           <button class="ftab active" data-fleet="all" onclick="setFilter('all')">All</button>
-          <button class="ftab" data-fleet="Goodyear Towing" onclick="setFilter('Goodyear Towing')">Goodyear</button>
+          <button class="ftab" data-fleet="Elite Towing" onclick="setFilter('Elite Towing')">Elite</button>
           <button class="ftab" data-fleet="Elite Wrecker Service" onclick="setFilter('Elite Wrecker Service')">Elite</button>
         </div>
         <div class="pending-row">
@@ -369,7 +369,7 @@ function renderList() {
   list.innerHTML=items.map(inc=>{
     const v=inc.vehicle?.make?`${inc.vehicle.make} ${inc.vehicle.model||''}`.trim():'Unknown Vehicle';
     const loc=inc.location?.address||(inc.location?.lat?`${parseFloat(inc.location.lat).toFixed(4)}, ${parseFloat(inc.location.lng).toFixed(4)}`:'No location');
-    const gy=inc.customerName==='Goodyear Towing';
+    const gy=inc.customerName==='Elite Towing';
     const driverName=inc.driver?.name||'Unknown Driver';
     return `<div class="icard status-${inc.status} ${inc.id===selectedId?'selected':''} ${inc.status!=='pending'?inc.status:''}" onclick="selectInc('${inc.id}')">
       <div class="ic-row1"><span class="ic-id">${(inc.id||'').substring(0,20)}</span><span class="sev sev-${inc.severity||'unknown'}">${inc.severity||'?'}</span></div>
@@ -398,7 +398,7 @@ function renderDetail(inc) {
   const raw=inc.rawPayload||{};
   const eng=computeEng(inc,raw);
   const cams=getCams(inc,raw);
-  const gy=inc.customerName==='Goodyear Towing';
+  const gy=inc.customerName==='Elite Towing';
   const driverName=inc.driver?.name||'Unknown Driver';
   const driverInitials=driverName.split(' ').map(n=>n[0]||'').join('').substring(0,2).toUpperCase()||'?';
 

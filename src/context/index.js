@@ -10,7 +10,7 @@ const { rngFrom, hashStr, haversineMi, round, int, range, pick } = require('../u
 
 const YARDS = {
   fleet_gulfcoast: { name: 'Gulf Coast Freight Yard', address: '2400 Dauphin Island Pkwy, Mobile, AL', lat: 30.6602, lng: -88.0802 },
-  fleet_goodyear: { name: 'Goodyear Towing Yard', address: 'Enterprise, AL', lat: 31.3152, lng: -85.8552 },
+  fleet_elite: { name: 'Elite Towing Yard', address: 'Enterprise, AL', lat: 31.3152, lng: -85.8552 },
   fleet_piedmont: { name: 'Piedmont Logistics Terminal', address: '5100 Statesville Rd, Charlotte, NC', lat: 35.2702, lng: -80.8502 },
   fleet_bluegrass: { name: 'Bluegrass Dairy Transport Terminal', address: 'Lexington, KY', lat: 38.0406, lng: -84.5037 },
   fleet_redline: { name: 'Redline Regional Terminal', address: 'Nashville, TN', lat: 36.16, lng: -86.78 },

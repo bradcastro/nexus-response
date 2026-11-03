@@ -11,14 +11,14 @@ const roadside = require('./enrich/roadside');
 const claims = require('./claims');
 const { windows: warrantyWindows } = require('./enrich/warranty');
 
-const TREND_P = { fleet_gulfcoast: 1.0, fleet_goodyear: 0.9, fleet_piedmont: 1.55, fleet_bluegrass: 0.65, fleet_summit: 1.25, fleet_redline: 0.55, fleet_magnolia: 0.6 };
+const TREND_P = { fleet_gulfcoast: 1.0, fleet_elite: 0.9, fleet_piedmont: 1.55, fleet_bluegrass: 0.65, fleet_summit: 1.25, fleet_redline: 0.55, fleet_magnolia: 0.6 };
 // share of the 90-day events falling in [last 30d, 30-60d, 60-90d] (trend shape)
-const SHARES = { fleet_gulfcoast: [0.34, 0.33, 0.33], fleet_goodyear: [0.34, 0.33, 0.33], fleet_piedmont: [0.46, 0.30, 0.24], fleet_bluegrass: [0.24, 0.33, 0.43], fleet_summit: [0.40, 0.33, 0.27], fleet_redline: [0.19, 0.33, 0.48], fleet_magnolia: [0.19, 0.33, 0.48] };
+const SHARES = { fleet_gulfcoast: [0.34, 0.33, 0.33], fleet_elite: [0.34, 0.33, 0.33], fleet_piedmont: [0.46, 0.30, 0.24], fleet_bluegrass: [0.24, 0.33, 0.43], fleet_summit: [0.40, 0.33, 0.27], fleet_redline: [0.19, 0.33, 0.48], fleet_magnolia: [0.19, 0.33, 0.48] };
 // how much driver-behaviour signal each vendor's gear captures before a collision (drives precursor density)
 const CAPTURE = { mantis: 1.0, lytx: 0.85, samsara: 0.7, motive: 0.55, geotab: 0.3 };
 const LEAD_TYPES = ['following_distance', 'harsh_brake', 'harsh_turn', 'harsh_accel', 'distracted', 'speeding'];
-const ABBR = { fleet_gulfcoast: 'GCF', fleet_goodyear: 'GYT', fleet_piedmont: 'PLG', fleet_bluegrass: 'BDT', fleet_summit: 'SLM', fleet_redline: 'RRC', fleet_magnolia: 'MBD' };
-const STATE = { fleet_gulfcoast: 'AL', fleet_goodyear: 'AL', fleet_piedmont: 'NC', fleet_bluegrass: 'KY', fleet_summit: 'GA', fleet_redline: 'TN', fleet_magnolia: 'MS' };
+const ABBR = { fleet_gulfcoast: 'GCF', fleet_elite: 'ELT', fleet_piedmont: 'PLG', fleet_bluegrass: 'BDT', fleet_summit: 'SLM', fleet_redline: 'RRC', fleet_magnolia: 'MBD' };
+const STATE = { fleet_gulfcoast: 'AL', fleet_elite: 'AL', fleet_piedmont: 'NC', fleet_bluegrass: 'KY', fleet_summit: 'GA', fleet_redline: 'TN', fleet_magnolia: 'MS' };
 const YEARS = [[2020, 6], [2021, 10], [2022, 16], [2023, 20], [2024, 20], [2025, 18], [2026, 10]];
 
 function buildRoster(now = new Date()) {
@@ -251,6 +251,8 @@ async function seed({ reset = false, now = new Date() } = {}) {
     await ingestLog.record({ receivedAt: new Date(now.getTime() - (4 - i) * 3600000 + 60000).toISOString(), provider: 'geotab', fleetId: 'fleet_bluegrass', status: 'rejected', error: i === 0 ? 'location.lat/lng missing' : i === 1 ? 'location.lat out of range (-90..90): 123.4' : 'timestamp is not a valid date: "not-a-date"', latencyMs: 3, payloadBytes: JSON.stringify(pl).length, payload: pl, auth: 'hmac', statusCode: 422 });
   }
   const opsRes = await require('./ops').seedOps({ now });
+  // deterministic spread of claim outcomes (approved/paid majority, some under review / more info / denied)
+  for (const inc of await db.listIncidents({ limit: 1e6, clone: false })) { if (!process.env.NX_NO_SPREAD && claims.spreadOutcome(inc, now.getTime())) await db.saveIncident(inc); }
   return { fleets: fleets.length, incidents: n, skipped: false, precursorCollisions, ops: opsRes };
 }
 

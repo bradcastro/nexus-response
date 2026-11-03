@@ -102,4 +102,49 @@ function summary(inc) {
     nextActions: cp.status === 'draft' || cp.status === 'ready' ? ['submit'] : cp.status === 'more_info_needed' ? ['upload_info', 'simulate_oem_response'] : cp.status === 'denied' ? ['appeal', 'simulate_oem_response'] : cp.status === 'paid' ? [] : ['simulate_oem_response'],
   };
 }
-module.exports = { NEXT, ensureMeta, submit, applyStatus, simulateNext, advanceTo, summary, claimNumber };
+
+// ---- deterministic spread of seeded claim outcomes (hash-based; consumes no seed RNG so incident data is unchanged) ----
+const SEED_DENIALS = ['Outside warranty mileage', 'Aftermarket modification', 'Fault code not covered', 'Missing maintenance records'];
+const SEED_MORE_INFO = ['Please upload the last two PM invoices.', 'Need technician notes and the freeze-frame export for the listed fault codes.', 'Provide proof of scheduled service (last 2 oil/fuel-filter changes).'];
+// target mix by hash bucket (0-99): paid 38, approved 12, under_review 18, more_info_needed 12, denied 14, submitted 6
+const OUTCOME_BANDS = [[38, 'paid'], [50, 'approved'], [68, 'under_review'], [80, 'more_info_needed'], [94, 'denied'], [100, 'submitted']];
+function spreadOutcome(inc, nowMs) {
+  const cp = inc.warranty && inc.warranty.claimPacket;
+  if (!cp || cp.status === 'draft') return false;
+  const h = hashStr('outcome' + inc.id), b = h % 100;
+  // most claims older than 2 days that were only 'ready' get submitted too; the newest stay ready (to-do for the fleet)
+  if (cp.status === 'ready' && (nowMs - +new Date(inc.receivedAt) < 2 * 86400000 || hashStr('rdy' + inc.id) % 100 >= 65 || !inc.warranty.claimEligible)) return false;
+  let target = OUTCOME_BANDS.find(([hi]) => b < hi)[1];
+  ensureMeta(inc);
+  const hrs = (k) => 3 + (hashStr('step' + k + inc.id) % 30);
+  const subAt = +new Date(cp.submittedAt || (cp.status === 'ready' ? new Date(+new Date(inc.receivedAt) + (2 + hashStr('sub' + inc.id) % 18) * 3600000).toISOString() : null) || ((inc.timeline.find((e) => e.action === 'warranty_submitted') || {}).t) || new Date(+new Date(inc.receivedAt) + 300 * 60000));
+  if (subAt > nowMs) return false;
+  const PATH = { submitted: [], under_review: ['under_review'], more_info_needed: ['under_review', 'more_info_needed'], denied: ['under_review', 'denied'], approved: ['under_review', 'approved'], paid: ['under_review', 'approved', 'paid'] };
+  // downgrade until the path fits before "now" (recent claims cannot already be decided)
+  const order = ['paid', 'approved', 'denied', 'more_info_needed', 'under_review', 'submitted'];
+  const fits = (t) => { let at = subAt; for (let k = 0; k < PATH[t].length; k++) at += hrs(k) * 3600000; return at <= nowMs; };
+  while (!fits(target) && target !== 'submitted') target = order[order.indexOf(target) + 1];
+  // rebuild the lifecycle from the submission point
+  cp.history = [{ t: new Date(subAt).toISOString(), status: 'submitted', by: 'fleet', note: 'Submitted (simulated)' }];
+  inc.timeline = inc.timeline.filter((e) => !/^(warranty_submitted|warranty_under_review|warranty_approved|warranty_denied|warranty_more_info_needed|warranty_paid)$/.test(e.action));
+  for (const k of ['approvedAmountUsd', 'paidAmountUsd', 'paidAt', 'paymentRef', 'denialReason', 'requestedInfo', 'oemResponse']) delete cp[k];
+  cp.claimNumber = cp.claimNumber || claimNumber(inc); preAuth(inc);
+  cp.status = 'submitted'; cp.submittedAt = new Date(subAt).toISOString(); cp.submittedTo = cp.oemDesk.portal; cp.confirmation = inc.warranty.claimId;
+  inc.timeline.push({ t: cp.submittedAt, actor: 'fleet', action: 'warranty_submitted', note: `Warranty claim ${inc.warranty.claimId} submitted to ${cp.oemDesk.portal}: claim # ${cp.claimNumber}, est. $${cp.estimatedValueUsd} (simulated)`, meta: { claimId: inc.warranty.claimId, claimNumber: cp.claimNumber, status: 'submitted' } });
+  let at = subAt;
+  PATH[target].forEach((st, k) => {
+    at += hrs(k) * 3600000; const t = iso(at);
+    if (st === 'denied') applyStatus(inc, st, { at: t, outcomeExtra: { reason: SEED_DENIALS[hashStr('deny' + inc.id) % SEED_DENIALS.length] } });
+    else if (st === 'more_info_needed') applyStatus(inc, st, { at: t, outcomeExtra: { requested: SEED_MORE_INFO[hashStr('info' + inc.id) % SEED_MORE_INFO.length] } });
+    else if (st === 'approved') {
+      applyStatus(inc, st, { at: t });
+      const frac = 0.78 + (hashStr('amt' + inc.id) % 22) / 100; // approved 78-99% of the estimate
+      const amt = Math.round((cp.estimatedValueUsd || 0) * frac);
+      cp.approvedAmountUsd = amt; cp.oemResponse.approvedAmountUsd = amt; cp.history[cp.history.length - 1].note = `Approved $${amt.toLocaleString('en-US')} (simulated OEM response)`;
+      inc.timeline[inc.timeline.length - 1].note = cp.history[cp.history.length - 1].note;
+    } else applyStatus(inc, st, { at: t });
+  });
+  inc.timeline.sort((x, y) => (x.t < y.t ? -1 : x.t > y.t ? 1 : 0));
+  return true;
+}
+module.exports = { spreadOutcome, NEXT, ensureMeta, submit, applyStatus, simulateNext, advanceTo, summary, claimNumber };

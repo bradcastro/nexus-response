@@ -42,6 +42,49 @@
       if (d.timeline && d.timeline.length) h += C('Timeline', '<ul class="rp-list">' + d.timeline.map(function (t) { return '<li><span class="nx-mono nx-dim">' + esc(fmt.dateTime(t.t)) + '</span> ' + esc(t.action || '') + (t.note ? ': ' + esc(redact(t.note)) : '') + '</li>'; }).join('') + '</ul>', true);
       return h + '</div>';
     },
+    builder: function (d) {
+      var res = d.result || {}, cols = res.columns || [], rows = res.rows || [], tot = res.totals || null, m = res.meta || {}, per = m.period || {}, ch = d.chart || {};
+      var cellText = function (c, v) {
+        if (v == null || v === '') return '—';
+        if (c.type === 'number') { var n = Number(v); if (!isFinite(n)) return String(v); if (c.unit === 'USD' || c.unit === '$') return fmt.currency(n, Math.abs(n) < 100 && n % 1 ? 2 : 0); var s = fmt.number(n, Number.isInteger(n) ? 0 : 2); return c.unit === '%' ? s + '%' : (c.unit && c.unit !== 'count' ? s + ' ' + c.unit : s); }
+        if (c.type === 'date') { var st = String(v); return /^\d{4}-\d{2}-\d{2}$/.test(st) ? fmt.date(st + 'T00:00:00') : fmt.dateTime(v); }
+        if (c.type === 'boolean' || typeof v === 'boolean') return v ? 'Yes' : 'No';
+        if (c.type === 'enum') return fmt.label(v);
+        var t = String(v); if (/^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/.test(t)) return t.length === 10 ? fmt.date(t + 'T00:00:00') : fmt.dateTime(t);
+        return redact(t);
+      };
+      var byId = {}; cols.forEach(function (c) { byId[c.id] = c; });
+      var colFmt = function (id, v) { return byId[id] ? cellText(byId[id], v) : String(v == null ? '—' : v); };
+      var colLabel = function (id) { var c = byId[id]; return c ? c.label + (c.unit && c.unit !== 'count' ? ' (' + c.unit + ')' : '') : id; };
+      var h = '<div class="rp-callout rp-synth" role="note"><b>' + esc(d.label || m.label || 'Synthetic demo data') + '.</b> ' + esc(d.note || 'Frozen snapshot of simulated records; not real policyholder, driver or claims data, and not validated.') + '</div>';
+      h += '<div class="rp-meta">' + [fmt.number(res.rowCount != null ? res.rowCount : rows.length) + ' rows', per.from ? fmt.date(per.from) + ' to ' + fmt.date(per.to) : '', d.frozenAt ? 'Frozen ' + fmt.dateTime(d.frozenAt) : m.generatedAt ? 'Generated ' + fmt.dateTime(m.generatedAt) : '', d.area ? fmt.label(d.area) : ''].filter(Boolean).map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div>';
+      if (res.truncated) h += '<div class="rp-callout rp-warn" role="status"><b>Truncated.</b> Showing ' + fmt.number(rows.length) + (res.rowCount > rows.length ? ' of ' + fmt.number(res.rowCount) : '') + ' rows.</div>';
+      (m.notes || []).forEach(function (n) { h += '<div class="rp-callout rp-warn">' + esc(String(n)) + '</div>'; });
+      if (!rows.length) return h + '<div class="rp-card rp-span"><h2>No rows</h2><p class="nx-dim">This report ran successfully when it was shared and returned no rows.</p></div>';
+      var type = ch.type || ch.suggested || 'table', x = byId[ch.x] ? ch.x : (cols[0] && cols[0].id);
+      var series = (ch.series || []).filter(function (s) { return byId[s]; });
+      if (!series.length) series = cols.filter(function (c) { return c.type === 'number' && c.id !== x; }).slice(0, 1).map(function (c) { return c.id; });
+      if (type !== 'table' && window.NXChart && series.length) {
+        h += '<section class="rp-card rp-span"><h2>Chart <span class="nx-dim nx-mono" style="font-size:11px">' + esc(fmt.label(type)) + '</span></h2><div id="rp-chart"></div></section>';
+      }
+      h += '<section class="rp-card rp-span"><h2>Data</h2><div class="rp-wrap"><table class="rp-tbl"><thead><tr>' + cols.map(function (c) { return '<th' + (c.type === 'number' ? ' class="n"' : '') + '>' + esc(colLabel(c.id)) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        rows.map(function (r) { return '<tr>' + cols.map(function (c) { return '<td' + (c.type === 'number' ? ' class="n"' : '') + '>' + esc(cellText(c, r[c.id])) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody>' +
+        (tot ? '<tfoot><tr>' + cols.map(function (c, i) { return '<td' + (c.type === 'number' ? ' class="n"' : '') + '>' + (tot[c.id] != null ? esc(cellText(c, tot[c.id])) : i === 0 ? 'Total' : '') + '</td>'; }).join('') + '</tr></tfoot>' : '') + '</table></div></section>';
+      var sb = (ch.options && ch.options.seriesBy) || ch.seriesBy || ''; if (sb === 'none' || !byId[sb] || sb === x) sb = '';
+      var cc = res.columns, cr = rows, cs = series, cfmt = colFmt, clab = colLabel;
+      if (sb && series.length && /^(bar|stacked_bar|line|area)$/.test(type)) {
+        var s0 = series[0], xs = [], gs = [], map = {};
+        rows.forEach(function (row) { var xv = row[x], gv = row[sb] == null ? '—' : String(row[sb]); if (xs.indexOf(xv) < 0) xs.push(xv); if (gs.indexOf(gv) < 0) gs.push(gv); map[xv + '\u0001' + gv] = row[s0]; });
+        cc = [byId[x]].concat(gs.map(function (g) { return Object.assign({}, byId[s0], { id: 'pv:' + g, label: lbl(g) }); }));
+        cr = xs.map(function (xv) { var o = {}; o[x] = xv; gs.forEach(function (g) { var v = map[xv + '\u0001' + g]; o['pv:' + g] = v == null ? 0 : v; }); return o; });
+        cs = gs.map(function (g) { return 'pv:' + g; });
+        var cm = {}; cc.forEach(function (c) { cm[c.id] = c; });
+        cfmt = function (id, v) { return cm[id] ? cellText(cm[id], v) : String(v == null ? '—' : v); };
+        clab = function (id) { var c = cm[id]; return c ? c.label + (c.unit && c.unit !== 'count' && !/^pv:/.test(id) ? ' (' + c.unit + ')' : '') : id; };
+      }
+      setTimeout(function () { var host = document.getElementById('rp-chart'); if (host && window.NXChart) { try { host.appendChild(window.NXChart.render({ type: type, columns: cc, rows: cr, x: x, series: cs, fmt: cfmt, label: clab })); } catch (e) { host.innerHTML = '<p class="nx-dim">Chart could not be drawn.</p>'; } } }, 0);
+      return '<div class="rp-grid">' + h.replace('<div class="rp-grid">', '') + '</div>';
+    },
     digest: function (d) {
       var it = function (x) { return typeof x === 'string' ? x : [pick(x, 'name', 'fleetName'), pick(x, 'headline', 'why', 'label', 'text', 'summary', 'detail')].filter(Boolean).join(': '); };
       return '<div class="rp-headline">' + esc(d.headline || 'No exceptions this period.') + '</div><div class="rp-kpis" style="margin-top:16px">' + K('Needing attention', String((d.fleetsNeedingAttention || []).length)) + K('High-severity events', String((d.newHighSeverity || []).length)) + K('Improvements', String((d.notableImprovements || []).length)) + K('Claims opened', fmt.number(d.claimsOpened)) + K('FNOLs sent', fmt.number(d.fnolsSent)) + '</div><div class="rp-grid">' + C('Fleets needing attention', list((d.fleetsNeedingAttention || []).map(it))) + C('New high-severity events', list((d.newHighSeverity || []).map(it))) + C('Notable improvements', list((d.notableImprovements || []).map(it))) + C('Recommended actions', list(d.recommendedActions)) + '</div>';
@@ -60,11 +103,11 @@
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }).then(function (r) {
-    var d = r.snapshot || r.data || r.payload || r.report || r, kind = r.kind || d.kind || (d.headline && 'digest') || (d.eventType && 'incident') || (d.confidence != null && d.dataQualityScore != null && 'assessment') || 'fleet';
+    var d = r.snapshot || r.data || r.payload || r.report || r, kind = r.kind || d.kind || (d.headline && 'digest') || (d.eventType && 'incident') || (d.result && d.result.columns && 'builder') || (d.confidence != null && d.dataQualityScore != null && 'assessment') || 'fleet';
     if (d && d.deepDive) { var ub = d.usageBased || {}; d = Object.assign({}, d.deepDive, { driveScore: ub.driveScore, topImprovementLevers: ub.topImprovementLevers, usageNote: ub.pricing && ub.pricing.note }); }
     var exp = r.expiresAt ? new Date(r.expiresAt) : null, days = exp ? Math.ceil((exp - Date.now()) / 864e5) : null;
     var name = (d.fleet && d.fleet.name) || d.fleetName || d.name || (kind === 'incident' ? d.id : kind === 'digest' ? d.periodLabel : '') || '';
-    var titles = { fleet: 'Policyholder risk report', assessment: 'Underwriting assessment', incident: 'Incident report', digest: 'Weekly digest' };
+    var titles = { fleet: 'Policyholder risk report', assessment: 'Underwriting assessment', incident: 'Incident report', digest: 'Weekly digest', builder: 'Custom report' };
     document.title = (titles[kind] || 'Report') + (name ? ' — ' + name : '') + ' — Nexus Response';
     var h = '<div class="rp-eyebrow">' + esc(titles[kind] || 'Shared report') + '</div><h1 class="rp-h">' + esc(name || titles[kind] || 'Report') + '</h1><p class="rp-sub">' + (r.createdAt ? 'Snapshot taken ' + esc(fmt.dateTime(r.createdAt)) : '') + (d.fleet && d.fleet.vendor ? ' · ' + esc(lbl(d.fleet.vendor)) : '') + '</p>';
     h += '<div class="rp-expiry' + (days != null && days <= 3 ? ' warn' : '') + '"><span>' + (exp ? (days > 0 ? 'This link expires on <b>' + esc(fmt.date(exp)) + '</b> (' + days + ' day' + (days === 1 ? '' : 's') + ' left).' : 'This link has expired.') : 'This link is time-limited.') + ' Read-only snapshot, no sign-in required.</span><button class="nx-btn nx-btn--sm nx-no-print" style="margin-left:auto" onclick="window.print()">Print / save PDF</button></div>';

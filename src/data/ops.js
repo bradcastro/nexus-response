@@ -16,7 +16,7 @@ const CARRIERS = [
   { id: 'car_bayou', name: 'Bayou Specialty Insurance (simulated)', fnolLine: null },
 ];
 CARRIERS.forEach((c) => { c.fnolLine = phone('fnol' + c.id, 'AL'); c.portal = c.name.split(' (')[0] + ' Claims Portal'; });
-const FLEET_CARRIER = { fleet_gulfcoast: 'car_bayou', fleet_goodyear: 'car_bayou', fleet_piedmont: 'car_keystone', fleet_bluegrass: 'car_harbor', fleet_summit: 'car_keystone', fleet_redline: 'car_harbor', fleet_magnolia: 'car_bayou' };
+const FLEET_CARRIER = { fleet_gulfcoast: 'car_bayou', fleet_elite: 'car_bayou', fleet_piedmont: 'car_keystone', fleet_bluegrass: 'car_harbor', fleet_summit: 'car_keystone', fleet_redline: 'car_harbor', fleet_magnolia: 'car_bayou' };
 const carrierOf = (fleetId) => CARRIERS.find((c) => c.id === (FLEET_CARRIER[fleetId] || CARRIERS[hashStr(fleetId) % CARRIERS.length].id));
 const policyNo = (fleetId) => `CP-${String(hashStr('pol' + fleetId) % 9000000 + 1000000)}`;
 

@@ -1,7 +1,7 @@
 // Static reference data: fleets, locations, roadside providers, vehicle models, names.
 const FLEETS = [
   { id: 'fleet_gulfcoast', name: 'Gulf Coast Freight', vendor: 'motive', region: 'Gulf Coast (AL/MS/FL Panhandle)', vehicles: 38, home: 'Mobile, AL', models: [['fcascadia', 70], ['fm2', 30]], cameraPct: 0.82, events: 21, bias: 0.6, profile: { collision: 0.5, speeding: 0.8, harsh: 0.9, distraction: 0.7, diag: 1.0 }, regions: ['gulf'] },
-  { id: 'fleet_goodyear', name: 'Goodyear Towing', vendor: 'motive', region: 'Wiregrass (AL/GA/FL Panhandle)', vehicles: 22, home: 'Enterprise, AL', models: [['ff550', 40], ['kt680', 30], ['kt880', 30]], cameraPct: 0.9, events: 9, bias: 0.4, profile: { collision: 0.6, speeding: 0.7, harsh: 0.8, distraction: 0.6, diag: 1.2 }, regions: ['wiregrass'] },
+  { id: 'fleet_elite', name: 'Elite Towing', vendor: 'motive', region: 'Wiregrass (AL/GA/FL Panhandle)', vehicles: 22, home: 'Enterprise, AL', models: [['ff550', 40], ['kt680', 30], ['kt880', 30]], cameraPct: 0.9, events: 9, bias: 0.4, profile: { collision: 0.6, speeding: 0.7, harsh: 0.8, distraction: 0.6, diag: 1.2 }, regions: ['wiregrass'] },
   { id: 'fleet_piedmont', name: 'Piedmont Logistics', vendor: 'samsara', region: 'Carolinas / North Georgia', vehicles: 54, home: 'Charlotte, NC', models: [['vnl', 60], ['p579', 40]], cameraPct: 0.74, events: 36, bias: 0.75, profile: { collision: 1.7, speeding: 1.6, harsh: 1.3, distraction: 1.2, diag: 0.9 }, regions: ['piedmont'] },
   { id: 'fleet_bluegrass', name: 'Bluegrass Dairy Transport', vendor: 'geotab', region: 'Kentucky / Tennessee', vehicles: 31, home: 'Lexington, KY', models: [['p579', 55], ['p567', 45]], cameraPct: 0.4, events: 11, bias: 0.3, profile: { collision: 0.5, speeding: 0.6, harsh: 0.7, distraction: 0.5, diag: 1.4 }, regions: ['bluegrass'] },
   { id: 'fleet_summit', name: 'Summit Last-Mile Delivery', vendor: 'lytx', region: 'Georgia / North Florida', vehicles: 67, home: 'Atlanta, GA', models: [['transit', 55], ['sprinter', 45]], cameraPct: 1.0, events: 36, bias: 0.55, profile: { collision: 1.1, speeding: 0.8, harsh: 1.8, distraction: 1.8, diag: 0.7 }, regions: ['metro'] },
@@ -72,7 +72,7 @@ const LOCATIONS = [
 ];
 
 const PROVIDERS = [
-  { id: 'prov_goodyear', name: 'Goodyear Towing & Recovery', city: 'Enterprise', st: 'AL', lat: 31.3152, lng: -85.8552, heavy: true, services: ['tow_heavy', 'tow_light', 'jump_start', 'mobile_mechanic', 'fuel'], rating: 4.9 },
+  { id: 'prov_elite', name: 'Elite Towing & Recovery', city: 'Enterprise', st: 'AL', lat: 31.3152, lng: -85.8552, heavy: true, services: ['tow_heavy', 'tow_light', 'jump_start', 'mobile_mechanic', 'fuel'], rating: 4.9 },
   { id: 'prov_azalea', name: 'Azalea City Wrecker', city: 'Mobile', st: 'AL', lat: 30.6954, lng: -88.0399, heavy: true, services: ['tow_heavy', 'tow_light', 'jump_start'], rating: 4.7 },
   { id: 'prov_bayou', name: 'Bayou Diesel Mobile Repair', city: 'Mobile', st: 'AL', lat: 30.7, lng: -88.15, heavy: false, services: ['mobile_mechanic', 'tire', 'jump_start', 'fuel'], rating: 4.6 },
   { id: 'prov_panhandle', name: 'Panhandle Heavy Haul Recovery', city: 'Pensacola', st: 'FL', lat: 30.4213, lng: -87.2169, heavy: true, services: ['tow_heavy', 'tow_light'], rating: 4.8 },

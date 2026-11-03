@@ -49,7 +49,7 @@
   var soundBtn = NX.el('button.nx-icon-btn', { title: 'Alert sound', 'aria-label': 'Toggle alert sound', onclick: function () { S.sound = !S.sound; try { localStorage.setItem('nx-dispatch-sound', S.sound ? '1' : '0'); } catch (e) {} paintSound(); if (S.sound) beep(1); } }, '');
   var helpBtn = NX.el('button.nx-icon-btn.tb-hide-tablet', { title: 'Keyboard shortcuts (?)', onclick: showHelp }, '?');
   var demoBtn = NX.el('button.nx-btn.nx-btn--sm.tb-hide-tablet', { title: 'Fire a simulated live event (demo data only)', onclick: showDemo }, 'Simulate event');
-  NX.topbar('Dispatch', { sidebar: false, right: [demoBtn, clock, soundBtn, helpBtn] });
+  NX.topbar('Dispatch', { sidebar: false, right: [NX.el('a.nx-btn.nx-btn--sm.nx-btn--ghost.tb-hide-tablet', { href: '/reports/?area=dispatch', title: 'Reports for dispatch operations' }, 'Reports'), demoBtn, clock, soundBtn, helpBtn] });
   function paintSound() { soundBtn.textContent = S.sound ? '♪' : 'Ø'; soundBtn.style.color = S.sound ? 'var(--nx-accent)' : ''; soundBtn.title = 'Alert sound ' + (S.sound ? 'on' : 'off'); }
   paintSound();
   function tick() {
@@ -564,7 +564,7 @@
     var sections = fp ? [cam, tl, road, dtc, sop, coord, veh, war, raw] : haz ? [road, cam, load, dtc, dealer, oem, tl, sop, eq, trip, tele, coord, war, veh, raw] : [road, cam, dtc, tl, load, dealer, oem, sop, eq, trip, tele, coord, war, veh, raw];
     sections.unshift(C.chips(i)); sections.unshift(C.hazBanner(i)); sections.unshift(NXPro.banner(i));
     var nAudit = NXAudit.count(i, NXAct.comms(i));
-    var tabs = '<div class="d-tabs" role="tablist"><button role="tab" aria-selected="' + (S.dtab !== 'audit') + '" class="' + (S.dtab !== 'audit' ? 'is-active' : '') + '" data-dtab="overview">Overview</button><button role="tab" aria-selected="' + (S.dtab === 'audit') + '" class="' + (S.dtab === 'audit' ? 'is-active' : '') + '" data-dtab="audit">Audit trail <b>' + nAudit + '</b></button></div>';
+    var tabs = '<div class="d-tabs" role="tablist"><button role="tab" aria-selected="' + (S.dtab !== 'audit') + '" class="' + (S.dtab !== 'audit' ? 'is-active' : '') + '" data-dtab="overview">Overview</button><button role="tab" aria-selected="' + (S.dtab === 'audit') + '" class="' + (S.dtab === 'audit' ? 'is-active' : '') + '" data-dtab="audit">Audit trail <b>' + nAudit + '</b></button><a class="d-hist" href="/records/#incidents?fleet=' + encodeURIComponent(i.fleetId || '') + '&open=inc:' + encodeURIComponent(i.id) + '" target="_blank" rel="noopener">Full history</a></div>';
     detailEl.innerHTML = head + tabs + (S.dtab === 'audit' ? '<div class="d-body">' + NXAudit.html(i, NXAct.comms(i)) + '</div>' : '<div class="d-body">' + NXAct.urgent(i) + riskHTML(i) + sections.join('') + '</div>');
     var hd = detailEl.querySelector('.d-head'); if (hd) detailEl.style.setProperty('--d-head-h', hd.offsetHeight + 'px');
     detailEl.scrollTop = keepScroll;

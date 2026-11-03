@@ -137,6 +137,9 @@
     var ob = S.fleet.onboarding, bn = $('onboard');
     if (ob && ob.status === 'setup') { bn.hidden = false; bn.innerHTML = '<b>' + (ob.status === 'setup' ? 'Onboarding in progress.' : 'Demo data.') + '</b> ' + (ob.status === 'setup' ? 'This fleet is still being connected, so figures reflect partial data until the first events and history arrive.' : 'This fleet shows seeded demonstration data, not live vendor events.') + (S.fleet.id ? ' <a href="/onboarding/?fleet=' + encodeURIComponent(S.fleet.id) + '">Open setup checklist</a>' : ''); } else { bn.hidden = true; }
     $('side-source').innerHTML = '';
+    var fq = encodeURIComponent(S.fleet.id);
+    $('nav-reports').href = '/reports/?area=fleet&fleet=' + fq;
+    $('nav-records').href = '/records/#claims?fleet=' + fq;
   }
   function renderCounts() {
     $('cnt-inc').textContent = S.incidents.filter(isOpen).length;
@@ -393,8 +396,9 @@
 
     h += sec('Vehicle and driver', '', '<div class="fl-kvs"><div><span>Vehicle</span><b>' + esc(vehSub(inc) || '—') + '</b></div><div><span>Plate / VIN</span><b class="nx-mono" style="font-size:12px">' + esc(v.plate || '') + ' ' + esc(v.vin || '') + '</b></div><div><span>Odometer</span><b>' + (v.odometer_mi != null ? fmt.number(v.odometer_mi) + ' mi' : '—') + '</b></div><div><span>Speed at event</span><b>' + (l.speed_mph != null ? Math.round(l.speed_mph) + ' mph' : '—') + '</b></div><div><span>Driver</span><b>' + esc(d.name || '—') + '</b></div><div><span>Driver safety score</span><b>' + (d.safetyScore != null ? fmt.number(d.safetyScore) : '—') + '</b></div></div>');
     h += '</div>';
+    var hist = '<a class="nx-btn nx-btn--sm nx-btn--ghost fl-hist" href="/records/#incidents?fleet=' + encodeURIComponent(S.fleet.id) + '&open=inc:' + encodeURIComponent(inc.id) + '" target="_blank" rel="noopener">Full history</a>';
     var dcm = S.dcomms[inc.id] || [], nAud = NXAudit.count(inc, dcm);
-    var tabs = '<div class="fl-d-tabs" role="tablist"><button role="tab" aria-selected="' + (S.dtab !== 'audit') + '" class="' + (S.dtab !== 'audit' ? 'is-active' : '') + '" data-dtab="overview">Overview</button><button role="tab" aria-selected="' + (S.dtab === 'audit') + '" class="' + (S.dtab === 'audit' ? 'is-active' : '') + '" data-dtab="audit">Audit trail <b>' + nAud + '</b></button></div>';
+    var tabs = '<div class="fl-d-tabs" role="tablist"><button role="tab" aria-selected="' + (S.dtab !== 'audit') + '" class="' + (S.dtab !== 'audit' ? 'is-active' : '') + '" data-dtab="overview">Overview</button><button role="tab" aria-selected="' + (S.dtab === 'audit') + '" class="' + (S.dtab === 'audit' ? 'is-active' : '') + '" data-dtab="audit">Audit trail <b>' + nAud + '</b></button>' + hist + '</div>';
     h = head + tabs + (S.dtab === 'audit' ? '<div class="fl-d-body">' + NXAudit.html(inc, dcm) + '</div>' : h);
     var dr = $('drawer'), top = dr.scrollTop;
     dr.innerHTML = h; dr.scrollTop = top;
@@ -806,7 +810,7 @@
     var pendVal = pend.reduce(function (a, i) { return a + cVal(i); }, 0);
     var ready = cs.filter(function (i) { return cStatus(i) === 'ready'; }), info = cs.filter(function (i) { return cStatus(i) === 'more_info_needed'; });
     var readyVal = ready.reduce(function (a, i) { return a + cVal(i); }, 0);
-    var html = '<div class="fl-sim">' + NXSim.line('claim') + '<span class="nx-dim"> Nexus records a confirmation number and the audit trail, but nothing is sent to an OEM.</span></div>' +
+    var html = '<div class="fl-histlink"><a class="nx-btn nx-btn--sm" href="/records/#claims?fleet=' + encodeURIComponent(S.fleet.id) + '">Claim history</a></div><div class="fl-sim">' + NXSim.line('claim') + '<span class="nx-dim"> Nexus records a confirmation number and the audit trail, but nothing is sent to an OEM.</span></div>' +
       '<div class="nx-kpis"><div class="nx-kpi nx-kpi--ok"><div class="nx-kpi__label">Recovered</div><div class="nx-kpi__value">' + fmt.currency(recovered) + '</div><div class="nx-kpi__delta">paid by OEMs</div></div>' +
       '<div class="nx-kpi nx-kpi--accent"><div class="nx-kpi__label">Pending value</div><div class="nx-kpi__value">' + fmt.currency(pendVal) + '</div><div class="nx-kpi__delta">' + pend.length + ' open claims</div></div>' +
       '<div class="nx-kpi"><div class="nx-kpi__label">Ready to file</div><div class="nx-kpi__value">' + ready.length + '</div><div class="nx-kpi__delta">' + fmt.currency(readyVal) + ' evidence complete</div></div>' +

@@ -124,7 +124,7 @@ Global caveats: all data is invented/simulated; Mantis payloads are **assumed**;
 | `POST /api/demo/seed` | A | **called**: `skipped: true` when data exists (`reset` option present in code). |
 | `GET /api/demo/sample/:provider`, `/api/demo/scenarios` | A | **called**. |
 | `/tour/` guided walkthrough (five-minute and guided modes, "What's real", Reset demo) | A (page) / C (content) | First probe returned 404 mid-audit while another agent was still building it; re-checked on a restarted scratch server: `GET /tour/` 200, **UI loaded** (title "Mantis walkthrough", banner "Synthetic data; Mantis is a prospective partner", no console errors). Steps beyond the landing screen were not clicked through. |
-| `GET /api/capabilities` | A | Re-checked: 200; 35 entries (`total`=35; 7 working_verified, 16 working_synthetic, 7 simulated, 5 planned) plus honesty statements. This is the backend agent's self-classification; it differs in granularity from this document, and where the two differ this document's evidence column governs. |
+| `GET /api/capabilities` | A | Re-checked: 200; 41 entries (`total`=41; 7 working_verified, 21 working_synthetic, 8 simulated, 5 planned) plus honesty statements. This is the backend agent's self-classification; it differs in granularity from this document, and where the two differ this document's evidence column governs. |
 | `POST /api/demo/reset`, `GET /api/demo/state` | A | **called**: reset returned `ok` with counts (7 fleets, 574 incidents, 0 custom fleets) and rebuilt predictive state; state endpoint reports `resetEnabled: true`. Gate: refuses when `DATABASE_URL` set or `DEMO_MODE=0` (API.md; code not stress-tested). The reset endpoint is itself unauthenticated. |
 | `POST /api/demo/mantis-scenario` | A (mechanics) / B (data) | **called**: 201, created a new incident through the Mantis adapter (phone use, eyes-off-road, short following distance, AI verdict "distraction"), tagged `synthetic`, `payloadAssumed`, with deep links and a recommended response. |
 | `/test/trigger-event` (legacy) | A | **code read**: fires a random scenario through the real adapters. Open endpoint. |
@@ -153,7 +153,7 @@ Global caveats: all data is invented/simulated; Mantis payloads are **assumed**;
 5. All outbound actions (SMS, FNOL, OEM claims, tow texts, authority calls) are simulated; alert-recipient config does nothing.
 6. Postgres mode and the legacy pollers were not verified. (`/tour`, `/api/capabilities`, `/api/demo/reset` and `/api/demo/mantis-scenario` landed during the audit and were re-checked: 200.)
 7. Inferred load/weight/value figures are accurate only against their own simulator.
-8. Seed data includes a fleet/provider named "Goodyear Towing" - confirm intent before external demos.
+8. Seed data includes a fleet/provider named "Elite Towing" - confirm intent before external demos.
 
 ## Final re-check
 

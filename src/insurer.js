@@ -159,11 +159,17 @@ router.get('/api/insurer/digest', wrap(async (req, res) => res.json(await digest
 
 router.post('/api/insurer/reports', wrap(async (req, res) => {
   const { kind, refId } = req.body || {};
-  if (!['fleet', 'assessment', 'incident', 'digest'].includes(kind)) return res.status(422).json({ error: 'validation_failed', message: 'kind must be fleet|assessment|incident|digest' });
+  if (!['fleet', 'assessment', 'incident', 'digest', 'builder'].includes(kind)) return res.status(422).json({ error: 'validation_failed', message: 'kind must be fleet|assessment|incident|digest|builder' });
   let data, title, fleetId = null;
   if (kind === 'fleet') { if (!roster.getFleet(refId)) return res.status(404).json({ error: 'Fleet not found' }); fleetId = refId; data = { deepDive: await A.fleetDeepDive(refId), usageBased: await usageBased(refId) }; title = `Fleet risk report - ${roster.getFleet(refId).name}`; }
   else if (kind === 'assessment') { const a = await db.get('assessment', refId); if (!a) return res.status(404).json({ error: 'Assessment not found' }); fleetId = a.fleetId; data = a; title = `Risk assessment - ${a.fleetName}`; }
   else if (kind === 'incident') { const i = await db.getIncident(refId); if (!i) return res.status(404).json({ error: 'Incident not found' }); fleetId = i.fleetId; const { raw, ...rest } = i; data = rest; title = `Incident ${i.id} - ${i.fleetName}`; }
+  else if (kind === 'builder') {
+    // frozen snapshot of a report-builder result + its config (no live link back to the data); same redaction + 30-day expiry as every kind
+    const b = await require('./reports').freeze(refId, req.body || {});
+    if (b.error) return res.status(b.status || 400).json({ error: b.error, message: b.message, field: b.field });
+    data = b.snapshot; title = b.title; fleetId = b.fleetId;
+  }
   else { data = await digest({ carrier: refId, period: (req.body.period) || 'weekly' }); title = 'Exceptions digest'; }
   const token = crypto.randomBytes(12).toString('hex');
   const now = Date.now();
@@ -180,4 +186,5 @@ router.get('/api/reports/:token', wrap(async (req, res) => {
 }));
 router.delete('/api/insurer/reports/:token', wrap(async (req, res) => { const r = await db.get('report', req.params.token); if (!r) return res.status(404).json({ error: 'Report not found' }); r.status = 'revoked'; await db.put('report', r); res.json({ revoked: true }); }));
 
-module.exports = { router, usageBased, digest };
+const ds = (r) => Math.round(clamp(100 - 0.85 * r, 0, 100));
+module.exports = { router, usageBased, digest, components, bandOf, driverRows, fleetEnd, liveFleets, driveScoreOf: ds, isFP };

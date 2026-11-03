@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexus Response — Records &amp; History</title>
+<link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/brand.css">
+<link rel="stylesheet" href="records.css?v=1">
+<script src="/shared/brand.js"></script>
+</head>
+<body>
+<div class="nx-app nx-app--nosidebar">
+  <div id="nx-topbar"></div>
+  <main class="nx-main" id="main">
+    <div class="nx-page-head">
+      <div>
+        <div class="nx-eyebrow">Records / History explorer</div>
+        <h1>Records &amp; history</h1>
+        <p>Find past incidents, warranty claims, risk trends and communications.</p>
+      </div>
+      <div class="rec-head-badges">
+        <span class="nx-badge nx-badge--info">Synthetic demo data</span>
+        <a class="nx-btn nx-btn--sm" href="/reports/" id="rec-reports-link">Open Reports</a>
+      </div>
+    </div>
+
+    <div class="rec-searchrow">
+      <form id="rec-search" role="search" class="rec-search" autocomplete="off">
+        <label for="rec-q" class="nx-sr">Search records</label>
+        <input id="rec-q" class="nx-input" type="search" placeholder="Search id, VIN, unit, driver, claim number" enterkeyhint="search">
+        <button class="nx-btn nx-btn--primary" type="submit">Search</button>
+      </form>
+      <button class="nx-btn rec-filter-toggle" id="rec-filter-toggle" type="button" aria-expanded="false" aria-controls="rec-filters">Filters<span id="rec-filter-count"></span></button>
+    </div>
+
+    <div class="nx-tabs rec-tabs" role="tablist" aria-label="Record types" id="rec-tabs"></div>
+
+    <div class="rec-layout">
+      <aside class="rec-filters nx-card" id="rec-filters" aria-label="Filters">
+        <div id="rec-filters-body"></div>
+      </aside>
+      <section class="rec-content" aria-live="polite" aria-busy="false" id="rec-content">
+        <div id="rec-chips" class="rec-chips"></div>
+        <div id="rec-body"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<div id="rec-drawer-root"></div>
+<script src="charts.js?v=1"></script>
+<script src="records.js?v=1"></script>
+</body>
+</html>

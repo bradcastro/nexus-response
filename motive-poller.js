@@ -284,7 +284,7 @@ async function normalize(event, id, type) {
     snapshots,
     gpsTrail,
     fleetId: vehicle.number || null,
-    customerName: 'Goodyear Towing',
+    customerName: 'Elite Towing',
     customerLocation: 'Enterprise, AL',
     diagnostics: vehicleDetails ? {
       odometer:    vehicleDetails.odometer,

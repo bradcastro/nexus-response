@@ -68,6 +68,8 @@ const opsMod = require('./src/ops');
 app.use(opsMod.router);
 app.use(require('./src/insurer').router);
 app.use(require('./src/demo').router);
+app.use('/api/report-builder', require('./src/reports').router);
+app.use('/api/records', require('./src/records').router);
 // pages for link-based, no-login views (other agents own the HTML)
 for (const [route, dir] of [['/job/:token', 'job'], ['/report/:token', 'report']]) app.get(route, (req, res, next) => { const f = path.join(PUBLIC, dir, 'index.html'); fs.existsSync(f) ? res.sendFile(f) : next(); });
 // Predictive risk router (owned by the predict agent). Optional: the server runs without it.

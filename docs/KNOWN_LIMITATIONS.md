@@ -13,7 +13,7 @@ A proof-of-concept demo. Not a product, not a pilot, not validated on any real c
 - **CSV import** works on the repo's sample files; real vendor export layouts are unverified (Mantis export columns are assumed).
 
 ## Data limits
-- **Everything is synthetic**: 7 fleets, drivers, vehicles, about 570 incidents over 90 days, tow providers, OEM dealers, business stops, carriers, policy numbers, phone numbers (fictional 555 numbers), contacts. Business names are invented; any resemblance to real businesses is unchecked (the seed includes a fleet named "Goodyear Towing" - confirm intent before external use).
+- **Everything is synthetic**: 7 fleets, drivers, vehicles, about 570 incidents over 90 days, tow providers, OEM dealers, business stops, carriers, policy numbers, phone numbers (fictional 555 numbers), contacts. Business names are invented; any resemblance to real businesses is unchecked (the seed includes a fleet named "Elite Towing" - confirm intent before external use).
 - **Deterministic and generated with structure built in**: the seed deliberately plants pre-collision precursor patterns and gives each vendor a different "capture" factor (Mantis highest). Results that favour camera-first fleets are partly *inputs*, not findings.
 - **No real video.** Clips are `.invalid` URLs; "camera frames" are generated placeholder SVGs.
 - **Camera verification is not video analysis.** For Mantis events the verdict comes from the *assumed* AI block in the payload. For other vendors Nexus derives a verdict from sensor hints with a small hash-based jitter.

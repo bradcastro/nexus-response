@@ -71,7 +71,7 @@ Ingest adapters live in `src/adapters/<provider>.js` and export `{ provider, ver
 - `GET /health`
 
 ## Demo fleets (seed; keep these names so all UIs agree)
-Gulf Coast Freight (Motive, 38 trucks, Freightliner), Goodyear Towing (Motive, 22, Ford/Kenworth), Piedmont Logistics (Samsara, 54, Volvo/Peterbilt), Bluegrass Dairy Transport (Geotab, 31, Peterbilt), Summit Last-Mile Delivery (Lytx, 67 vans, Ford Transit/Mercedes Sprinter).
+Gulf Coast Freight (Motive, 38 trucks, Freightliner), Elite Towing (Motive, 22, Ford/Kenworth), Piedmont Logistics (Samsara, 54, Volvo/Peterbilt), Bluegrass Dairy Transport (Geotab, 31, Peterbilt), Summit Last-Mile Delivery (Lytx, 67 vans, Ford Transit/Mercedes Sprinter).
 
 ## Brand (brand agent finalizes in docs/BRAND.md + shared/brand.css; others consume tokens)
 Name: Nexus Response. Tagline: "Every event, resolved." Feel: mission-control / emergency-ops: dark navy base, signal-orange accent for urgency, clean data-dense UI, light-theme variant for fleet + insurer portals. CSS custom properties are the contract (`--nx-*`).

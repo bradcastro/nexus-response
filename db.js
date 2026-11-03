@@ -7,7 +7,7 @@ const { Pool } = require('pg');
 
 let pool = null;
 let pgReady = null;
-const KINDS = { fleet: 'fleets', vehicle: 'vehicles', driver: 'drivers', provider: 'providers', api_key: 'api_keys', ingest_log: 'ingest_log', import_job: 'import_jobs', alert: 'alerts', assessment: 'assessments', comms: 'comms_log', template: 'comms_templates', report: 'reports', job: 'jobs' };
+const KINDS = { fleet: 'fleets', vehicle: 'vehicles', driver: 'drivers', provider: 'providers', api_key: 'api_keys', ingest_log: 'ingest_log', import_job: 'import_jobs', alert: 'alerts', assessment: 'assessments', comms: 'comms_log', template: 'comms_templates', report: 'reports', job: 'jobs', saved_report: 'saved_reports', schedule: 'report_schedules' };
 const mem = { incidents: new Map(), byEvent: new Map(), docs: {} };
 for (const k of Object.keys(KINDS)) mem.docs[k] = new Map();
 const MEM_CAP = { ingest_log: 40000, comms: 60000 };
@@ -33,6 +33,11 @@ const MIGRATIONS = [
     ]),
   ] },
   { version: 3, name: 'v4 ops tables (comms, templates, reports, tow jobs)', sql: ['comms_log', 'comms_templates', 'reports', 'jobs'].flatMap((t) => [
+    `CREATE TABLE IF NOT EXISTS ${t} (id TEXT PRIMARY KEY, fleet_id TEXT, status TEXT, ukey TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), data JSONB NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS ${t}_fleet ON ${t} (fleet_id, created_at DESC)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${t}_ukey ON ${t} (ukey) WHERE ukey IS NOT NULL`,
+  ]) },
+  { version: 4, name: 'v6 report builder (saved reports, simulated schedules)', sql: ['saved_reports', 'report_schedules'].flatMap((t) => [
     `CREATE TABLE IF NOT EXISTS ${t} (id TEXT PRIMARY KEY, fleet_id TEXT, status TEXT, ukey TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), data JSONB NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS ${t}_fleet ON ${t} (fleet_id, created_at DESC)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS ${t}_ukey ON ${t} (ukey) WHERE ukey IS NOT NULL`,
@@ -71,8 +76,8 @@ async function ready() { const p = getPool(); if (p) await pgReady; return p; }
 function ensureCanonical(i) {
   if (i.provider && i.timeline) return i;
   i.provider = i.provider || i.source || 'motive';
-  i.fleetId = i.fleetId || 'fleet_goodyear';
-  i.fleetName = i.fleetName || i.customerName || 'Goodyear Towing';
+  i.fleetId = i.fleetId || 'fleet_elite';
+  i.fleetName = i.fleetName || i.customerName || 'Elite Towing';
   i.category = i.category || 'safety';
   i.status = i.status || 'pending';
   i.receivedAt = i.receivedAt || new Date().toISOString();
