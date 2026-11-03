@@ -17,3 +17,5 @@ services:
         value: "1"
       - key: ENABLE_DEBUG
         value: "0"
+      - key: DEMO_PASSWORD
+        sync: false

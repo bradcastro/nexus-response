@@ -14,6 +14,7 @@ Runs as a single Node 18+ process. In-memory storage is the default (data resets
 | `MOTIVE_/SAMSARA_/GEOTAB_/LYTX_/MANTIS_/GENERIC_WEBHOOK_SECRET` | empty | HMAC-SHA256 secrets for vendor signature verification (header `x-<vendor>-signature` or `x-webhook-signature`, value `sha256=<hex>`) |
 | `TRUST_PROXY` | unset | Set to `1` behind one reverse proxy (Render sets it in render.yaml) so `req.ip` and per-IP rate limits use the real client IP from `X-Forwarded-For`. Leave unset when the app is directly exposed (header would be spoofable) |
 | `ENABLE_DEBUG` | 0 | `1` enables `/api/debug/*` and `POST /test/trigger-event` (call third-party APIs with server keys / fire random events). Keep `0` in any shared deployment; they return 404 otherwise |
+| `DEMO_PASSWORD` | empty (no gate) | Shared access password for hosted demos: shows a branded `/login` page and requires a signed 12-hour session cookie for portals and `/api`. Not per-user auth. Stays open: `/webhook/*`, `/health`, `/shared/*`, token links (`/job/*`, `/api/jobs/*`, `/report/*`, `/api/reports/*`). Optional `SESSION_SECRET` signs the cookie (defaults to the password). 10 attempts per 10 minutes per IP |
 | `PUBLIC_BASE_URL` | request host | used to render webhook URLs in onboarding |
 | `VIN_ONLINE` | 0 | `1` also tries NHTSA vPIC for VINs not in the offline table |
 | `ENABLE_LEGACY_POLLERS`, `MOTIVE_API_KEY`, `SAMSARA_API_KEY` | | legacy pollers (only when `DEMO_MODE=0` or enabled explicitly) |

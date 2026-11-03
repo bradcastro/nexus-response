@@ -44,6 +44,9 @@ app.use(cors());
 // Keep the raw body for webhook HMAC verification.
 app.use(express.json({ limit: '30mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 
+// Optional shared-password gate for hosted demos (only when DEMO_PASSWORD is set).
+require('./src/gate').install(app, express);
+
 // ─── Static portals ───────────────────────────────────────────────────────────
 const PUBLIC = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC, { extensions: ['html'] }));
