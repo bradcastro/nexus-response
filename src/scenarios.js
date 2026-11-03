@@ -120,6 +120,13 @@ function scenarioSpec(name, rng, o = {}) {
     name = weighted(rng, [['collision_camera', 2], ['dtc_breakdown', 2], ['warranty_failure', 1], ['false_positive', 1], ['reefer_collision', 0.8], ['flatbed_steel_collision', 0.6], ['warranty_dealer_breakdown', 0.8], ['hazmat_tanker_rollover', 0.3], ['speeding', 1.2], ['harsh_brake', 1.5], ['harsh_turn', 0.6], ['distracted', 1.2], ['following_distance', 0.8], ['tire', 0.7], ['battery', 0.5]]);
   }
   switch (name) {
+    case 'mantis_collision': {
+      if (v && v.fleetId && roster.getFleet(v.fleetId).vendor !== 'mantis') { v = null; fleet = null; }
+      if (fleet && fleet.vendor !== 'mantis') fleet = null;
+      fleet = fleet || sample(rng, fleets.filter((f) => f.vendor === 'mantis' && f.vehicles.some((x) => x.hasCamera)));
+      v = v || sample(rng, fleet.vehicles.filter((x) => x.hasCamera));
+      return { name, fleet, spec: makeSpec(rng, fleet, v, 'collision', { timestamp: ts, hasCamera: true, gForce: round(range(rng, 4.2, 5.9), 1), airbag: rng() < 0.7, aiLabel: 'collision', aiConfidence: round(range(rng, 0.9, 0.97), 2), speed: int(rng, 52, 68), facingForward: true }) };
+    }
     case 'collision_camera': {
       v = v || choose((x) => x.hasCamera);
       return { name, fleet, spec: makeSpec(rng, fleet, v, 'collision', { timestamp: ts, hasCamera: true, gForce: round(range(rng, 4.2, 5.9), 1), airbag: rng() < 0.7, aiLabel: 'collision', aiConfidence: round(range(rng, 0.9, 0.97), 2), speed: int(rng, 52, 68), facingForward: true }) };
@@ -181,4 +188,4 @@ function scenarioSpec(name, rng, o = {}) {
   }
 }
 
-module.exports = { makeSpec, scenarioSpec, pickType, pickLoc, pickDtcs, SCENARIOS: ['collision_camera', 'dtc_breakdown', 'warranty_failure', 'false_positive', 'reefer_collision', 'flatbed_steel_collision', 'warranty_dealer_breakdown', 'hazmat_tanker_rollover', 'random'] };
+module.exports = { makeSpec, scenarioSpec, pickType, pickLoc, pickDtcs, SCENARIOS: ['mantis_collision', 'collision_camera', 'dtc_breakdown', 'warranty_failure', 'false_positive', 'reefer_collision', 'flatbed_steel_collision', 'warranty_dealer_breakdown', 'hazmat_tanker_rollover', 'random'] };

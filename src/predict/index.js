@@ -2,6 +2,7 @@
 const data = require('./data');
 const alerts = require('./alerts');
 const A = require('./analyze');
+const { provenance, DISCLAIMER } = require('./provenance');
 module.exports = {
   start: data.start,
   onBoot: () => { data.start(); },            // server.js calls this after seeding (optional)
@@ -19,6 +20,8 @@ function publicFleet(a, horizonDays) {
   return {
     fleetId: a.fleetId, generatedAt: a.generatedAt, horizonDays: h, risk: a.risk, series: [...hist, ...fut], expected: a.expected, leadingIndicators: a.leadingIndicators, interventions: a.interventions,
     hotspots: a.hotspots, patterns: a.patterns, modelNotes: a.modelNotes,
+    illustrative: true, label: 'Illustrative risk indicators (synthetic demo data)', disclaimer: DISCLAIMER, provenance: provenance(),
+    basis: { population: 'this fleet only', n: { vehicles: a._.vehicleCount, drivers: a._.driverCount, backtestCollisions: a._.backtest.collisions }, period: 'projection horizon ' + h + 'd; backtest window ' + (a._.backtest.window && a._.backtest.window.days) + 'd' },
     fleetName: a.fleetName, vendor: a.vendor, predictionConfidence: Math.round(a._.confidence * 100) / 100, cameraCoveragePct: Math.round(a._.camCov * 100), dataHistoryDays: Math.round(a._.historyDays),
     backtest: { recallPct: a._.backtest.recallPct, collisions: a._.backtest.collisions, caught: a._.backtest.caught, medianLeadDays: a._.backtest.medianLeadDays },
   };

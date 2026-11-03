@@ -30,6 +30,11 @@ const PORT = process.env.PORT || 3000;
 const DEMO = process.env.DEMO_MODE !== '0';
 const STATUSES = ['pending', 'validating', 'dispatched', 'en_route', 'on_scene', 'resolved', 'dismissed'];
 
+// Behind a reverse proxy (Render) set TRUST_PROXY=1 (or a hop count / 'loopback') so req.ip is the real client IP, not the proxy's.
+if (process.env.TRUST_PROXY) { const tp = process.env.TRUST_PROXY; app.set('trust proxy', /^\d+$/.test(tp) ? parseInt(tp, 10) : tp === 'true' || tp === '1' ? 1 : tp); }
+const DEBUG_ROUTES = process.env.ENABLE_DEBUG === '1';
+const debugOnly = (req, res, next) => (DEBUG_ROUTES ? next() : res.status(404).json({ error: 'Not found' }));
+
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -59,6 +64,7 @@ app.use(assess.router);
 const opsMod = require('./src/ops');
 app.use(opsMod.router);
 app.use(require('./src/insurer').router);
+app.use(require('./src/demo').router);
 // pages for link-based, no-login views (other agents own the HTML)
 for (const [route, dir] of [['/job/:token', 'job'], ['/report/:token', 'report']]) app.get(route, (req, res, next) => { const f = path.join(PUBLIC, dir, 'index.html'); fs.existsSync(f) ? res.sendFile(f) : next(); });
 // Predictive risk router (owned by the predict agent). Optional: the server runs without it.
@@ -67,11 +73,11 @@ catch (e) { if (e.code !== 'MODULE_NOT_FOUND' || !/routes\/predict|predict/.test
 
 // ─── Incidents ────────────────────────────────────────────────────────────────
 const addTimeline = db.addTimeline;
-async function mutate(req, res, fn) {
+async function mutate(req, res, fn, extra) {
   const out = await db.updateIncident(req.params.id, async (inc) => { const r = await fn(inc); return r || inc; });
   if (!out) return res.status(404).json({ error: 'Incident not found' });
   stream.publish(out, 'update');
-  res.json(out);
+  res.json(extra ? { ...out, ...extra } : out);
 }
 
 app.get('/api/incidents', wrap(async (req, res) => {
@@ -122,8 +128,8 @@ app.post('/api/incidents/:id/dispatch', wrap(async (req, res) => {
     if (chosen) rs.etaMin = chosen.etaMin;
     inc.status = 'dispatched';
     if (chosen) { const jl = await opsMod.createJob(inc, chosen, actor, req); if (jl) { inc.jobLink = jl; addTimeline(inc, actor || 'dispatcher', 'job_link_sent', `Job link ${jl.url} texted to ${chosen.name} (simulated)`); } }
-    addTimeline(inc, actor || 'dispatcher', 'dispatched', `${chosen ? `Dispatched ${chosen.name} (${rs.serviceType}${chosen.etaMin ? `, ETA ${chosen.etaMin} min` : ''})` : 'Marked dispatched (no roadside provider)'}${note ? ' - ' + note : ''}`);
-  });
+    addTimeline(inc, actor || 'dispatcher', 'dispatched', `${chosen ? `Dispatched ${chosen.name} (${rs.serviceType}${chosen.etaMin ? `, ETA ${chosen.etaMin} min` : ''})` : 'Marked dispatched (no roadside provider)'}${note ? ' - ' + note : ''} (simulated: no provider is actually contacted)`);
+  }, { simulated: true, deliveredTo: 'no external recipient' });
 }));
 
 app.post('/api/incidents/:id/dismiss', wrap(async (req, res) => {
@@ -237,14 +243,14 @@ app.get('/api/demo/sample/:provider', (req, res) => {
 app.get('/api/demo/scenarios', (req, res) => res.json({ scenarios: scenarios.SCENARIOS, extra: ['speeding', 'harsh_brake', 'harsh_turn', 'distracted', 'following_distance', 'tire', 'battery'] }));
 
 // Legacy test trigger (kept): now fires a random scenario through the real adapters.
-app.post('/test/trigger-event', wrap(async (req, res) => {
+app.post('/test/trigger-event', debugOnly, wrap(async (req, res) => {
   const sc = scenarios.scenarioSpec('random', Math.random, { timestamp: new Date().toISOString() });
   const incident = await pipeline.ingest(sc.fleet.vendor, fixtures.build(sc.fleet.vendor, sc.spec), { contextHint: sc.contextHint });
   res.json({ success: true, incident });
 }));
 
 // ─── Samsara Debug ────────────────────────────────────────────────────────────
-app.get('/api/debug/samsara', async (req, res) => {
+app.get('/api/debug/samsara', debugOnly, async (req, res) => {
   const apiKey = process.env.SAMSARA_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'SAMSARA_API_KEY not set in Render environment' });
 
@@ -281,7 +287,7 @@ app.get('/api/debug/samsara', async (req, res) => {
 });
 
 // ─── Motive Safety Debug ──────────────────────────────────────────────────────
-app.get('/api/debug/motive-safety-list', async (req, res) => {
+app.get('/api/debug/motive-safety-list', debugOnly, async (req, res) => {
   const apiKey = process.env.MOTIVE_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'No API key' });
 
@@ -318,7 +324,7 @@ app.get('/api/debug/motive-safety-list', async (req, res) => {
   res.json(results);
 });
 
-app.get('/api/debug/motive-safety/:eventId', async (req, res) => {
+app.get('/api/debug/motive-safety/:eventId', debugOnly, async (req, res) => {
   const apiKey = process.env.MOTIVE_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'No API key' });
   const results = {};

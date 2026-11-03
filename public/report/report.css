@@ -42,3 +42,9 @@ h1.rp-h { font: 600 clamp(28px, 6vw, 44px)/1.05 var(--nx-font-display); text-tra
 .up { color: var(--nx-sev-critical); } .down { color: var(--nx-ok); }
 @media (max-width: 640px) { .rp-grid { grid-template-columns: minmax(0, 1fr); } .rp-bar { grid-template-columns: 100px 1fr 34px; } .rp-main { padding: 16px 12px 32px; } .rp-tag { display: none; } .rp-top button { margin-left: auto; } }
 @media print { .rp-top, .nx-no-print { display: none !important; } body { background: #fff; } .rp-card, .rp-k { break-inside: avoid; box-shadow: none; } .rp-main { padding: 0; max-width: none; } }
+
+:root[data-theme="light"] { --nx-text-faint: #5d6c86; }
+:root[data-theme="dark"] { --nx-text-faint: #8a9cb8; }
+.rp-foot { font-size: 13px; line-height: 1.5; }
+.rp-tbl th, .rp-tbl td { padding-top: 8px; padding-bottom: 8px; }
+@media (max-width: 640px) { .rp-wrap { overflow-x: auto; } }

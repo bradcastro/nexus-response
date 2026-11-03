@@ -13,6 +13,20 @@ const state = {
 };
 const TTL_MS = 5 * 60 * 1000;
 const clock = () => (state.now != null ? state.now : Date.now());
+// Deterministic model clock: all windows (backtest, EWMA, projections) are anchored to the newest live event rounded up to the
+// hour, NOT to wall-clock time, so repeated calls on the same store state give identical numbers regardless of cache TTL.
+let anchorCache = { n: -1, newest: null, t: 0 };
+async function anchor() {
+  if (state.now != null) return state.now;
+  const n = await db.countIncidents();
+  const newest = n ? (await db.listIncidents({ limit: 1, clone: false, notSource: 'historical_import' }))[0] : null;
+  const key = newest ? newest.id + '|' + newest.timestamp : null;
+  if (anchorCache.n === n && anchorCache.newest === key) return anchorCache.t;
+  const ts = newest ? Date.parse(newest.timestamp) : NaN;
+  const t = Number.isFinite(ts) ? Math.ceil(ts / 3600000) * 3600000 : Date.now();
+  anchorCache = { n, newest: key, t };
+  return t;
+}
 
 // ---------- fleets / ctx ----------
 async function listFleetMeta() {
@@ -28,7 +42,7 @@ async function loadCtx(fleetId, fleetsMeta) {
   const r = meta && meta.roster;
   const fleet = { id: fleetId, name: (meta && meta.name) || (incs[0] && incs[0].fleetName) || fleetId, vendor: (meta && meta.vendor) || (incs[0] && incs[0].provider) || 'unknown', vehicles: meta && meta.doc ? meta.doc.vehicles : undefined };
   const last = incs.reduce((m, i) => Math.max(m, Date.parse(i.timestamp) || 0), 0);
-  const now = clock();
+  const now = await anchor();
   const asOf = last && now - last > 14 * DAY ? last + 3600000 : now; // historical imports: project from the end of the data
   const ctx = { fleet, drivers: r ? r.drivers : [], vehicles: r ? r.vehicles : [], incidents: incs, asOf };
   state.ctx.set(fleetId, ctx);
@@ -42,7 +56,7 @@ async function ensureCalib(force = false) {
   const ctxs = [];
   for (const id of meta.keys()) ctxs.push(await loadCtx(id, meta));
   const live = ctxs.filter(Boolean);
-  const asOf = live.length ? Math.max(...live.map((c) => c.asOf)) : clock();
+  const asOf = live.length ? Math.max(...live.map((c) => c.asOf)) : await anchor();
   state.calib = A.calibrate(live.map((c) => A.buildIndex({ ...c, asOf })), asOf);
   state.calibCount = n;
   state.analysis.clear();
@@ -58,7 +72,7 @@ async function getAnalysis(fleetId, { force = false } = {}) {
     let ctx = state.ctx.get(fleetId);
     if (!ctx || force || (hit && Date.now() - hit.at >= TTL_MS)) ctx = await loadCtx(fleetId);
     if (!ctx) return null;
-    ctx.asOf = ctx.incidents.length && clock() - ctx.incidents.reduce((m, i) => Math.max(m, Date.parse(i.timestamp) || 0), 0) > 14 * DAY ? ctx.asOf : clock();
+    { const an = await anchor(); ctx.asOf = ctx.incidents.length && an - ctx.incidents.reduce((m, i) => Math.max(m, Date.parse(i.timestamp) || 0), 0) > 14 * DAY ? ctx.asOf : an; }
     const a = A.analyzeFleet(ctx, calib, { horizonDays: 90 });
     state.analysis.set(fleetId, { a, at: Date.now() });
     return a;
@@ -179,6 +193,6 @@ function start() {
   const kick = () => refreshIfChanged();
   state.timer = setInterval(kick, 1500); if (state.timer.unref) state.timer.unref();
 }
-function reset() { state.analysis.clear(); state.ctx.clear(); state.calib = null; state.calibCount = 0; state.count = -1; state.bootAlertsDone = false; alerts.clear(); }
+function reset() { anchorCache = { n: -1, newest: null, t: 0 };  state.analysis.clear(); state.ctx.clear(); state.calib = null; state.calibCount = 0; state.count = -1; state.bootAlertsDone = false; alerts.clear(); }
 
 module.exports = { start, getAnalysis, getAllAnalyses, allFleetIds, evaluateFleet, evaluateAll, onIncident, ensureCalib, reset, state, listFleetMeta, setClock: (n) => { state.now = n; } };

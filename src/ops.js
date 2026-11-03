@@ -11,6 +11,7 @@ const D = require('./data/ops');
 const { rngFrom, hashStr, round } = require('./util');
 
 const SIM = 'delivered (simulated)';
+const SIMMARK = { simulated: true, deliveredTo: 'no external recipient' };
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const ago = (inc, a) => (inc.timeline || []).slice().reverse().find((e) => e.action === a);
 const hasA = (inc, ...as) => (inc.timeline || []).find((e) => as.includes(e.action));
@@ -82,7 +83,7 @@ function brief(inc) {
     recommended: rec, needsAuthorities: rec.some((x) => x.urgency === 'now' || x.urgency === 'soon'), script,
     location: { lat: l.lat, lng: l.lng, address: l.address, road: p.road, direction: p.direction, city: p.city, state: p.st, nearestMileMarker: null, crossStreet: null },
     facts, hazmat: hz ? { present: true, notes: `${ld.contents.label.replace(' (likely)', '')}; est. ${ld.estimatedWeightLb.toLocaleString('en-US')} lb; placard/UN number NOT confirmed - ask driver to read the placard from a safe distance. Isolate and deny entry; wait for hazmat team.` } : null,
-    authorities: auth, simulated: true,
+    authorities: auth, ...SIMMARK, note: 'Simulated: no call is placed and no agency is contacted.',
   };
 }
 
@@ -157,7 +158,7 @@ function resolveTo(inc, to) {
 }
 async function logComms(inc, { channel, to, subject, body, actor, template, outcome, at }) {
   const t = at || new Date().toISOString();
-  const doc = { id: 'cm_' + crypto.randomBytes(5).toString('hex'), at: t, createdAt: t, incidentId: inc.id, fleetId: inc.fleetId, fleetName: inc.fleetName, channel, to, subject: subject || null, body, status: SIM, simulated: true, actor: actor || 'dispatcher', template: template || null, outcome: outcome || null };
+  const doc = { id: 'cm_' + crypto.randomBytes(5).toString('hex'), at: t, createdAt: t, incidentId: inc.id, fleetId: inc.fleetId, fleetName: inc.fleetName, channel, to, subject: subject || null, body, status: SIM, simulated: true, deliveredTo: 'no external recipient', actor: actor || 'dispatcher', template: template || null, outcome: outcome || null };
   await db.put('comms', doc);
   return doc;
 }
@@ -294,7 +295,7 @@ function ticket(job, inc, req) {
   const wc = ld && ld.estimatedWeightLb > 300 ? (ld.estimatedWeightLb > 60000 ? 'over 60k lb gross' : ld.estimatedWeightLb > 30000 ? '30-60k lb payload' : 'under 30k lb payload') : 'empty / light';
   const td = rs.towDestination;
   return {
-    token: job.token, status: job.status, simulated: true, incidentId: inc.id, createdAt: job.createdAt, expiresAt: job.expiresAt, provider: { id: job.providerId, name: job.providerName },
+    token: job.token, status: job.status, ...SIMMARK, incidentId: inc.id, createdAt: job.createdAt, expiresAt: job.expiresAt, provider: { id: job.providerId, name: job.providerName },
     summary: `${(rs.serviceType || 'roadside').replace(/_/g, ' ')} - ${inc.vehicle.year || ''} ${inc.vehicle.make || ''} ${inc.vehicle.model || ''}`.replace(/\s+/g, ' '), serviceType: rs.serviceType || 'none', rationale: rs.rationale || null,
     location: { lat: inc.location.lat, lng: inc.location.lng, address: inc.location.address, road: p.road, direction: p.direction, navUrl: `https://maps.google.com/?q=${inc.location.lat},${inc.location.lng}` },
     vehicle: { description: `${inc.vehicle.year || ''} ${inc.vehicle.make || ''} ${inc.vehicle.model || ''}`.replace(/\s+/g, ' ').trim(), plate: inc.vehicle.plate, unit: inc.vehicle.unit, vin: inc.vehicle.vin, class: inc.equipment ? inc.equipment.tractor.class : null, gvwrLb: inc.equipment ? inc.equipment.tractor.gvwrLb : null },
@@ -316,7 +317,7 @@ router.get('/api/incidents/:id/contacts', wrap(async (req, res) => { const i = a
 router.get('/api/fleets/:id/contacts', (req, res) => {
   const f = roster.getFleet(req.params.id); if (!f) return res.status(404).json({ error: 'Fleet not found' });
   const car = D.carrierOf(f.id);
-  res.json({ fleetId: f.id, fleetManagers: D.fleetManagers(f), insurer: { carrier: car.name, policyNo: D.policyNo(f.id), fnolLine: car.fnolLine, portal: car.portal }, simulated: true });
+  res.json({ fleetId: f.id, fleetManagers: D.fleetManagers(f), insurer: { carrier: car.name, policyNo: D.policyNo(f.id), fnolLine: car.fnolLine, portal: car.portal }, ...SIMMARK });
 });
 router.get('/api/incidents/:id/authority-brief', wrap(async (req, res) => { const i = await getInc(req, res); if (i) res.json(brief(i)); }));
 
@@ -340,7 +341,7 @@ router.delete('/api/comms/templates/:key', wrap(async (req, res) => { await db.d
 
 router.post('/api/incidents/:id/notify', wrap(async (req, res) => {
   const i = await getInc(req, res); if (!i) return;
-  try { const r = await notify(i, req.body || {}, req); res.json({ ...r.comms, incident: r.incident }); } catch (e) { res.status(e.status || 500).json({ error: 'validation_failed', message: e.message }); }
+  try { const r = await notify(i, req.body || {}, req); res.json({ ...r.comms, ...SIMMARK, incident: r.incident }); } catch (e) { res.status(e.status || 500).json({ error: 'validation_failed', message: e.message }); }
 }));
 router.get('/api/incidents/:id/comms', wrap(async (req, res) => {
   const i = await getInc(req, res); if (!i) return;
@@ -374,7 +375,7 @@ router.post('/api/incidents/:id/sop/:stepKey', wrap(async (req, res) => {
 router.post('/api/incidents/:id/fnol', wrap(async (req, res) => {
   const i = await getInc(req, res); if (!i) return;
   const r = await sendFnol(i, req.body && req.body.actor, req.body && req.body.note);
-  res.status(r.alreadySent ? 200 : 201).json({ ...r.inc.fnol, alreadySent: r.alreadySent });
+  res.status(r.alreadySent ? 200 : 201).json({ ...r.inc.fnol, ...SIMMARK, alreadySent: r.alreadySent });
 }));
 router.get('/api/incidents/:id/fnol', wrap(async (req, res) => { const i = await getInc(req, res); if (!i) return; if (!i.fnol) return res.status(404).json({ error: 'No FNOL sent for this incident' }); res.json(i.fnol); }));
 
@@ -387,7 +388,7 @@ async function submitClaim(id, actor, req) {
   const cp = out.warranty.claimPacket;
   return {
     status: 'submitted', claimStatus: cp.status, confirmation: out.warranty.claimId, submittedTo: cp.submittedTo, submittedAt: cp.submittedAt, packetUrl: `/api/incidents/${id}/warranty-packet?format=html`,
-    estimatedValueUsd: cp.estimatedValueUsd, claimNumber: cp.claimNumber, preAuthNumber: cp.preAuthNumber || null, oemDesk: cp.oemDesk, alreadySubmitted: !created, simulated: true, incident: out,
+    estimatedValueUsd: cp.estimatedValueUsd, claimNumber: cp.claimNumber, preAuthNumber: cp.preAuthNumber || null, oemDesk: cp.oemDesk, alreadySubmitted: !created, ...SIMMARK, incident: out,
   };
 }
 router.post('/api/incidents/:id/warranty/submit', wrap(async (req, res) => {
@@ -399,7 +400,7 @@ router.post('/api/fleets/:id/warranty/submit-ready', wrap(async (req, res) => {
   const ready = incs.filter((i) => i.warranty && i.warranty.claimPacket && i.warranty.claimPacket.status === 'ready').map((i) => i.id);
   const results = [];
   for (const id of ready) { try { const r = await submitClaim(id, (req.body && req.body.actor) || 'fleet', req); results.push({ incidentId: id, confirmation: r.confirmation, claimNumber: r.claimNumber, estimatedValueUsd: r.estimatedValueUsd }); } catch (e) { results.push({ incidentId: id, error: e.message }); } }
-  res.json({ submitted: results.filter((r) => !r.error).length, totalValueUsd: results.reduce((s, r) => s + (r.estimatedValueUsd || 0), 0), results, simulated: true });
+  res.json({ submitted: results.filter((r) => !r.error).length, totalValueUsd: results.reduce((s, r) => s + (r.estimatedValueUsd || 0), 0), results, ...SIMMARK });
 }));
 router.get('/api/incidents/:id/warranty/claim', wrap(async (req, res) => { const i = await getInc(req, res); if (!i) return; const s = claims.summary(i); if (!s) return res.status(404).json({ error: 'No warranty claim on this incident' }); res.json(s); }));
 router.post('/api/incidents/:id/warranty/status', wrap(async (req, res) => {
@@ -411,7 +412,7 @@ router.post('/api/incidents/:id/warranty/status', wrap(async (req, res) => {
     if (b.simulate || !to) { to = claims.simulateNext(i0, b.outcome); actor = 'oem'; if (!to) return res.status(409).json({ error: 'nothing_to_simulate', message: `Claim is ${i0.warranty.claimPacket.status}; submit it first or it is already final.` }); }
     const out = await db.updateIncident(i0.id, (inc) => { claims.applyStatus(inc, to, { note: b.note, actor }); });
     stream.publish(out, 'update');
-    res.json({ ...claims.summary(out), simulated: true, incident: out });
+    res.json({ ...claims.summary(out), ...SIMMARK, incident: out });
   } catch (e) { res.status(e.status || 500).json({ error: 'invalid_transition', message: e.message, allowed: claims.NEXT[i0.warranty.claimPacket.status] }); }
 }));
 

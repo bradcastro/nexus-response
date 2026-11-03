@@ -27,8 +27,8 @@
     return out.sort(function (a, b) { return (ST_RANK[a.status] - ST_RANK[b.status]) || (SEV_RANK[a.severity] - SEV_RANK[b.severity]) || ((pct(b.probability) || 0) - (pct(a.probability) || 0)); });
   }
   function paintCounts() {
-    var c = counts(), n = $('#c-pro'); if (n) { n.textContent = c.open || 0; n.classList.toggle('is-hot', !!c.open); }
-    var h = $('#hud-watch'); if (h) h.textContent = c.open || 0;
+    var c = counts(), n = $('#c-pro'), ok = S.alertsDone; if (n) { n.textContent = ok ? (c.open || 0) : '\u2014'; n.classList.toggle('is-hot', !!(ok && c.open)); }
+    var h = $('#hud-watch'); if (h) h.textContent = ok ? (c.open || 0) : '\u2014';
   }
 
   /* ---------- queue ---------- */
@@ -42,13 +42,13 @@
   }
   function renderList() {
     var c = counts(), chips = $('#pro-chips');
-    chips.innerHTML = ['open', 'acknowledged', 'actioned', 'dismissed', 'all'].map(function (s) { return '<button class="nx-chip' + (S.af.status === s ? ' is-active' : '') + '" data-ast="' + s + '">' + fmt.label(s) + ' <b>' + (c[s] || 0) + '</b></button>'; }).join('');
+    chips.innerHTML = ['open', 'acknowledged', 'actioned', 'dismissed', 'all'].map(function (s) { return '<button class="nx-chip' + (S.af.status === s ? ' is-active' : '') + '" data-ast="' + s + '">' + fmt.label(s) + ' <b>' + (S.alertsDone ? (c[s] || 0) : '\u2014') + '</b></button>'; }).join('');
     var ks = $('#f-kind'); if (!ks.options.length) ks.innerHTML = '<option value="">All alert types</option>' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '">' + KINDS[k] + '</option>'; }).join('');
     var l = sorted(), box = $('#q-list');
     $('#q-shown').textContent = l.length + ' shown';
     paintCounts();
     if (S.alertsLoading) { box.innerHTML = '<div class="sk">' + [1, 2, 3].map(function () { return '<span class="nx-skel nx-skel--block"></span>'; }).join('') + '</div>'; return; }
-    if (S.alertsError) { box.innerHTML = ''; box.appendChild(NX.empty('Predictive alerts unavailable', S.alertsError, '!')); return; }
+    if (S.alertsError) { box.innerHTML = ''; box.appendChild(NX.empty('Predictive alerts could not be loaded', S.alertsError, '!')); return; }
     if (!l.length) { box.innerHTML = ''; box.appendChild(NX.empty(S.alerts.size ? 'No alerts match' : 'Nothing to prevent right now', S.alerts.size ? 'Adjust the filters above.' : 'Predicted risks appear here before they become incidents.', '◌')); return; }
     var top = box.scrollTop; box.innerHTML = l.map(row).join(''); box.scrollTop = top; S.newAlerts.clear();
     var el = box.querySelector('.is-selected'); if (el && S._scrollA) { el.scrollIntoView({ block: 'nearest' }); S._scrollA = false; }
@@ -59,7 +59,7 @@
     S.alertsLoading = !S.alerts.size; S.alertsError = null;
     return api('/api/predict/alerts', { query: { limit: 500 } }).then(function (d) {
       S.alerts.clear(); list(d, 'alerts').forEach(function (a) { S.alerts.set(a.id, a); });
-      S.alertsLoading = false; paintCounts(); if (S.mode === 'proactive') { renderList(); D.renderDetail(); drawMap(); } else D.renderDetail();
+      S.alertsLoading = false; S.alertsDone = true; paintCounts(); if (S.mode === 'proactive') { renderList(); D.renderDetail(); drawMap(); } else D.renderDetail();
     }).catch(function (e) { S.alertsLoading = false; S.alertsError = e.status === 404 ? 'The predictive engine is not enabled on this server.' : e.message; paintCounts(); if (S.mode === 'proactive') renderList(); });
   }
   function upsert(a) {
@@ -232,7 +232,7 @@
 
   /* ---------- wiring ---------- */
   function init(d) {
-    D = d; S = d.S; S.alerts = new Map(); S.newAlerts = new Set(); S.af = { status: 'open', kind: '', fleet: '' }; S.selAlert = null;
+    D = d; S = d.S; S.alerts = new Map(); S.alertsLoading = true; S.alertsDone = false; S.newAlerts = new Set(); S.af = { status: 'open', kind: '', fleet: '' }; S.selAlert = null;
     $('#pro-chips').addEventListener('click', function (e) { var b = e.target.closest('[data-ast]'); if (!b) return; S.af.status = b.dataset.ast; renderList(); drawMap(); });
     $('#f-kind').addEventListener('change', function (e) { S.af.kind = e.target.value; renderList(); drawMap(); });
     $('#q-list').addEventListener('click', function (e) { var r = e.target.closest('[data-aid]'); if (r) { selectAlert(r.dataset.aid); if (window.innerWidth <= 1100) D.setView('detail'); } });

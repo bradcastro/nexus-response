@@ -234,8 +234,8 @@ function analyzeFleet(ctx, calib, opts = {}) {
 
   const recentInc = idx.events.filter((e) => e.ts > asOf - 30 * DAY && !e.maint).length;
   const modelNotes = [
-    'DEMO-CALIBRATED model: transparent weighted-logistic collision probability on EWMA leading indicators; weights are hand-set, not fitted to real loss data.',
-    `Fleet probability level is shrunk toward observed collisions (Poisson-gamma): gamma=${round(gamma, 2)} from ${cObs} collisions in ${round(histWin, 0)}d vs ${round(cPred, 1)} predicted.`,
+    'DEMO-CALIBRATED model: transparent weighted-logistic collision-risk indicator on EWMA leading indicators; weights are hand-set, not fitted to real loss data.',
+    `Fleet risk-indicator level is shrunk toward observed collisions (Poisson-gamma): gamma=${round(gamma, 2)} from ${cObs} collisions in ${round(histWin, 0)}d vs ${round(cPred, 1)} predicted.`,
     `Indicators are relative to portfolio norms (f=1 = as frequent as the average portfolio driver); camera-derived indicators are normalised only over camera-equipped vehicles.`,
     `Prediction confidence ${round(confidence, 2)} = 0.40 signal richness (${round(richness, 2)}) + 0.22 history (${round(histScore, 2)}) + 0.13 volume (${round(volume, 2)}) + 0.25 camera-verified share (${round(verifiedPct, 2)}).`,
     `Camera coverage ${Math.round(camCov * 100)}%: ${camCov < 0.6 ? 'driver-facing signals (phone, drowsiness, tailgating) are mostly unobserved here, so risk may be understated; band widened.' : 'driver-facing signals are well observed.'}`,
@@ -394,16 +394,16 @@ function runBacktest(ctx, idx, rows, scan, dayTs, flagged, norm, asOf, scanStart
   examples.sort((a, b) => b.leadDays - a.leadDays);
   return {
     fleetId: ctx.fleet.id, window: { from: iso(scanStartMs).slice(0, 10), to: iso(asOf).slice(0, 10), days: Math.round((asOf - scanStartMs) / DAY) },
-    collisions: colls.length, caught, recallPct: recall == null ? null : round(recall * 100, 0), medianLeadDays: median(leads) == null ? null : round(median(leads), 1),
+    collisions: colls.length, caught, leadDaysAll: leads.map((l) => round(l, 1)), recallPct: recall == null ? null : round(recall * 100, 0), medianLeadDays: median(leads) == null ? null : round(median(leads), 1),
     falseAlertsPer100Veh: round((falseEps / nVeh) * 100, 1), falseAlertsPer100VehPer30d: round(((falseEps / nVeh) * 100 * 30) / judgedDays, 1),
     alertEpisodes: episodes, precisionPct: episodes ? round((trueEps / episodes) * 100, 0) : null,
     examples: [...examples.slice(0, 8), ...misses.slice(0, 5)],
     limitations: [
       'Walk-forward replay: each day uses only events before that day; alert thresholds and portfolio norms are fixed constants, but they were tuned on this same demo data (in-sample).',
-      `A collision counts as "caught" if its driver was flagged at least 12h and at most ${ALERT.LEAD_WINDOW_DAYS} days beforehand; flagged = 30-day collision probability >= ${round(ALERT.P_FLAG * 100, 1)}% (${ALERT.FLAG_MULT}x the portfolio-average driver) or sharp escalation.`,
+      `A collision counts as "caught" if its driver was flagged at least 12h and at most ${ALERT.LEAD_WINDOW_DAYS} days beforehand; flagged = 30-day modeled collision-risk indicator (illustrative) >= ${round(ALERT.P_FLAG * 100, 1)}% (${ALERT.FLAG_MULT}x the portfolio-average driver) or sharp escalation.`,
       'Collisions with no precursor behavior (random, other-party fault, mechanical) cannot be predicted and are reported as misses.',
       'False alerts = flag episodes (14-day cooldown) with no collision by that driver in the next 30 days; recent episodes still inside the 30-day window are excluded from the count.',
-      'Small samples: with few collisions the recall figure has a wide confidence interval; treat as indicative, not guaranteed.',
+      'Small samples: with few collisions the recall figure has a wide confidence interval; treat as indicative, not guaranteed; synthetic data, not validated.',
     ],
   };
 }

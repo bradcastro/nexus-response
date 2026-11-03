@@ -29,6 +29,7 @@ function verify(req) { return verifyHmac(req, 'MANTIS_WEBHOOK_SECRET', ['x-manti
 function normalize(p) {
   const inc = skeleton('mantis', p.event_id || p.id, p.occurred_at || p.timestamp);
   inc.raw = p;
+  inc.integrationNote = 'Mantis payload shape is ASSUMED (mantis.event.v1), not taken from the real Mantis specification.';
   inc.eventType = TYPE(p.event_type);
   const v = p.vehicle || {};
   inc.vehicle = { providerVehicleId: v.id != null ? String(v.id) : null, unit: v.unit || null, vin: v.vin || null, plate: v.plate || null, make: v.make || null, model: v.model || null, year: num(v.year), odometer_mi: num(v.odometer_mi) };

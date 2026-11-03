@@ -14,9 +14,9 @@
   function colorFor(v, good) { v = num(v) || 0; var r = good ? 100 - v : v; return r >= 70 ? 'var(--nx-sev-high)' : r >= 50 ? 'var(--nx-warn)' : r >= 30 ? 'var(--nx-info)' : 'var(--nx-ok)'; }
   function bars(items, good) { items = items || []; return items.length ? '<div class="rp-bars">' + items.map(function (b) { var v = num(b.score != null ? b.score : b.value) || 0; return '<div class="rp-bar"><span>' + esc(b.label || lbl(b.key)) + '</span><span class="t"><i style="width:' + Math.min(100, v) + '%;--c:' + colorFor(v, good) + '"></i></span><span class="nx-mono" style="text-align:right">' + Math.round(v) + '</span></div>'; }).join('') + '</div>' : '<span class="nx-dim">Not reported.</span>'; }
   function tier(t) { return t ? NX.badgeHTML(t, ({ low: 'ok', moderate: 'info', elevated: 'warn', high: 'danger' })[String(t).toLowerCase()] || 'plain') : ''; }
-  function price(p) { p = p || {}; var a = num(pick(p, 'suggestedPremiumAdjustmentPct', 'adjustmentPct')); if (a == null) return '<span class="nx-dim">No pricing signal.</span>'; var r = p.rationale; return '<div style="font:600 44px/1 var(--nx-font-display)" class="' + (a > 0 ? 'up' : a < 0 ? 'down' : '') + '">' + signed(a) + '</div><div class="nx-dim" style="font-size:13px;margin:4px 0 10px">suggested premium adjustment' + (p.estAdjustmentUsdPerMonth != null ? ' · about ' + money(Math.abs(p.estAdjustmentUsdPerMonth)) + ' / month' : '') + '</div>' + list(Array.isArray(r) ? r : r ? [r] : []); }
+  function price(p) { p = p || {}; var a = num(pick(p, 'suggestedPremiumAdjustmentPct', 'adjustmentPct')); if (a == null) return '<span class="nx-dim">No pricing signal.</span>'; var r = p.rationale; return '<div style="font:600 44px/1 var(--nx-font-display)" class="' + (a > 0 ? 'up' : a < 0 ? 'down' : '') + '">' + signed(a) + '</div><div class="nx-dim" style="font-size:13px;margin:4px 0 10px">illustrative premium adjustment' + (p.estAdjustmentUsdPerMonth != null ? ' · about ' + money(Math.abs(p.estAdjustmentUsdPerMonth)) + ' / month' : '') + '</div>' + list(Array.isArray(r) ? r : r ? [r] : []); }
   function drivers(d) { d = d || []; return d.length ? '<div class="rp-wrap"><table class="rp-tbl"><thead><tr><th>Driver</th><th class="n">Score</th><th class="n">Events</th></tr></thead><tbody>' + d.slice(0, 8).map(function (x) { return '<tr><td>' + esc(x.name) + '</td><td class="n">' + esc(pick(x, 'safetyScore', 'driveScore', 'riskScore') != null ? Math.round(pick(x, 'safetyScore', 'driveScore', 'riskScore')) : '—') + '</td><td class="n">' + esc(pick(x, 'events30d', 'events') != null ? pick(x, 'events30d', 'events') : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<span class="nx-dim">None.</span>'; }
-  function evidence(list_) { list_ = list_ || []; return list_.length ? '<div class="rp-callout" style="margin-bottom:12px"><b>Camera-verified evidence.</b> Each event was confirmed by camera AI with video or snapshots and sensor signals, which makes staged or inflated claims easy to check.</div><div class="rp-ev">' + list_.slice(0, 6).map(function (i) { return '<div><b>' + esc(lbl(i.eventType)) + '</b> ' + NX.badgeHTML(i.severity || 'low') + ' <span class="nx-dim">' + esc(fmt.dateTime(i.timestamp)) + (i.address ? ' · ' + esc(i.address) : '') + '</span>' + (i.aiVerdict ? '<div>AI verdict: <b>' + esc(lbl(i.aiVerdict)) + '</b>' + (i.confidence != null ? ' at ' + Math.round(i.confidence * 100) + '%' : '') + '</div>' : '') + (i.signals && i.signals.length ? '<div class="nx-dim">' + esc(i.signals.slice(0, 4).join(' · ')) + '</div>' : '') + (i.snapshot ? '<img loading="lazy" alt="Camera frame" src="' + esc(i.snapshot) + '">' : '') + '</div>'; }).join('') + '</div>' : '<span class="nx-dim">No recent verified incidents.</span>'; }
+  function evidence(list_) { list_ = list_ || []; return list_.length ? '<div class="rp-callout" style="margin-bottom:12px"><b>Camera-verified evidence.</b> Each event was confirmed by camera AI with video or snapshots and sensor signals, which can support checking a claim against what the camera recorded (simulated in this demo).</div><div class="rp-ev">' + list_.slice(0, 6).map(function (i) { return '<div><b>' + esc(lbl(i.eventType)) + '</b> ' + NX.badgeHTML(i.severity || 'low') + ' <span class="nx-dim">' + esc(fmt.dateTime(i.timestamp)) + (i.address ? ' · ' + esc(i.address) : '') + '</span>' + (i.aiVerdict ? '<div>AI verdict: <b>' + esc(lbl(i.aiVerdict)) + '</b>' + (i.confidence != null ? ' at ' + Math.round(i.confidence * 100) + '%' : '') + '</div>' : '') + (i.signals && i.signals.length ? '<div class="nx-dim">' + esc(i.signals.slice(0, 4).join(' · ')) + '</div>' : '') + (i.snapshot ? '<img loading="lazy" alt="Camera frame" src="' + esc(i.snapshot) + '">' : '') + '</div>'; }).join('') + '</div>' : '<span class="nx-dim">No recent verified incidents.</span>'; }
 
   var R = {
     fleet: function (d) {
@@ -25,12 +25,12 @@
       h += '<div class="rp-grid">' + C('Pricing signal', price(d.pricingSignal || d.pricing)) + C('Score breakdown', bars(d.scoreBreakdown, false));
       if (d.recentVerifiedIncidents) h += C('Camera-verified incidents', evidence(d.recentVerifiedIncidents), true);
       if (d.driversRanked) h += C('Highest-risk drivers', drivers(d.driversRanked));
-      if (d.topImprovementLevers) h += C('How to improve', list(d.topImprovementLevers.map(function (x) { return x.label + (x.potentialSavingsUsd ? ' (potential saving ' + money(x.potentialSavingsUsd) + ' / yr)' : ''); })));
+      if (d.topImprovementLevers) h += C('How to improve', list(d.topImprovementLevers.map(function (x) { return x.label + (x.potentialSavingsUsd ? ' (illustrative saving ' + money(x.potentialSavingsUsd) + ' / yr)' : ''); })));
       if (d.usageNote) h += '<p class="nx-dim" style="font-size:12px;margin-top:12px">' + esc(d.usageNote) + '.</p>';
       return h + '</div>';
     },
     assessment: function (d) {
-      var pr = d.pricing || {}, h = '<div class="rp-kpis">' + K('Risk score', fmt.number(d.riskScore), tier(d.riskTier)) + K('Confidence', d.confidence != null ? Math.round(d.confidence <= 1 ? d.confidence * 100 : d.confidence) + '%' : '—') + K('Data quality', fmt.number(d.dataQualityScore), 'of 100') + K('Events / million miles', d.eventsPerMillionMiles == null ? 'n/a' : fmt.number(d.eventsPerMillionMiles), d.eventsPerMillionMiles == null ? 'no mileage supplied' : '') + '</div>';
+      var pr = d.pricing || {}, h = '<div class="rp-kpis">' + K('Risk score', fmt.number(d.riskScore), tier(d.riskTier)) + K('Data sufficiency (modeled)', d.confidence != null ? Math.round(d.confidence <= 1 ? d.confidence * 100 : d.confidence) + '%' : '—') + K('Data quality', fmt.number(d.dataQualityScore), 'of 100') + K('Events / million miles', d.eventsPerMillionMiles == null ? 'n/a' : fmt.number(d.eventsPerMillionMiles), d.eventsPerMillionMiles == null ? 'no mileage supplied' : '') + '</div>';
       h += '<div class="rp-grid">' + C('Pricing signal', price(pr)) + C('Score breakdown', bars(d.scoreBreakdown, false)) + C('Pre-accident indicators', list(d.preAccidentIndicators)) + C('Recommended programs', list((d.recommendedPrograms || []).map(function (x) { return typeof x === 'string' ? x : (x.label || x.name) + (x.description ? ': ' + x.description : ''); }))) + C('Limitations', list(d.limitations), true) + '</div>';
       return h;
     },
@@ -53,6 +53,8 @@
   function fail(title, text) { app.innerHTML = '<div class="rp-err"><h1>' + esc(title) + '</h1><p class="nx-dim">' + esc(text) + '</p></div>'; }
   var tk = token();
   if (!tk) return fail('No report specified', 'This link is missing its report code. Ask the sender for a new link.');
+  function load() {
+  app.innerHTML = '<div class="rp-skel" aria-busy="true"></div>';
   fetch('/api/reports/' + encodeURIComponent(tk), { headers: { Accept: 'application/json' } }).then(function (r) {
     if (r.status === 404 || r.status === 410) throw Object.assign(new Error('gone'), { gone: true });
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -70,6 +72,8 @@
     app.innerHTML = h;
   }).catch(function (e) {
     if (e.gone) fail('This link is no longer available', 'The report has expired or the link is not valid. Ask the sender for a new link.');
-    else fail('Could not load the report', 'Please try again in a moment. ' + (e.message || ''));
+    else { fail('Could not load the report', 'Please try again in a moment. ' + (e.message || '')); var b = document.createElement('button'); b.className = 'nx-btn'; b.textContent = 'Retry'; b.onclick = load; app.firstChild.appendChild(b); }
   });
+  }
+  load();
 })();

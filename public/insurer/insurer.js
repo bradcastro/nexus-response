@@ -87,7 +87,7 @@
       ['Policyholders', fmt.number(pick(T, 'fleets') != null ? T.fleets : F.length), 'fleets in book'],
       ['Insured vehicles', fmt.number(pick(T, 'vehicles') != null ? T.vehicles : F.reduce(function (s, f) { return s + f.vehicles; }, 0)), 'across ' + new Set(F.map(function (f) { return f.vendor; })).size + ' telematics vendors'],
       ['Events, 30d', fmt.number(T.events30d), 'normalized from all vendors'],
-      ['Loss-ratio proxy', lrTxt, 'modelled from verified severity mix']
+      ['Loss-ratio proxy (illustrative)', lrTxt, 'synthetic data, demo assumptions']
     ];
     var cargoTot = F.some(function (f) { return f.cargo != null; }) ? F.reduce(function (a, f) { return a + (f.cargo || 0); }, 0) : null;
     if (cargoTot != null) kp.splice(4, 0, ['Cargo exposure', fmt.currency(cargoTot), 'est. value of loads in recent events']);
@@ -275,7 +275,7 @@
     p.hidden = true; d.hidden = false; window.scrollTo(0, 0); $('#main').scrollTop = 0;
     d.replaceChildren(NX.skeleton(5));
     NX.api('/api/insurer/fleets/' + encodeURIComponent(id)).then(function (data) { if (decodeURIComponent(location.hash.slice(1)) === id) renderDive(id, data); })
-      .catch(function (e) { d.innerHTML = '<button class="nx-btn nx-btn--ghost ins-back" data-back>← Portfolio</button><div class="nx-card nx-card--alert"><div class="nx-card__body"><b>Could not load policyholder.</b> ' + esc(e.message) + '</div></div>'; });
+      .catch(function (e) { d.innerHTML = '<button class="nx-btn nx-btn--ghost ins-back" data-back>← Portfolio</button><div class="nx-card nx-card--alert"><div class="nx-card__body"><b>Could not load policyholder.</b> ' + esc(e.message || 'The request failed.') + ' <button class="nx-btn nx-btn--sm" type="button" data-retry>Retry</button></div></div>'; });
   }
 
   var SHORT = { collisions: 'Collisions', harsh_events: 'Harsh', speeding: 'Speeding', distraction: 'Distraction', maintenance: 'Maint./DTC' };
@@ -371,10 +371,10 @@
       '<div class="nx-kpi"><div class="nx-kpi__label">Verified events</div><div class="nx-kpi__value">' + (f.ver == null ? '—' : f.ver.toFixed(0) + '%') + '</div><div class="nx-kpi__delta nx-dim">' + fmt.number((D.kpis || {}).falsePositivesFiltered) + ' false positives filtered</div></div></div>';
     h += '<div class="ins-dive-grid">';
     var rl = pr.rationale || [];
-    h += '<section class="nx-card"><div class="nx-card__head"><h2 class="nx-card__title">Pricing signal</h2>' + (pr.confidence ? '<span class="nx-dim ins-note">Confidence: ' + esc(pr.confidence) + '</span>' : '') + '</div><div class="nx-card__body">' +
-      (adj == null ? '<span class="nx-dim">No pricing signal reported.</span>' : '<div class="ins-price"><span class="ins-price__v ' + (adj > 0 ? 'up' : adj < 0 ? 'down' : '') + '">' + signed(adj) + '</span><span class="nx-dim">suggested premium adjustment' + (pr.estAdjustmentUsdPerMonth != null ? ' · about ' + fmt.currency(Math.abs(pr.estAdjustmentUsdPerMonth)) + ' / month on ' + fmt.currency(pr.estMonthlyPremiumUsd) : '') + '</span></div>') +
+    h += '<section class="nx-card"><div class="nx-card__head"><h2 class="nx-card__title">Illustrative pricing signal</h2>' + (pr.confidence ? '<span class="nx-dim ins-note">Confidence: ' + esc(pr.confidence) + '</span>' : '') + '</div><div class="nx-card__body">' +
+      (adj == null ? '<span class="nx-dim">No pricing signal reported.</span>' : '<div class="ins-price"><span class="ins-price__v ' + (adj > 0 ? 'up' : adj < 0 ? 'down' : '') + '">' + signed(adj) + '</span><span class="nx-dim">illustrative premium adjustment' + (pr.estAdjustmentUsdPerMonth != null ? ' · about ' + fmt.currency(Math.abs(pr.estAdjustmentUsdPerMonth)) + ' / month on ' + fmt.currency(pr.estMonthlyPremiumUsd) : '') + '</span></div>') +
       (rl.length ? '<ul style="margin:var(--nx-sp-3) 0 0;padding-left:18px;font-size:var(--nx-text-sm)">' + rl.map(function (r) { return '<li style="margin-bottom:4px">' + esc(r) + '</li>'; }).join('') + '</ul>' : '') +
-      '<p class="nx-faint ins-note" style="margin:var(--nx-sp-3) 0 0">Decision support only. Final pricing remains with underwriting.</p></div></section>';
+      '<p class="nx-faint ins-note" style="margin:var(--nx-sp-3) 0 0">Illustrative only; not a rate filing and not validated on real-world claims data.</p></div></section>';
     var bmRows = (B.metrics || []).map(function (m) { return { label: m.label, a: m.fleet, b: m.portfolio, d: m.deltaPct }; });
     h += '<section class="nx-card"><div class="nx-card__head"><h2 class="nx-card__title">Benchmark vs portfolio</h2><span class="nx-dim ins-note">Events per 100 vehicles, 30d · marker = portfolio</span></div><div class="nx-card__body"><div class="ins-bars">' +
       bmRows.map(function (r) {
@@ -387,7 +387,7 @@
       }).join('') + '</div></div>' : '<span class="nx-dim">No breakdown reported.</span>') + '</div></section>';
     h += cargoSection(D);
     h += '<section class="nx-card ins-span2"><div class="nx-card__head"><h2 class="nx-card__title">Camera-verified incidents</h2><span class="nx-dim ins-note">' + incs.length + ' most recent</span></div><div class="nx-card__body">' +
-      '<div class="ins-fraud"><b>Claims-fraud-resistant evidence.</b> Each event below was independently confirmed by camera AI with video or snapshots, GPS trail and sensor signals. Staged, inflated or unrelated losses can be checked against what the camera recorded.</div>' +
+      '<div class="ins-fraud"><b>Camera-backed evidence (simulated).</b> Each event below was flagged by camera AI with snapshots, GPS trail and sensor signals. Such records can support checking a loss against what the camera recorded; the frames and verdicts in this demo are generated.</div>' +
       (incs.length ? '<div class="ins-ev">' + incs.slice(0, 6).map(incidentHTML).join('') + '</div>' : '<span class="nx-dim">No recent verified incidents.</span>') + '</div></section>';
     h += '<section class="nx-card"><div class="nx-card__head"><h2 class="nx-card__title">Highest-risk drivers</h2></div><div class="nx-card__body nx-card--flush">' +
       (drivers.length ? '<div class="nx-table-wrap"><table class="nx-table"><thead><tr><th>#</th><th>Driver</th><th class="num">Safety score</th><th class="num">Events</th><th class="num">Collisions</th><th>Main behavior</th></tr></thead><tbody>' + drivers.slice(0, 8).map(function (d, i) {

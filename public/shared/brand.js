@@ -104,8 +104,27 @@
     return resolved ? getComputedStyle(document.documentElement).getPropertyValue(v.slice(4, -1)).trim() : v;
   };
   // NX.badge('critical') / NX.badge('en_route') / NX.badge('Verified','ok') -> element
+  // Capability kinds ("what is real"): NX.badge('simulated'), NX.badge('working_verified'), ...
+  var CAP = {
+    working_verified: { g: '\u2713', label: 'Working & verified', desc: 'Exercised end to end and checked by tests or inspection.' },
+    working_synthetic: { g: '\u25D0', label: 'Working, synthetic data', desc: 'The code path runs for real, but the inputs are seeded or generated demo data.' },
+    simulated: { g: '\u25B7', label: 'Simulated action', desc: 'The outcome is faked in the demo: nothing is sent to a real person, carrier or OEM.' },
+    planned: { g: '\u25CB', label: 'Planned / needs integration', desc: 'Not built, or blocked on a real partner integration or specification.' }
+  };
+  var CAP_ALIAS = { verified: 'working_verified', working: 'working_verified', synthetic: 'working_synthetic', working_with_synthetic_data: 'working_synthetic', simulate: 'simulated', needs_integration: 'planned', integration: 'planned' };
+  NX.capabilities = CAP;
+  NX.capKind = function (v) { v = String(v == null ? '' : v).toLowerCase().replace(/[^a-z]+/g, '_'); return CAP[v] ? v : (CAP_ALIAS[v] || null); };
+  NX.capBadge = function (kind, text) {
+    var k = NX.capKind(kind) || 'planned';
+    return el('span', { class: 'nx-badge nx-badge--cap nx-badge--' + k, title: CAP[k].desc }, el('span.nx-badge__g', { 'aria-hidden': 'true' }, CAP[k].g), text || CAP[k].label);
+  };
+  // four-badge legend (each with its one-line meaning)
+  NX.capLegend = function () {
+    return el('ul.nx-cap-legend', Object.keys(CAP).map(function (k) { return el('li', NX.capBadge(k), CAP[k].desc); }));
+  };
   NX.badge = function (value, variant) {
     var v = String(value == null ? '' : value);
+    if (!variant && NX.capKind(v)) return NX.capBadge(v);
     var key = variant || v;
     return el('span', { class: 'nx-badge nx-badge--' + key.replace(/[^\w]/g, '_') }, fmt.label(v));
   };
@@ -182,7 +201,7 @@
   };
 
   /* ---------------- topbar ---------------- */
-  var PORTALS = [['Dispatch', '/dispatch/'], ['Fleet', '/fleet/'], ['Insurer', '/insurer/'], ['Onboarding', '/onboarding/']];
+  var PORTALS = [['Dispatch', '/dispatch/'], ['Fleet', '/fleet/'], ['Insurer', '/insurer/'], ['Onboarding', '/onboarding/'], ['Tour', '/tour/']];
   // NX.topbar('Dispatch', {mount:'#nx-topbar'|Element, sidebar:true, live:true, right:[Node...]}) -> <header class="nx-topbar">
   // Mounts by replacing #nx-topbar, else prepends to .nx-app, else body.
   NX.topbar = function (portalName, opts) {

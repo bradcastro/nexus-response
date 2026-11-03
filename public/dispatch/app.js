@@ -16,9 +16,9 @@
     providers: [],           // providers near selected incident
     provFor: null,
     pick: null,              // picked providerId
-    loading: true, error: null,
+    loading: true, loaded: false, error: null, sseState: 'connecting', dtab: 'overview', forceOpen: {},
     sound: true, follow: false,
-    noteDraft: {}, busy: {}, camTab: 'road', coll: { 'oem-warranty': 1, 'vehicle-driver': 1, equipment: 0 }, dealerPick: null, towLocal: {},
+    noteDraft: {}, busy: {}, camTab: 'road', coll: {}, dealerPick: null, towLocal: {},
     newIds: new Set()
   };
   try { S.sound = localStorage.getItem('nx-dispatch-sound') !== '0'; } catch (e) {}
@@ -48,7 +48,7 @@
   var clock = NX.el('div.tb-clock', NX.el('span#clk-t', '--:--:--'), NX.el('small#clk-d', ''));
   var soundBtn = NX.el('button.nx-icon-btn', { title: 'Alert sound', 'aria-label': 'Toggle alert sound', onclick: function () { S.sound = !S.sound; try { localStorage.setItem('nx-dispatch-sound', S.sound ? '1' : '0'); } catch (e) {} paintSound(); if (S.sound) beep(1); } }, '');
   var helpBtn = NX.el('button.nx-icon-btn.tb-hide-tablet', { title: 'Keyboard shortcuts (?)', onclick: showHelp }, '?');
-  var demoBtn = NX.el('button.nx-btn.nx-btn--sm.tb-hide-tablet', { title: 'Fire a simulated live event', onclick: showDemo }, 'Demo');
+  var demoBtn = NX.el('button.nx-btn.nx-btn--sm.tb-hide-tablet', { title: 'Fire a simulated live event (demo data only)', onclick: showDemo }, 'Simulate event');
   NX.topbar('Dispatch', { sidebar: false, right: [demoBtn, clock, soundBtn, helpBtn] });
   function paintSound() { soundBtn.textContent = S.sound ? '♪' : 'Ø'; soundBtn.style.color = S.sound ? 'var(--nx-accent)' : ''; soundBtn.title = 'Alert sound ' + (S.sound ? 'on' : 'off'); }
   paintSound();
@@ -105,7 +105,7 @@
     var c = counts(), el = $('#status-chips');
     var items = [['open', 'Open'], ['all', 'All']].concat(STATUS_LIST.map(function (s) { return [s, fmt.label(s)]; }));
     el.innerHTML = items.map(function (it) {
-      return '<button class="nx-chip' + (S.filters.status === it[0] ? ' is-active' : '') + '" data-st="' + it[0] + '">' + esc(it[1]) + ' <b>' + (c[it[0]] || 0) + '</b></button>';
+      return '<button class="nx-chip' + (S.filters.status === it[0] ? ' is-active' : '') + '" data-st="' + it[0] + '">' + esc(it[1]) + ' <b>' + (S.loaded ? (c[it[0]] || 0) : '\u2014') + '</b></button>';
     }).join('');
   }
   function fillSelects() {
@@ -140,14 +140,19 @@
       '<div class="qr-tags"><span class="qr-id">' + esc(i.id) + '</span>' + tags + '<span class="tag' + (i.provider === 'mantis' ? ' acc' : '') + '">' + esc(i.provider || '') + '</span></div></div>';
   }
   function renderQueue() {
-    var cl = $('#c-live'); if (cl) cl.textContent = counts().open || 0;
+    var cl = $('#c-live'); if (cl) cl.textContent = S.loaded ? (counts().open || 0) : '\u2014';
     if (S.mode === 'proactive') return NXPro.renderList();
     chips();
     var list = filtered(), box = $('#q-list');
-    $('#q-shown').textContent = list.length + ' shown';
-    if (S.loading) { box.innerHTML = '<div class="sk">' + [1, 2, 3, 4, 5].map(function () { return '<span class="nx-skel nx-skel--block"></span>'; }).join('') + '</div>'; return; }
-    if (S.error) { box.innerHTML = ''; box.appendChild(NX.empty('Cannot load incidents', S.error, '!')); var b = NX.el('button.nx-btn.nx-btn--primary.nx-btn--sm', { onclick: load }, 'Retry'); box.firstChild.appendChild(b); return; }
-    if (!list.length) { box.innerHTML = ''; box.appendChild(NX.empty(S.inc.size ? 'No incidents match' : 'Queue is clear', S.inc.size ? 'Adjust the filters above.' : 'New events appear here the moment they arrive.')); return; }
+    $('#q-shown').textContent = S.loaded ? list.length + ' shown' : '';
+    if (S.loading && !S.loaded) { box.innerHTML = '<div class="sk">' + [1, 2, 3, 4, 5].map(function () { return '<span class="nx-skel nx-skel--block"></span>'; }).join('') + '</div>'; return; }
+    if (S.error && !S.loaded) { box.innerHTML = ''; box.appendChild(NX.empty('Incidents could not be loaded', 'The incident list did not load, so nothing here is confirmed empty. Check your connection and try again.', '!')); var b = NX.el('button.nx-btn.nx-btn--primary.nx-btn--sm', { onclick: load }, 'Retry'); box.firstChild.appendChild(b); return; }
+    if (!list.length) {
+      box.innerHTML = '';
+      var open = S.filters.status === 'open' && !S.filters.sev && !S.filters.cat && !S.filters.fleet && !S.filters.vendor && !S.filters.q.trim();
+      box.appendChild(open ? NX.empty('No open incidents', 'Confirmed by the server just now. New events appear here as they arrive.') : NX.empty('No incidents match', 'Adjust the filters above.'));
+      return;
+    }
     var top = box.scrollTop;
     box.innerHTML = list.map(rowHTML).join('');
     box.scrollTop = top;
@@ -158,7 +163,8 @@
     if (window.NXAct && NXAct.shift) NXAct.shift();
     var o = [], crit = 0, un = 0, act = 0;
     S.inc.forEach(function (i) { if (isHist(i) || isClosed(i)) return; o.push(i); if (i.severity === 'critical') crit++; if (i.status === 'pending' || i.status === 'validating') un++; else act++; });
-    $('#hud-stats').innerHTML = [['Open', o.length], ['Critical', crit], ['Unassigned', un], ['In progress', act], ['Watch', '<span id="hud-watch">' + (S.alerts ? Array.from(S.alerts.values()).filter(function (a) { return a.status === 'open'; }).length : 0) + '</span>']].map(function (x) { return '<div class="hud-stat"><b' + (x[0] === 'Critical' && x[1] ? ' style="color:var(--nx-sev-critical)"' : '') + '>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
+    var D = '\u2014', ok = S.loaded, alertsOk = S.alerts && !S.alertsLoading && !S.alertsError;
+    $('#hud-stats').innerHTML = [['Open', ok ? o.length : D], ['Critical', ok ? crit : D], ['Unassigned', ok ? un : D], ['In progress', ok ? act : D], ['Watch', '<span id="hud-watch">' + (alertsOk ? Array.from(S.alerts.values()).filter(function (a) { return a.status === 'open'; }).length : D) + '</span>']].map(function (x) { return '<div class="hud-stat"><b' + (x[0] === 'Critical' && x[1] && x[1] !== D ? ' style="color:var(--nx-sev-critical)"' : (x[1] === D ? ' class="is-pending-val"' : '')) + '>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
   }
 
   /* ---------- map ---------- */
@@ -272,7 +278,7 @@
     S.sel = id; S._scrollSel = true;
     if (!o.noHash) { try { history.replaceState(null, '', '#' + encodeURIComponent(id)); } catch (e) {} }
     var cached = S.inc.get(id);
-    S.pick = null; S.providers = []; S.provFor = null; S.camTab = 'road'; S.dealerPick = null; S.ctxFor = null;
+    S.pick = null; S.providers = []; S.provFor = null; S.camTab = 'road'; S.dealerPick = null; S.ctxFor = null; S.dtab = 'overview';
     renderQueue(); renderDetail(); syncMarkers(); NXAct.load(id);
     if (cached) { afterSelect(cached); }
     if (o.view && window.innerWidth <= 1100) setView(o.view);
@@ -338,18 +344,42 @@
     NX.toast('Critical: ' + title(i) + ' · ' + unit(i), 'critical', 6000);
   }
 
+  /* ---------- connection / load state banner ---------- */
+  function paintConn() {
+    var b = $('#conn-bar'); if (!b) return;
+    var retry = '<button class="nx-btn nx-btn--sm" data-conn-retry>Retry now</button>', html = '', cls = '';
+    if (S.error && !S.loaded) { cls = 'is-error'; html = '<span><b>Incidents could not be loaded.</b> Counts are hidden until the list loads.</span>' + retry; }
+    else if (S.error) { cls = 'is-warn'; html = '<span><b>Refresh failed.</b> Showing the last loaded incidents, which may be out of date.</span>' + retry; }
+    else if (S.sseState === 'down') { cls = 'is-warn'; html = '<i class="conn-spin" aria-hidden="true"></i><span><b>Live feed disconnected.</b> Reconnecting automatically.' + (S.loaded ? ' Showing the last loaded incidents, which may be out of date.' : '') + '</span>' + retry; }
+    b.className = 'conn-bar' + (html ? ' ' + cls : ' nx-hide'); b.innerHTML = html;
+  }
+  function startStream() {
+    if (S.sse) S.sse.close();
+    clearTimeout(S._sseT); S.sseState = 'connecting'; NX.setLive('reconnecting');
+    S._sseT = setTimeout(function () { if (S.sseState === 'connecting') { S.sseState = 'down'; paintConn(); } }, 7000);
+    S.sse = NX.sse('/api/stream', function (data, type) {
+      if (type === 'alert') return NXPro.upsert(data && (data.alert || data));
+      var inc = data && (data.incident || data);
+      if (inc && inc.id) upsert(inc, true);
+    }, { events: ['incident', 'alert'], onStatus: function (ok) {
+      clearTimeout(S._sseT);
+      if (ok) { var was = S._wasDown; S.sseState = 'live'; S._wasDown = false; paintConn(); if (was) { load(); NXPro.load(); } }
+      else { S.sseState = 'down'; S._wasDown = true; paintConn(); }
+    } });
+  }
+
   function load() {
-    S.loading = true; S.error = null; renderQueue();
+    S.loading = true; S.error = null; renderQueue(); renderHud(); paintConn();
     return api('/api/incidents', { query: { limit: 300 } }).then(function (d) {
       S.inc.clear(); listFrom(d, 'incidents').forEach(function (i) { if (!isHist(i)) S.inc.set(i.id, i); });
-      S.loading = false; S.error = null;
+      S.loading = false; S.loaded = true; S.error = null; paintConn(); if (!S.sel) renderDetail();
       paintFleetSelect(); renderQueue(); renderHud(); syncMarkers();
       var h = decodeURIComponent((location.hash || '').slice(1));
       if (h && !S.sel) select(h, { noHash: true, view: 'detail' });
       else if (!S.sel && !h) { if (!S._fitted) { S._fitted = true; fitAll(); } }
       else if (S.sel) renderDetail();
       if (!S._fitted && !h) { S._fitted = true; fitAll(); }
-    }).catch(function (e) { S.loading = false; S.error = e.message; renderQueue(); });
+    }).catch(function (e) { S.loading = false; S.error = e.message; renderQueue(); renderHud(); paintConn(); if (!S.sel) renderDetail(); });
   }
 
   /* ---------- actions ---------- */
@@ -358,7 +388,7 @@
     var key = kind; S.busy[key] = true; renderDetail();
     return api('/api/incidents/' + encodeURIComponent(id) + path, { method: 'POST', body: body || {} }).then(function (r) {
       var inc = r && (r.incident || r); var jl = (r && r.jobLink) || (inc && inc.jobLink); if (jl) NXAct.setJob(id, jl); if (inc && inc.id) upsert(inc);
-      if (okMsg) NX.toast(okMsg, 'success');
+      if (okMsg) NX.toast(okMsg, 'success', okMsg instanceof Node ? 7000 : 0 || undefined);
       return inc;
     }).catch(function (e) { NX.toast(e.message, 'error'); }).then(function (x) { delete S.busy[key]; renderDetail(); return x; });
   }
@@ -367,14 +397,14 @@
     if (isClosed(i)) return NX.toast('Incident is ' + i.status, 'warn');
     var pid = S.pick || ((i.roadside || {}).recommendedProvider || {}).id;
     var p = S.providers.find(function (x) { return x.id === pid; }) || (i.roadside || {}).recommendedProvider || {};
-    act('dispatch', '/dispatch', { providerId: pid, note: 'Dispatched via console' }, 'Dispatched ' + (p.name || 'provider') + (p.etaMin != null ? ' · ETA ' + Math.round(p.etaMin) + ' min' : ''));
+    act('dispatch', '/dispatch', { providerId: pid, note: 'Dispatched via console' }, NXSim.toast('Dispatch recorded for ' + esc(p.name || 'provider') + (p.etaMin != null ? ' \u00b7 ETA ' + Math.round(p.etaMin) + ' min' : ''), 'tow'));
   }
   function towToDealer() {
     var i = S.inc.get(S.sel); if (!i || !i.warrantyDealer) return;
     var d = i.warrantyDealer, x = [d.nearest].concat(d.alternates || []).find(function (y) { return y.id === S.dealerPick; }) || d.nearest;
     var dest = { kind: 'oem_dealer', name: x.name, address: x.address, lat: x.lat, lng: x.lng, distanceMi: x.distanceMi };
     var pid = S.pick || ((i.roadside || {}).recommendedProvider || {}).id;
-    act('tow', '/dispatch', { providerId: pid, towDestination: dest, note: 'Tow destination: ' + x.name + (d.preAuthNumber ? ' (pre-auth ' + d.preAuthNumber + ')' : '') }, 'Tow destination set: ' + x.name).then(function (r) {
+    act('tow', '/dispatch', { providerId: pid, towDestination: dest, note: 'Tow destination: ' + x.name + (d.preAuthNumber ? ' (pre-auth ' + d.preAuthNumber + ')' : '') }, NXSim.toast('Tow destination recorded: ' + esc(x.name), 'tow')).then(function (r) {
       var cur = S.inc.get(S.sel); // backend may not persist towDestination yet: keep it locally so UI stays truthful
       if (cur && cur.roadside && !cur.roadside.towDestination) { cur.roadside.towDestination = dest; renderDetail(); }
     });
@@ -402,17 +432,19 @@
     m = NX.modal('Simulate live event', box);
   }
   function showHelp() {
-    var rows = [['j / k', 'Next / previous incident'], ['v', 'Validate event'], ['d', 'Dispatch tow'], ['f', 'Notify fleet manager'], ['p', 'Call authorities'], ['i', 'FNOL to insurer'], ['o', 'Submit OEM claim'], ['g', 'Notify cargo owner'], ['e', 'Share ETA with driver'], ['x', 'Dismiss incident'], ['1 / 2 / 3', 'En route / on scene / resolved'], ['n', 'Add note'], ['t', 'Contacts / comms log'], ['H', 'Shift handoff notes'], ['m', 'Live / Proactive'], ['/', 'Search queue'], ['z', 'Fit map to all'], ['Esc', 'Clear / close']];
+    var rows = [['j / k', 'Next / previous incident'], ['v', 'Validate event'], ['d', 'Dispatch tow'], ['f', 'Notify fleet manager'], ['p', 'Call authorities'], ['i', 'FNOL to insurer'], ['o', 'Submit OEM claim'], ['g', 'Notify cargo owner'], ['e', 'Share ETA with driver'], ['x', 'Dismiss incident'], ['1 / 2 / 3', 'En route / on scene / resolved'], ['n', 'Add note'], ['a', 'Overview / audit trail'], ['t', 'Contacts / comms log'], ['H', 'Shift handoff notes'], ['m', 'Live / Proactive'], ['/', 'Search queue'], ['z', 'Fit map to all'], ['Esc', 'Clear / close']];
     NX.modal('Keyboard shortcuts', NX.el('div.help-grid', rows.map(function (r) { return [NX.el('kbd', r[0]), NX.el('span', r[1])]; })));
   }
 
   /* ---------- detail ---------- */
   var detailEl = $('#detail');
   function btn(label, cls, a, extra, k) { return '<button class="nx-btn ' + cls + (S.busy[k || a] ? ' is-loading' : '') + '" data-act="' + a + '"' + (extra || '') + '>' + label + '</button>'; }
+  // supporting detail stays one click away but collapsed until asked for (or until it is the next action)
+  var SUPPORT = { sop: 1, 'oem-warranty': 1, oemclaim: 1, 'vehicle-driver': 1, equipment: 1, load: 1, dealer: 1, trip: 1, telemetry: 1, 'engine-load-fuel-economy': 1, coord: 1, rawpayload: 1 };
   function panel(t, right, body, id) {
     var key = id || String(t).replace(/&amp;/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    var col = !!S.coll[key];
-    return '<section class="pc' + (col ? ' is-collapsed' : '') + '" data-key="' + key + '"><div class="pc-h is-toggle" data-toggle="' + key + '"><h4>' + t + '</h4>' + (right || '') + '</div><div class="pc-b">' + body + '</div></section>';
+    var col = S.coll[key] !== undefined ? !!S.coll[key] : (!!SUPPORT[key] && !S.forceOpen[key]);
+    return '<section class="pc' + (col ? ' is-collapsed' : '') + '" data-key="' + key + '"><div class="pc-h is-toggle" data-toggle="' + key + '" role="button" tabindex="0" aria-expanded="' + !col + '"><h4>' + t + '</h4>' + (right || '') + '</div><div class="pc-b">' + body + '</div></section>';
   }
   var CAM_SVG = '<svg viewBox="0 0 200 100" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M20 100 L85 20 M180 100 L115 20 M100 100 L100 62 M100 50 L100 38" /><rect x="68" y="58" width="64" height="26" rx="3" stroke-dasharray="3 3"/><path d="M62 54 v-8 h8 M138 54 v-8 h-8 M62 88 v8 h8 M138 88 v8 h-8"/></svg>';
 
@@ -449,11 +481,11 @@
     if (!d || !(d.dtcs || []).length) return panel('Trouble codes', NX.badgeHTML('None', 'plain'), '<p class="nx-dim">No active fault codes reported with this event.</p>');
     var dr = { yes: ['var(--nx-ok)', 'Drivable', 'Vehicle can continue to destination or shop.'], limp: ['var(--nx-warn)', 'Limp mode', 'Reduced power. Drive only to nearest safe location.'], no: ['var(--nx-danger)', 'Not drivable', 'Do not move. Tow or mobile repair required.'] }[d.drivable] || ['var(--nx-text-faint)', 'Unknown', ''];
     var rows = d.dtcs.map(function (x) {
-      return '<tr><td class="code">' + esc(x.code) + (x.spn != null && String(x.code).indexOf('SPN') < 0 ? '<div class="nx-faint" style="font-size:10.5px;font-weight:400">SPN ' + esc(x.spn) + ' / FMI ' + esc(x.fmi) + '</div>' : '') + '</td><td><div>' + esc(x.desc) + '</div>' +
+      return '<tr><td class="code">' + esc(x.code) + (x.spn != null && String(x.code).indexOf('SPN') < 0 ? '<div class="nx-faint" style="font-size:11.5px;font-weight:400">SPN ' + esc(x.spn) + ' / FMI ' + esc(x.fmi) + '</div>' : '') + '</td><td><div>' + esc(x.desc) + '</div>' +
         (x.recommendedAction ? '<div class="act">&#9656; ' + esc(x.recommendedAction) + '</div>' : '') + (x.partsHint ? '<div class="parts">Parts: ' + esc(x.partsHint) + '</div>' : '') +
         '</td><td>' + esc(x.system || '') + '</td><td>' + NX.badgeHTML(x.severity || 'low') + '</td></tr>';
     }).join('');
-    return panel('Trouble codes', '<span class="nx-mono nx-faint" style="font-size:11px">' + (d.engineHours != null ? fmt.number(d.engineHours) + ' eng h' : '') + '</span>',
+    return panel('Trouble codes', '<span class="nx-mono nx-faint" style="font-size:12px">' + (d.engineHours != null ? fmt.number(d.engineHours) + ' eng h' : '') + '</span>',
       '<div class="drive" style="--c:' + dr[0] + '"><span class="lamp" style="' + (d.faultLampOn ? '' : 'background:var(--nx-text-faint);box-shadow:none') + '" title="Fault lamp"></span><div><b>' + dr[1] + '</b><br><span>' + dr[2] + (d.faultLampOn ? ' Fault lamp on.' : '') + '</span></div></div>' +
       '<table class="dtc"><thead><tr><th>Code</th><th>Decoded</th><th>System</th><th>Sev</th></tr></thead><tbody>' + rows + '</tbody></table>');
   }
@@ -470,7 +502,7 @@
     var dis = closed ? ' disabled' : '';
     return panel('Roadside', NX.badgeHTML(asg ? 'Assigned' : r.needed ? 'Needed' : 'Optional', asg ? 'ok' : r.needed ? 'accent' : 'plain'),
       top + (provs ? '<div class="nx-eyebrow" style="margin:12px 0 6px">Nearby providers</div><div class="provs">' + provs + '</div>' : '') +
-      NXAct.jobLinkHTML(i) + '<div style="margin-top:12px">' + btn(lbl + ' <kbd>d</kbd>', 'nx-btn--primary nx-btn--block', 'dispatch', dis) + '</div>');
+      NXAct.jobLinkHTML(i) + '<div style="margin-top:12px">' + btn(lbl + ' <kbd>d</kbd>', 'nx-btn--primary nx-btn--block', 'dispatch', dis) + NXSim.note('tow') + '</div>');
   }
   function warrantyHTML(i) {
     var w = i.warranty, v = i.vehicle || {};
@@ -479,7 +511,7 @@
     var decRows = Object.keys(dec).filter(function (k) { return ['vin', 'valid', 'checkDigitOk', 'source', 'oem'].indexOf(k) < 0 && typeof dec[k] !== 'boolean' && dec[k] != null && typeof dec[k] !== 'object'; }).slice(0, 7).map(function (k) { return '<dt>' + esc(fmt.label(k)) + '</dt><dd>' + esc(typeof dec[k] === 'object' ? JSON.stringify(dec[k]) : dec[k]) + '</dd>'; }).join('');
     return panel('OEM warranty', NX.badgeHTML(w.claimEligible ? 'Claim eligible' : w.inWarranty ? 'In warranty' : 'Out of warranty', w.claimEligible ? 'ok' : w.inWarranty ? 'info' : 'plain'),
       '<div class="cov"><div class="nx-grow"><div class="nx-eyebrow">Coverage</div><div class="cov-big" style="margin-top:5px;color:' + (w.inWarranty ? 'var(--nx-ok)' : 'var(--nx-text-dim)') + '">' + esc(fmt.label(w.coverage || 'none')) + '</div></div>' +
-      '<div style="text-align:right"><div class="nx-eyebrow">Expires</div><div class="nx-mono" style="margin-top:5px">' + (w.expiresAt ? fmt.date(w.expiresAt) : '--') + '</div>' + (w.milesRemaining != null ? '<div class="nx-faint nx-mono" style="font-size:11px">' + fmt.number(w.milesRemaining) + ' mi left</div>' : '') + '</div></div>' +
+      '<div style="text-align:right"><div class="nx-eyebrow">Expires</div><div class="nx-mono" style="margin-top:5px">' + (w.expiresAt ? fmt.date(w.expiresAt) : '--') + '</div>' + (w.milesRemaining != null ? '<div class="nx-faint nx-mono" style="font-size:12px">' + fmt.number(w.milesRemaining) + ' mi left</div>' : '') + '</div></div>' +
       '<dl class="nx-kv"><dt>OEM</dt><dd>' + esc(w.oem || v.oem || '--') + '</dd><dt>VIN</dt><dd class="vin">' + esc(v.vin || '--') + '</dd>' + decRows +
       (pk ? '<dt>Claim packet</dt><dd>' + NX.badgeHTML(pk.status || 'draft', pk.status === 'ready' || pk.status === 'submitted' ? 'ok' : 'warn') + (pk.estimatedValueUsd != null ? ' <span class="nx-mono">' + fmt.currency(pk.estimatedValueUsd) + '</span>' : '') + '</dd>' : '') + '</dl>' +
       (pk && pk.summary ? '<p class="nx-dim" style="margin-top:10px;font-size:12.5px">' + esc(pk.summary) + '</p>' : '') +
@@ -490,7 +522,7 @@
     return panel('Vehicle &amp; driver', NX.badgeHTML(i.fleetName || 'Fleet', 'plain'),
       '<div class="two"><dl class="nx-kv"><dt>Unit</dt><dd>' + esc(unit(i)) + '</dd><dt>Vehicle</dt><dd>' + esc(vlabel(v)) + '</dd><dt>Plate</dt><dd class="nx-mono">' + esc(v.plate || '--') + '</dd><dt>VIN</dt><dd class="vin" style="font-size:11.5px">' + esc(v.vin || '--') + '</dd><dt>Odometer</dt><dd class="nx-mono">' + (v.odometer_mi != null ? fmt.number(v.odometer_mi) + ' mi' : '--') + '</dd></dl>' +
       '<dl class="nx-kv"><dt>Driver</dt><dd>' + esc(d.name || '--') + '</dd><dt>Score</dt><dd class="nx-mono">' + (d.safetyScore != null ? d.safetyScore : '--') + '</dd><dt>Speed</dt><dd class="nx-mono">' + (l.speed_mph != null ? Math.round(l.speed_mph) + ' mph' : '--') + '</dd><dt>Heading</dt><dd class="nx-mono">' + (l.heading != null ? Math.round(l.heading) + '°' : '--') + '</dd><dt>Road</dt><dd>' + esc(l.road || '--') + '</dd></dl></div>' +
-      '<div class="callbtns">' + (d.phone ? '<a class="nx-btn nx-btn--sm" href="tel:' + esc(d.phone) + '">Call driver &middot; ' + esc(d.phone) + '</a>' : '') + '<a class="nx-btn nx-btn--sm" href="tel:+18005550142">Call fleet manager</a>' + (l.lat != null ? '<a class="nx-btn nx-btn--sm nx-btn--ghost" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=' + l.lat + '&mlon=' + l.lng + '#map=16/' + l.lat + '/' + l.lng + '">Open in OSM</a>' : '') + '</div>');
+      '<div class="callbtns">' + (d.phone ? '<a class="nx-btn nx-btn--sm" href="tel:' + esc(d.phone) + '">Call driver &middot; ' + esc(d.phone) + '</a>' : '') + '<a class="nx-btn nx-btn--sm" href="tel:+18005550142">Call fleet manager</a>' + '' + '</div>');
   }
   function timelineHTML(i) {
     var tl = (i.timeline || []).slice().sort(function (a, b) { return new Date(b.t) - new Date(a.t); });
@@ -501,12 +533,10 @@
       return '<button class="nx-btn nx-btn--sm' + (s === next ? ' is-next' : '') + (done ? ' is-done' : '') + (S.busy['st_' + s] ? ' is-loading' : '') + '" data-act="status" data-st="' + s + '"' + (done || closed ? ' disabled' : '') + '>' + fmt.label(s) + ' <kbd>' + (k + 1) + '</kbd></button>';
     }).join('') + '</div>';
     var draft = S.noteDraft[i.id] || '';
-    return panel('Timeline', '<span class="nx-mono nx-faint" style="font-size:11px">' + tl.length + ' entries</span>',
+    return panel('Status &amp; notes', '<span class="nx-mono nx-faint" style="font-size:12px">' + tl.length + ' events</span>',
       '<div class="nx-eyebrow" style="margin-bottom:8px">Progress status</div>' + st +
       '<div class="note-form" style="margin-top:14px"><input class="nx-input" id="note-in" placeholder="Add dispatcher note..." value="' + esc(draft) + '" autocomplete="off">' + btn('Add', 'nx-btn--sm nx-btn--primary', 'note', '', 'note') + '</div>' +
-      '<div class="tl-wrap"><ul class="nx-timeline">' + tl.map(function (e, k) {
-        return '<li class="nx-timeline__item is-' + esc(e.actor || 'system') + (k === 0 ? ' is-latest' : '') + '"><div class="nx-timeline__time">' + esc(fmt.dateTime(e.t)) + ' &middot; ' + esc(e.actor || 'system') + '</div><div class="nx-timeline__action">' + esc(e.action) + '</div>' + (e.note ? '<div class="nx-timeline__note">' + esc(e.note) + '</div>' : '') + '</li>';
-      }).join('') + '</ul></div>');
+      '<button class="nx-btn nx-btn--sm nx-btn--ghost" style="margin-top:12px" data-dtab="audit">View full audit trail (' + tl.length + ')</button>', 'timeline');
   }
   function riskHTML(i) {
     if (!i.risk) return '';
@@ -517,24 +547,32 @@
     var i = S.inc.get(S.sel), keepScroll = detailEl.scrollTop, note = $('#note-in');
     if (note && S.sel) S.noteDraft[S.sel] = note.value;
     var focusNote = note && document.activeElement === note;
-    if (!S.sel) { detailEl.innerHTML = '<div class="nx-empty d-empty"><div class="nx-empty__icon">&#9678;</div><div class="nx-empty__title">No incident selected</div><p>Pick an incident from the queue or a marker on the map. Use <kbd>j</kbd> / <kbd>k</kbd> to step through.</p></div>'; return; }
+    if (!S.sel) { detailEl.innerHTML = '<div class="nx-empty d-empty"><div class="nx-empty__icon">&#9678;</div><div class="nx-empty__title">' + (S.loaded ? 'No incident selected' : S.error ? 'Waiting for incidents' : 'Loading incidents') + '</div><p>' + (S.loaded ? 'Pick an incident from the queue or a marker on the map. Use <kbd>j</kbd> / <kbd>k</kbd> to step through.' : S.error ? 'The list could not be loaded. Use Retry in the queue.' : 'Details appear here once the queue has loaded.') + '</p></div>'; return; }
     if (!i) { detailEl.innerHTML = S.detailError ? '' : '<div class="sk"><span class="nx-skel nx-skel--lg"></span><span class="nx-skel nx-skel--block"></span><span class="nx-skel nx-skel--block"></span></div>'; if (S.detailError) detailEl.appendChild(NX.empty('Incident not found', S.detailError)); return; }
     var closed = isClosed(i), fp = isFP(i);
     var head = '<header class="d-head" style="--c:' + sevColor(i.severity) + '"><div class="d-id">' + NX.badgeHTML(i.severity) + NX.badgeHTML(i.status) + '<span class="nx-mono">' + esc(i.id) + '</span><span class="nx-mono" style="margin-left:auto">' + esc(fmt.ago(i.receivedAt || i.timestamp)) + '</span></div>' +
       '<div class="d-titlerow"><div class="nx-grow"><h2 class="d-title">' + esc(title(i)) + ' &middot; ' + esc(unit(i)) + '</h2><div class="d-sub">' + esc(addr(i)) + '</div></div>' + NXAct.ring(i) +
       '<div class="d-mini">' + (closed ? '' : btn('Dismiss <kbd>x</kbd>', 'nx-btn--sm nx-btn--ghost', 'dismissopen', '', 'dismiss')) + '<button class="nx-btn nx-btn--sm nx-btn--ghost" data-act="center">Map</button></div></div>' + NXAct.strip(i) + '</header>';
+    var na = NXAct.next(i)[0] || {}; S.forceOpen = {};
+    if (na.key === 'oem') S.forceOpen.oemclaim = 1;
+    if (i.load && i.load.contents && i.load.contents.hazmat) S.forceOpen.load = 1;
     var C = window.NXCtx, cam = camHTML(i), dtc = dtcHTML(i), road = roadsideHTML(i), war = warrantyHTML(i), veh = vehicleHTML(i), tl = timelineHTML(i);
     var sop = NXAct.sop(i, panel), oem = NXAct.oem(i, panel), coord = NXAct.coord(i, panel), load = C.load(i, panel), dealer = C.dealer(i, panel, btn, S), eq = C.equipment(i, panel), trip = C.trip(i, panel), tele = C.telemetry(i, panel);
     var haz = !!(i.load && i.load.contents && i.load.contents.hazmat);
     // triage order: hazmat/severity context first, then verification, what is on the truck, how to respond, then history
-    var sections = fp ? [cam, sop, tl, coord, veh, dtc, road, war] : haz ? [sop, load, cam, road, dealer, dtc, oem, eq, trip, tele, coord, war, veh, tl] : [sop, cam, load, dealer, road, dtc, oem, eq, trip, tele, coord, war, veh, tl];
+    var raw = i.raw ? panel('Source event (raw vendor payload)', '<span class="nx-mono nx-faint" style="font-size:12px">' + esc(fmt.label(i.provider || 'vendor')) + '</span>', '<pre class="raw-pre">' + esc(typeof i.raw === 'string' ? i.raw : JSON.stringify(i.raw, null, 2)) + '</pre>', 'rawpayload') : '';
+    var sections = fp ? [cam, tl, road, dtc, sop, coord, veh, war, raw] : haz ? [road, cam, load, dtc, dealer, oem, tl, sop, eq, trip, tele, coord, war, veh, raw] : [road, cam, dtc, tl, load, dealer, oem, sop, eq, trip, tele, coord, war, veh, raw];
     sections.unshift(C.chips(i)); sections.unshift(C.hazBanner(i)); sections.unshift(NXPro.banner(i));
-    detailEl.innerHTML = head + '<div class="d-body">' + riskHTML(i) + sections.join('') + '</div>';
+    var nAudit = NXAudit.count(i, NXAct.comms(i));
+    var tabs = '<div class="d-tabs" role="tablist"><button role="tab" aria-selected="' + (S.dtab !== 'audit') + '" class="' + (S.dtab !== 'audit' ? 'is-active' : '') + '" data-dtab="overview">Overview</button><button role="tab" aria-selected="' + (S.dtab === 'audit') + '" class="' + (S.dtab === 'audit' ? 'is-active' : '') + '" data-dtab="audit">Audit trail <b>' + nAudit + '</b></button></div>';
+    detailEl.innerHTML = head + tabs + (S.dtab === 'audit' ? '<div class="d-body">' + NXAudit.html(i, NXAct.comms(i)) + '</div>' : '<div class="d-body">' + NXAct.urgent(i) + riskHTML(i) + sections.join('') + '</div>');
+    var hd = detailEl.querySelector('.d-head'); if (hd) detailEl.style.setProperty('--d-head-h', hd.offsetHeight + 'px');
     detailEl.scrollTop = keepScroll;
     if (focusNote) { var n = $('#note-in'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   }
 
   detailEl.addEventListener('click', function (e) {
+    var dt = e.target.closest('[data-dtab]'); if (dt) { S.dtab = dt.dataset.dtab; detailEl.scrollTop = 0; renderDetail(); return; }
     var tg = e.target.closest('[data-toggle]'); if (tg && !e.target.closest('a,button')) { S.coll[tg.dataset.toggle] = S.coll[tg.dataset.toggle] ? 0 : 1; tg.parentNode.classList.toggle('is-collapsed'); return; }
     var dl = e.target.closest('[data-dealer]'); if (dl) { S.dealerPick = dl.dataset.dealer; renderDetail(); drawSelection(); return; }
     var cam = e.target.closest('[data-cam]'); if (cam) { S.camTab = cam.dataset.cam; return renderDetail(); }
@@ -549,7 +587,11 @@
     else if (a === 'note') addNote();
     else if (a === 'towdealer') towToDealer();
   });
-  detailEl.addEventListener('keydown', function (e) { if (e.target.id === 'note-in' && e.key === 'Enter') { e.preventDefault(); addNote(); } });
+  detailEl.addEventListener('keydown', function (e) {
+    if (e.target.id === 'note-in' && e.key === 'Enter') { e.preventDefault(); addNote(); }
+    var t = e.target.closest && e.target.closest('[data-toggle]');
+    if (t && (e.key === 'Enter' || e.key === ' ') && e.target === t) { e.preventDefault(); t.click(); }
+  });
   function setStatus(st) { act('st_' + st, '/status', { status: st, note: 'Status set by dispatcher' }, 'Status: ' + fmt.label(st)); }
   function addNote() {
     var n = $('#note-in'); if (!n || !n.value.trim()) return n && n.focus();
@@ -585,7 +627,8 @@
     else if (k === 'd') doDispatch();
     else if (k === 'x') doDismiss();
     else if (k === '1' || k === '2' || k === '3') { var i = S.inc.get(S.sel); if (i && !isClosed(i)) setStatus(['en_route', 'on_scene', 'resolved'][+k - 1]); }
-    else if (k === 'n') { var n = $('#note-in'); if (n) { e.preventDefault(); n.focus(); } }
+    else if (k === 'n') { if (S.dtab === 'audit') { S.dtab = 'overview'; S.coll.timeline = 0; renderDetail(); } var n = $('#note-in'); if (n) { e.preventDefault(); n.focus(); } }
+    else if (k === 'a') { S.dtab = S.dtab === 'audit' ? 'overview' : 'audit'; renderDetail(); }
     else if (k === '/') { e.preventDefault(); setView('queue'); $('#f-q').focus(); }
     else if (k === 'z') fitAll();
     else if (k === '?') showHelp();
@@ -616,9 +659,6 @@
   renderDetail(); renderHud();
   api('/api/fleets').then(function (d) { S.fleets = listFrom(d, 'fleets'); paintFleetSelect(); }).catch(function () {});
   load();
-  NX.sse('/api/stream', function (data, type) {
-    if (type === 'alert') return NXPro.upsert(data && (data.alert || data));
-    var inc = data && (data.incident || data);
-    if (inc && inc.id) upsert(inc, true);
-  }, { events: ['incident', 'alert'], onStatus: function (ok) { if (ok && S._wasDown) { S._wasDown = false; load(); NXPro.load(); } if (!ok) S._wasDown = true; } });
+  startStream();
+  $('#conn-bar').addEventListener('click', function (e) { if (e.target.closest('[data-conn-retry]')) { startStream(); load(); } });
 })();

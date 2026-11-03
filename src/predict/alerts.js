@@ -35,7 +35,7 @@ function candidates(A, factor = 1) {
       key: `${kind}|${d.driverId}`, kind, severity: sev, subject: { type: 'driver', id: d.driverId, name: d.name }, headline,
       rationale: [...rationale, d.daysSinceLastCoaching != null ? `Last coaching ${d.daysSinceLastCoaching} days ago.` : 'No coaching on record in the available history.', ...(btLine ? [btLine] : [])],
       probability: Math.round(probability * 1000) / 1000, horizonHours, recommendedAction: action,
-      expectedImpact: imp ? `${imp.intervention.label}: this driver's 30-day collision probability ${pct(imp.before)} -> ${pct(imp.after)} (-${Math.round(imp.reductionPct)}%), about ${usd(imp.avoidedLossUsd90d)} expected loss avoided over 90 days (demo assumptions).` : 'Impact not estimated.',
+      expectedImpact: imp ? `${imp.intervention.label}: this driver's 30-day modeled collision-risk indicator (illustrative) ${pct(imp.before)} -> ${pct(imp.after)} (-${Math.round(imp.reductionPct)}%), about ${usd(imp.avoidedLossUsd90d)} expected loss avoided over 90 days (demo assumptions).` : 'Impact not estimated.',
       createdAt: created, lat: d.lat, lng: d.lng, evidence: { collisionProb30d: d.collisionProb30d, riskNow: d.riskNow, escalation: d.escalation },
     });
   };
@@ -47,7 +47,7 @@ function candidates(A, factor = 1) {
     // 1. overall risk spike
     if ((d.collisionProb30d >= pFlag || (d.escalation >= ALERT.ESC_FLAG * factor && d.collisionProb30d >= ALERT.ESC_MIN_P * factor)) && d.eventsLast30d >= 2) {
       mkDriver(d, 'driver_risk_spike', sevFromP(d.collisionProb30d), `${d.name}: collision risk ${pct(d.collisionProb30d)} next 30 days (${rel}x reference)${d.trend === 'up' ? ', rising' : ''}`,
-        [`Model collision probability ${pct(d.collisionProb30d)} (${rel}x the ${pct(MODEL.BASE_P30)} reference driver).`, ...d.signals.slice(0, 3).map(trendTxt), ...(d.escalation >= 1 ? ['Escalation pattern: risky events accelerating compared with the prior 4 weeks (the typical pre-collision signature).'] : [])],
+        [`Modeled collision-risk indicator (illustrative) ${pct(d.collisionProb30d)} (${rel}x the ${pct(MODEL.BASE_P30)} reference driver).`, ...d.signals.slice(0, 3).map(trendTxt), ...(d.escalation >= 1 ? ['Escalation pattern: risky events accelerating compared with the prior 4 weeks (the typical pre-collision signature).'] : [])],
         `Coach ${d.name.split(' ')[0]} now: ${d.recommendedIntervention}.`, 720, null, d.collisionProb30d);
     }
     // 2. fatigue pattern
@@ -57,14 +57,14 @@ function candidates(A, factor = 1) {
       if (drowsy) why.push(`${drowsy} driver-drowsiness event${drowsy > 1 ? 's' : ''} in 30d (driver-facing camera)`);
       if (night) why.push(`${night} risky events during night hours (22:00-05:59)`);
       if (lane) why.push(`${lane} lane departure${lane > 1 ? 's' : ''}`);
-      mkDriver(d, 'fatigue_pattern', drowsy >= 3 ? 'high' : 'medium', `${d.name}: fatigue pattern - ${why[0]}`, [...why, `Combined collision probability ${pct(d.collisionProb30d)} next 30 days.`],
+      mkDriver(d, 'fatigue_pattern', drowsy >= 3 ? 'high' : 'medium', `${d.name}: fatigue pattern - ${why[0]}`, [...why, `Combined modeled collision-risk indicator ${pct(d.collisionProb30d)} next 30 days.`],
         'Review duty-hour logs, adjust dispatch away from late-night legs, and run a fatigue check-in.', 336, 'fatigue_program', Math.min(0.95, Math.max(d.collisionProb30d, MODEL.BASE_P30 * 2)));
     }
     // 3. following distance trend
     const fd = sig.following_distance;
     if (fd && (fd.value >= 3 * factor || (fd.f >= 2 && fd.trendPct >= 50)) && d.collisionProb30d >= MODEL.BASE_P30 * 1.5 * factor) {
       mkDriver(d, 'following_distance_trend', fd.f >= 2.5 ? 'high' : 'medium', `${d.name}: tailgating trend ${fd.trendPct >= 0 ? '+' : ''}${fd.trendPct}% (${fd.value} events in 30d)`,
-        [trendTxt(fd), `Rear-end collisions are the most common outcome of persistent short following distance; combined collision probability ${pct(d.collisionProb30d)}.`],
+        [trendTxt(fd), `Rear-end collisions are the most common outcome of persistent short following distance; combined modeled collision-risk indicator ${pct(d.collisionProb30d)}.`],
         'Enable in-cab following-distance alerts and coach on 6-second spacing.', 504, 'following_distance_alerts', d.collisionProb30d);
     }
   }
@@ -162,7 +162,7 @@ function transition(id, action, { note, actor, detail } = {}) {
   return { alert: a };
 }
 
-const pub = (a) => { const { _key, evidence, ...rest } = a; return { ...rest, evidence }; };
+const pub = (a) => { const { _key, evidence, ...rest } = a; return { ...rest, evidence, illustrative: true, label: 'Illustrative risk indicator (synthetic demo data)', disclaimer: 'Demo-calibrated indicator, not a prediction of a specific event.' }; };
 function list({ fleetId, status, kind, severity, limit = 50 } = {}) {
   const st = status ? String(status).split(',') : null;
   let rows = [...store.values()];

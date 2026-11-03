@@ -7,6 +7,7 @@
 <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <link rel="stylesheet" href="/shared/brand.css">
+<link rel="stylesheet" href="common.css">
 <link rel="stylesheet" href="app.css">
 <script src="/shared/brand.js"></script>
 </head>
@@ -14,20 +15,21 @@
 <div class="nx-app nx-app--nosidebar nx-app--fill">
   <div id="nx-topbar"></div>
   <main class="nx-main nx-main--flush">
+    <div class="conn-bar nx-hide" id="conn-bar" role="status" aria-live="polite"></div>
     <div class="dc" id="dc" data-view="queue">
       <!-- QUEUE -->
       <section class="pane pane-queue" aria-label="Incident queue">
         <div class="q-head">
           <div class="mode-switch" id="mode-switch" role="tablist" aria-label="Queue mode">
-            <button data-mode="live" class="is-active" role="tab">Live incidents <b id="c-live"></b></button>
-            <button data-mode="proactive" role="tab">Proactive <b id="c-pro"></b></button>
+            <button data-mode="live" class="is-active" role="tab">Live incidents <b id="c-live">&mdash;</b></button>
+            <button data-mode="proactive" role="tab">Proactive <b id="c-pro">&mdash;</b></button>
           </div>
           <div class="nx-row">
             <h2 class="q-title-h">Incident queue</h2>
             <span class="nx-faint nx-mono" id="q-shown"></span>
             <button class="nx-btn nx-btn--sm nx-btn--ghost" id="btn-refresh" title="Reload">Refresh</button>
           </div>
-          <div class="q-search"><input class="nx-input" id="f-q" placeholder="Search id, unit, driver, VIN, address   ( / )" autocomplete="off"></div>
+          <div class="q-search"><input class="nx-input" id="f-q" placeholder="Search incident, unit, driver, VIN, address  ( / )" autocomplete="off"></div>
           <div class="nx-chips" id="status-chips"></div>
           <div class="q-filters" id="live-filters">
             <select class="nx-select" id="f-sev" aria-label="Severity"></select>
@@ -70,6 +72,7 @@
   </main>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="common.js"></script>
 <script src="ctx.js"></script>
 <script src="proactive.js"></script>
 <script src="actions.js"></script>

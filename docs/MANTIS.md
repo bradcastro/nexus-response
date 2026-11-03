@@ -1,5 +1,7 @@
 # Mantis integration (ASSUMED payload - replace with the real spec)
 
+> **STATUS: ASSUMED, NOT THE REAL MANTIS SPEC.** The payload below was designed by us; it was not provided by Mantis. Incidents from the adapter carry `integrationNote`, the guided scenario is labeled `payloadAssumed:true`, and `GET /api/capabilities` lists `adapters.mantis` as `working_synthetic` with `assumedPayload:true`. No Mantis media, API or account is connected.
+>
 > **Assumption notice.** We do not have Mantis's real webhook/API specification. Everything below (field names, header names, event vocabulary, signature scheme) is an **assumed shape** designed around what a camera-first telematics platform plausibly emits. The adapter (`src/adapters/mantis.js`) and fixture builder (`src/fixtures/mantis.js`) isolate every assumption so swapping in the real spec is a one-file change. Treat all of this as a proposal to validate with Mantis.
 
 ## Endpoint and auth

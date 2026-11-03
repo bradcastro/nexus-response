@@ -7,6 +7,7 @@
 <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <link rel="stylesheet" href="/shared/brand.css">
+<link rel="stylesheet" href="/dispatch/common.css">
 <link rel="stylesheet" href="fleet.css">
 <script src="/shared/brand.js"></script>
 </head>
@@ -16,15 +17,16 @@
   <aside class="nx-sidebar" id="side">
     <div class="nx-eyebrow nx-sidebar__label">Fleet portal</div>
     <button class="nx-nav is-active" data-view="overview">Overview</button>
-    <button class="nx-nav" data-view="predict">Ahead of risk <span class="nx-nav__count" id="cnt-pred">0</span></button>
-    <button class="nx-nav" data-view="incidents">Incidents <span class="nx-nav__count" id="cnt-inc">0</span></button>
-    <button class="nx-nav" data-view="warranty">Warranty claims <span class="nx-nav__count" id="cnt-war">0</span></button>
-    <button class="nx-nav" data-view="drivers">Drivers <span class="nx-nav__count" id="cnt-drv">0</span></button>
-    <button class="nx-nav" data-view="loads">Loads <span class="nx-nav__count" id="cnt-load">0</span></button>
-    <button class="nx-nav" data-view="vehicles">Vehicles <span class="nx-nav__count" id="cnt-veh">0</span></button>
+    <button class="nx-nav" data-view="predict">Ahead of risk <span class="nx-nav__count" id="cnt-pred">&mdash;</span></button>
+    <button class="nx-nav" data-view="incidents">Incidents <span class="nx-nav__count" id="cnt-inc">&mdash;</span></button>
+    <button class="nx-nav" data-view="warranty">Warranty claims <span class="nx-nav__count" id="cnt-war">&mdash;</span></button>
+    <button class="nx-nav" data-view="drivers">Drivers <span class="nx-nav__count" id="cnt-drv">&mdash;</span></button>
+    <button class="nx-nav" data-view="loads">Loads <span class="nx-nav__count" id="cnt-load">&mdash;</span></button>
+    <button class="nx-nav" data-view="vehicles">Vehicles <span class="nx-nav__count" id="cnt-veh">&mdash;</span></button>
     <div class="fl-side-foot" id="side-source"></div>
   </aside>
   <main class="nx-main" id="main">
+    <div class="conn-bar nx-hide" id="conn-bar" role="status" aria-live="polite"></div>
     <div class="nx-page-head">
       <div><div class="nx-eyebrow" id="region">&nbsp;</div><h1 id="fleet-name">Loading fleet</h1><p id="fleet-sub"></p></div>
       <div class="fl-head-right"><span id="source-badge"></span>
@@ -45,6 +47,7 @@
 <aside class="fl-drawer" id="drawer" aria-hidden="true" aria-label="Incident detail"></aside>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>NX.theme.defaultTo('light'); NX.topbar('Fleet');</script>
+<script src="/dispatch/common.js"></script>
 <script src="fleet.js"></script>
 </body>
 </html>

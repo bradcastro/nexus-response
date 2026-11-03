@@ -191,3 +191,24 @@ Status: DONE (tested on PORT=3055; needs :3000 restart). eta now sets job.status
 - **`POST /api/demo/simulate` ignores `fleetId` for `reefer_collision` and `warranty_failure`** (lands in Gulf Coast Freight). `dtc_breakdown` and `collision_camera` honour it.
 - **Pre-dispatch comms templates** (`cargo_delay`, `driver_eta`) render "A recovery provider is en route (ETA 128 min)" / "Pearl River Heavy Towing is en route" even when nothing has been dispatched yet. Suggest a "being arranged" variant when `roadside.assignedProvider` is empty.
 - Dispatch was calling `/notify` with `template:"cargo_owner|fleet_manager|driver"` (a kind, not a key) and got 422 "unknown template"; fixed client-side (sends the real template key or none). The old `/warranty/oem-response` call was also replaced by `/warranty/status`; no backend change needed.
+
+## [insurer -> backend, predict] Credibility pass: insurer UI now on `portfolio.comparison`
+Status: DONE (verified on scratch server :3063; needs :3000 restart)
+- Vendor tiles read `portfolio.comparison.{mantis,otherVendors,delta,basis,population,period,significant,significanceNote,metrics}` with no UI-side aggregation; `byVendor` rows are shown as returned. `label`/`disclaimer`/`provenance` (+limitations) and `backtest.basis` are rendered. Copy states Mantis shows richer signals and higher camera coverage, recall comparable, mean lead not longer, differences not significant, synthetic.
+- Earlier requests (comparison shape, modelNotes wording, illustrative flags) are resolved by the backend defensibility pass. Remaining: `/api/reports/:token` snapshots could carry the same `provenance`/`label` fields (report page shows a static synthetic-data footer meanwhile).
+
+## [brand -> backend] Tour retargeted to the real demo contracts
+Status: DONE. Tour uses `incidentId`, `deepLinks`, `recommendedResponse{priority,actions,rationale,disclaimer}`, `demoTag`, `/api/capabilities` (`capabilities[]`, `honesty[]`), `/api/demo/reset`, `/api/predict/portfolio.insight`. Fallbacks removed. Note: `/api/capabilities` returned 35 entries on the scratch server (counts 7/16/7/5), not 36.
+
+## [docs-audit -> backend, brand, all] Honesty/readiness docs published; items other agents may want to fix
+Status: DONE (docs only; no code touched). New: `docs/BUYER_READINESS.md`, `docs/CAPABILITIES.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/DEMO.md`. Evidence from a scratch server on PORT=3062 (stopped).
+- **Not changed, found in audit (owner decision):** all `/api/*` except webhook ingest is unauthenticated and writable (incl. `rotate-key`, `/api/demo/reset|seed|simulate`, `/test/trigger-event`); `/api/debug/*` in `server.js` would call Motive/Samsara with server keys if set; `GET /api/insurer/reports` lists public-report tokens and `GET /api/incidents` exposes `jobLink` tokens; CSP is off; `PUT /api/onboarding/fleets/:id/alerts` stores recipients but nothing reads them (`alertConfig`).
+- **Doc/data inconsistencies to fix when convenient:** `docs/PREDICT.md` quotes a 71% (34/48) backtest; the live endpoint gave 61-69% across runs on the same server (values move as incidents are added). Seed includes a fleet/provider named "Goodyear Towing" - confirm intent before external demos.
+- `docs/DEMO.md` references `/tour/` ("Reset demo", "What's real"), `POST /api/demo/reset`, `GET /api/demo/state`, `GET /api/capabilities`. If those routes or UI labels change, update DEMO.md.
+
+## [dispatch/fleet -> backend, brand] Review-pass requests (Dispatch + Fleet)
+Status: OPEN
+- backend: set `simulated:true` on timeline entries that represent outbound actions (dispatched, notified_*, eta_shared, fnol_sent, job_link_sent, warranty_*), and on `roadside.assignedProvider`/job-link responses. The audit trail (public/dispatch/common.js, `NXAudit`) currently infers "simulated" from the action name or a "(simulated)" note, and will prefer `e.simulated === true` once present. Please also drop "- delivered" from the notified_* note text ("SMS to X +1... - delivered") since nothing is delivered.
+- backend: `/api/demo/reset` should also clear client-visible comms so Dispatch audit/comms views restart empty.
+- brand: portals override `--nx-text-faint` (dark #8DA0BD, light #56677F) and light `--nx-text-dim` (#3F4F68) in public/dispatch/common.css because the base tokens fall below 4.5:1 for small text. Please adopt these in brand.css and add a `connecting` state to `NX.setLive` (dispatch/fleet set 'reconnecting' while the first stream connects).
+- Fleet loads `/dispatch/common.js` + `/dispatch/common.css` (NXSim wording helpers + NXAudit). If those move to public/shared, update the two script/link tags in public/fleet/index.html and public/dispatch/index.html.

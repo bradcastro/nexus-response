@@ -50,7 +50,7 @@ Walk-forward daily replay (`analyze.js runBacktest`): each day uses only earlier
 Caveats: thresholds and weights were tuned on the same demo data (in-sample); collisions with no precursor are unpredictable; samples are small (63 collisions in the demo seed over 7 fleets).
 
 ### Demo-seed results (90-day seed, 574 incidents, 287 vehicles)
-Overall 34/48 collisions flagged ahead (71%), median warning ~12 days, ~12 false alert episodes per 100 vehicles over the window. By vendor: mantis 70% (7/10, conf 0.96, lead 11.7d), lytx 73%, samsara 88%, motive 67%, geotab 0% (0/4, conf 0.53, camera 32%). **Honest finding:** with this small seed Mantis recall/lead are comparable to other camera vendors; Mantis' measurable edge is prediction confidence (0.96 vs ~0.78), signal richness, and complete visibility vs geotab. The portfolio `insight` string only claims advantages the numbers support.
+The live numbers are always in `/api/predict/portfolio` and `/api/predict/backtest`; they are deterministic for a given seed and store state (see 6c), so no figures are quoted here. Historical note from an older seed: ~71% recall, median warning ~12 days, ~12 false alert episodes per 100 vehicles over the window. By vendor: mantis 70% (7/10, conf 0.96, lead 11.7d), lytx 73%, samsara 88%, motive 67%, geotab 0% (0/4, conf 0.53, camera 32%). **Honest finding (synthetic data):** with this small seed Mantis recall/lead are comparable to other camera vendors; Mantis' measurable edge is prediction confidence (0.96 vs ~0.78), signal richness, and complete visibility vs geotab. The portfolio `insight` string only claims advantages the numbers support.
 
 ## 5. Limits
 - Hand-set weights; relative frequency vs portfolio norms means a fleet's score depends on the portfolio it is compared against.
@@ -59,6 +59,27 @@ Overall 34/48 collisions flagged ahead (71%), median warning ~12 days, ~12 false
 - The demo seed's collision frequency exceeds the model's plausibility ceiling; fleets with many collisions are under-stated in absolute terms (gamma capped at 1.5).
 - Local-time patterns assume UTC-5 for all fleets.
 - Alerts are in-memory plus `db.put('alert')`; acknowledgement state survives restarts only with Postgres.
+
+## 6b. Honesty and labeling
+Every predictive payload is illustrative output of a hand-weighted model on **synthetic** data. `portfolio`, `backtest`, `fleet/:id`, `model` and `simulate-what-if` include `illustrative:true`, `label`, `disclaimer` and a `provenance` block (`src/predict/provenance.js`): `data:"synthetic"`, `validated:false`, `method`, `assumptions[]`, `limitations[]`. Human-readable backend text uses "modeled collision-risk indicator (illustrative)" rather than collision probability; JSON keys such as `collisionProb30d` are unchanged for UI compatibility. Nothing here is evidence of real-world performance of Mantis or any other vendor.
+
+## 6c. Determinism
+Earlier, backtest recall varied between calls (e.g. 61% vs 69%) because each fleet analysis and the calibration were anchored to `Date.now()` and were recomputed on a 5-minute cache TTL or at different times per fleet, shifting every window. The model clock is now `anchor()` in `data.js`: the newest non-imported event timestamp rounded up to the hour (fleets whose own data is >14 days older keep their historical rule). Same seed + same store state therefore gives identical output regardless of cache expiry; adding a live event moves the anchor. No `Math.random` is used in the model. `scripts/check-consistency.js` calls backtest and portfolio twice and asserts identical JSON (ignoring `generatedAt`/`computeMs`).
+
+## 7. Vendor-comparison metrics: one calculation source
+All vendor/group comparison figures come from `portfolio.js statsFor()` over the per-fleet analyses. `GET /portfolio` (`byVendor`, `comparison`, `insight`) and `GET /backtest` (overall) use it; `fleet/:id` and `backtest?fleetId=` expose the same per-fleet numbers. Aggregation rules:
+
+| metric | aggregation | population |
+|---|---|---|
+| `cameraCoveragePct` | vehicle-weighted mean of fleet coverage | all vehicles in the group |
+| `predictionConfidence` / `avgPredictionConfidence` | vehicle-weighted mean of fleet confidence | all fleets in the group |
+| `avgRisk` | vehicle-weighted mean of predicted fleet risk | all fleets in the group |
+| `recallPct` / `backtestRecallPct` | pooled: collisions flagged ahead / all collisions | all backtest collisions in the group |
+| `avgLeadDays` (= `meanLeadDays`), `medianLeadDays` | pooled over every flagged-ahead collision (never a mean of fleet medians) | flagged-only; misses excluded; capped at 30 d |
+
+`portfolio.comparison` = `{basis,population,aggregation,period,metrics,significant:false,significanceNote,mantis,otherVendors,delta}` where `mantis` and `otherVendors` are `statsFor` results `{n{fleets,vehicles,backtestCollisions,backtestCaught,leadSamples},avgRisk,predictionConfidence,cameraCoveragePct,recallPct,meanLeadDays,medianLeadDays}`. "Other vendors" is ONE pooled group, not an unweighted average of vendor rows. The earlier mismatch (11.2 vs 7.6 days) came from the intro using a caught-weighted mean while a UI section averaged vendor rows without weights; UIs should read `comparison` instead of averaging `byVendor` themselves. `backtest.basis` labels the overall backtest (`population`, `aggregation`, `period`, `n`). Per-fleet `medianLeadDays` on `portfolio.fleets[]` is that fleet's own median (basis: single fleet). The insurer portfolio's `byVendor[].avgRisk` (src/analytics.js) is a different, event-based metric and is labeled as such. Run `node scripts/check-consistency.js` to assert agreement.
+
+On the current synthetic seed the pooled comparison shows Mantis higher on model confidence (0.96 vs 0.78) and camera coverage, comparable on recall (70% vs 68%) and slightly lower on mean lead time (12.4 vs 13.8 days); the generated `insight` text only states advantages the numbers support and always carries the synthetic/small-sample caveat.
 
 ## 6. Files
 `config.js` constants/weights/interventions - `features.js` event tagging + driver state - `model.js` math - `analyze.js` fleet analysis, backtest, hotspots, what-if - `alerts.js` rules/store - `portfolio.js` - `data.js` loaders, cache, hooks, SSE - `fixture.js` synthetic 7-fleet/90-day generator - `selftest.js` (`node src/predict/selftest.js`, invariants incl. probability bounds) - `selftest-seed.js` (seeds in-process; asserts bounds and that directions differ across fleets) - `index.js` (`fleetProjection(fleetId)`, `onBoot`, `alerts`).

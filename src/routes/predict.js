@@ -7,8 +7,10 @@ const { publicFleet } = require('../predict');
 const { whatIf } = require('../predict/analyze');
 const { INTERVENTIONS, ALERT, INDICATORS, MODEL } = require('../predict/config');
 
+const { provenance, DISCLAIMER } = require('../predict/provenance');
 const router = express.Router();
 data.start();
+router.use((req, res, next) => { res.set('X-Nexus-Data', 'synthetic-illustrative'); next(); });
 
 const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => { console.error('[PREDICT]', e); res.status(500).json({ error: 'predict_failed', message: e.message }); });
 const int = (v, d, lo, hi) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
@@ -56,7 +58,9 @@ router.post('/alerts/:id/:action(ack|action|dismiss)', wrap(async (req, res) => 
 router.get('/backtest', wrap(async (req, res) => {
   const as = await analysesFor(req.query.fleetId);
   if (!as) return res.status(404).json({ error: 'Unknown fleet', fleetId: req.query.fleetId });
-  res.json(req.query.fleetId ? as[0]._.backtest : portfolio.aggregateBacktest(as));
+  if (!req.query.fleetId) return res.json(portfolio.aggregateBacktest(as));
+  const b = as[0]._.backtest;
+  res.json({ ...b, basis: { population: 'this fleet only', aggregation: 'single fleet; lead time pooled over its flagged-ahead collisions', period: 'walk-forward backtest window', n: { collisions: b.collisions, caught: b.caught, leadSamples: (b.leadDaysAll || []).length } }, illustrative: true, label: 'Illustrative backtest on synthetic data (in-sample tuned)', disclaimer: DISCLAIMER, provenance: provenance() });
 }));
 
 router.get('/portfolio', wrap(async (req, res) => {
@@ -67,7 +71,7 @@ router.get('/portfolio', wrap(async (req, res) => {
 router.get('/interventions', (req, res) => res.json(INTERVENTIONS.map(({ key, label, target, effects, costPerDriverUsd, assumption }) => ({ key, label, target, effects, costPerDriverUsd, assumption }))));
 
 router.get('/model', (req, res) => res.json({
-  label: 'demo-calibrated', indicators: INDICATORS.map(({ key, label, beta, camera }) => ({ key, label, weight: beta, cameraDerived: !!camera })),
+  label: 'demo-calibrated', illustrative: true, provenance: provenance(), indicators: INDICATORS.map(({ key, label, beta, camera }) => ({ key, label, weight: beta, cameraDerived: !!camera })),
   escalationWeight: MODEL.BETA_ESCALATION, referenceP30: MODEL.BASE_P30, flagThresholdP30: ALERT.P_FLAG, halfLifeDays: MODEL.HALF_LIFE_DAYS,
   note: 'Weights are hand-set and demo-calibrated, not fitted to real loss data. See docs/PREDICT.md.',
 }));
@@ -83,7 +87,7 @@ router.post('/simulate-what-if', wrap(async (req, res) => {
   if (!a) return res.status(404).json({ error: 'Unknown fleet', fleetId: b.fleetId });
   const r = whatIf(a._.wctx, [...new Set(keys)]);
   delete r.single;
-  res.json({ fleetId: b.fleetId, interventions: [...new Set(keys)], projectedRisk90d: r.projected.riskProjected90d, baselineRisk90d: r.baseline.riskProjected90d, expectedAvoidedIncidents90d: r.avoidedIncidents90d, expectedSavingsUsd: r.savingsUsd, generatedAt: new Date().toISOString(), horizonDays: 90, ...r, assumptions: keys.map((k) => ({ key: k, assumption: INTERVENTIONS.find((i) => i.key === k).assumption })), note: 'Effects ramp in over ~30 days; savings use demo loss assumptions (collision ~$62k + cargo share, other incident ~$300, maintenance event ~$950).' });
+  res.json({ fleetId: b.fleetId, interventions: [...new Set(keys)], projectedRisk90d: r.projected.riskProjected90d, baselineRisk90d: r.baseline.riskProjected90d, expectedAvoidedIncidents90d: r.avoidedIncidents90d, expectedSavingsUsd: r.savingsUsd, generatedAt: new Date().toISOString(), horizonDays: 90, ...r, illustrative: true, label: 'Illustrative what-if on synthetic data; effects are literature-style assumptions', disclaimer: DISCLAIMER, provenance: provenance(), assumptions: keys.map((k) => ({ key: k, assumption: INTERVENTIONS.find((i) => i.key === k).assumption })), note: 'Effects ramp in over ~30 days; savings use demo loss assumptions (collision ~$62k + cargo share, other incident ~$300, maintenance event ~$950).' });
 }));
 
 module.exports = router;

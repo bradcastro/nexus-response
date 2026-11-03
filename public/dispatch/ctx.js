@@ -39,13 +39,13 @@
       var p = place(s.placeType);
       body += '<div class="stop-card"><div class="pt-ic" title="' + esc(p[1]) + '">' + esc(p[0]) + '</div><div class="nx-grow"><div class="stop-name">' + esc(s.businessName || s.name || 'Unnamed stop') + '</div><div class="nx-dim" style="font-size:12px">' + esc(p[1]) + (s.address ? ' &middot; ' + esc(s.address) : '') + '</div></div></div>' +
         '<div class="stat-row"><div><b>' + num(s.dwellMin, 0) + '</b><span>Dwell min</span></div><div><b>' + num(s.minutesBeforeIncident, 0) + '</b><span>Min before event</span></div><div><b>' + num(s.milesSinceStop, 1) + '</b><span>Miles since</span></div></div>' +
-        '<div class="nx-faint nx-mono" style="font-size:11px;margin:6px 0 2px">' + (s.arrivedAt ? 'Arrived ' + fmt.time(s.arrivedAt) : '') + (s.departedAt ? ' &middot; departed ' + fmt.time(s.departedAt) : '') + '</div>';
+        '<div class="nx-faint nx-mono" style="font-size:12px;margin:6px 0 2px">' + (s.arrivedAt ? 'Arrived ' + fmt.time(s.arrivedAt) : '') + (s.departedAt ? ' &middot; departed ' + fmt.time(s.departedAt) : '') + '</div>';
     }
     var rs = (t.recentStops || []);
     if (rs.length) body += '<div class="nx-eyebrow" style="margin:12px 0 6px">Recent stops</div><div class="rstops">' + rs.map(function (r) { var q = place(r.placeType); return '<div class="rstop"><span class="pt-ic sm">' + esc(q[0]) + '</span><span class="nx-grow">' + esc(r.name || r.businessName || q[1]) + '</span><span class="nx-mono nx-faint">' + (r.arrivedAt ? fmt.time(r.arrivedAt).slice(0, 5) : '') + ' &middot; ' + num(r.dwellMin, 0) + 'm</span></div>'; }).join('') + '</div>';
     var tl = (t.timeline || []).slice(-8);
     if (tl.length) body += '<div class="nx-eyebrow" style="margin:12px 0 6px">Trip timeline</div><ul class="mtl">' + tl.map(function (e) { return '<li style="--c:' + (KIND_COL[e.kind] || 'var(--nx-text-faint)') + '"><span class="nx-mono nx-faint">' + esc(fmt.time(e.t).slice(0, 5)) + '</span><span>' + esc(e.label) + '</span></li>'; }).join('') + '</ul>';
-    return panel('Trip &amp; last stop', '<span class="nx-mono nx-faint" style="font-size:11px">' + num(t.distanceMi, 0) + ' mi &middot; ' + (t.durationMin != null ? fmt.duration(t.durationMin) : '--') + (t.idleMin ? ' &middot; ' + num(t.idleMin, 0) + 'm idle' : '') + '</span>', body, 'trip');
+    return panel('Trip &amp; last stop', '<span class="nx-mono nx-faint" style="font-size:12px">' + num(t.distanceMi, 0) + ' mi &middot; ' + (t.durationMin != null ? fmt.duration(t.durationMin) : '--') + (t.idleMin ? ' &middot; ' + num(t.idleMin, 0) + 'm idle' : '') + '</span>', body, 'trip');
   }
 
   /* ---------- telemetry: engine load / fuel economy ---------- */
@@ -65,7 +65,7 @@
   }
   function delta(label, b, a, d, unit, goodDown, dec) {
     var bad = d != null && (goodDown ? d < 0 : d > 0);
-    return '<div class="delta"><div class="nx-eyebrow">' + label + '</div><div class="delta-n" style="color:' + (d == null ? '' : (label.indexOf('Fuel') === 0 ? (d < 0 ? 'var(--nx-sev-high)' : 'var(--nx-ok)') : (d > 0 ? 'var(--nx-sev-high)' : 'var(--nx-ok)'))) + '">' + sgn(d, dec) + '<small>' + unit + '</small></div><div class="nx-mono nx-faint" style="font-size:11px">' + num(b, dec) + ' &rarr; ' + num(a, dec) + '</div></div>';
+    return '<div class="delta"><div class="nx-eyebrow">' + label + '</div><div class="delta-n" style="color:' + (d == null ? '' : (label.indexOf('Fuel') === 0 ? (d < 0 ? 'var(--nx-sev-high)' : 'var(--nx-ok)') : (d > 0 ? 'var(--nx-sev-high)' : 'var(--nx-ok)'))) + '">' + sgn(d, dec) + '<small>' + unit + '</small></div><div class="nx-mono nx-faint" style="font-size:12px">' + num(b, dec) + ' &rarr; ' + num(a, dec) + '</div></div>';
   }
   function telemetryHTML(i, panel) {
     var T = i.trip && i.trip.telemetry; if (!T) return '';
@@ -73,10 +73,10 @@
     var dl = T.deltaEngineLoadPct != null ? T.deltaEngineLoadPct : (a.avgEngineLoadPct != null && b.avgEngineLoadPct != null ? a.avgEngineLoadPct - b.avgEngineLoadPct : null);
     var dm = T.deltaFuelMpg != null ? T.deltaFuelMpg : (a.avgFuelMpg != null && b.avgFuelMpg != null ? a.avgFuelMpg - b.avgFuelMpg : null);
     var stop = i.trip.lastStop;
-    return panel('Engine load &amp; fuel economy', '<span class="nx-mono nx-faint" style="font-size:11px">before vs after last stop</span>',
+    return panel('Engine load &amp; fuel economy', '<span class="nx-mono nx-faint" style="font-size:12px">before vs after last stop</span>',
       '<div class="deltas">' + delta('Engine load', b.avgEngineLoadPct, a.avgEngineLoadPct, dl, '%', false, 0) + delta('Fuel economy', b.avgFuelMpg, a.avgFuelMpg, dm, ' mpg', true, 1) + '</div>' +
       spark(series, 'engineLoadPct', 'var(--nx-sev-high)', stop, i.timestamp, 'Engine load', '%') + spark(series, 'fuelMpg', 'var(--nx-info)', stop, i.timestamp, 'Fuel economy', 'mpg') +
-      '<p class="nx-faint" style="font-size:11.5px;margin-top:8px">A step up in load and drop in mpg after the stop indicates a pickup. ' + (b.sampleCount != null ? 'Based on ' + b.sampleCount + ' + ' + (a.sampleCount || 0) + ' samples.' : '') + '</p>', 'telemetry');
+      '<p class="nx-faint" style="font-size:12px;margin-top:8px">A step up in load and drop in mpg after the stop indicates a pickup. ' + (b.sampleCount != null ? 'Based on ' + b.sampleCount + ' + ' + (a.sampleCount || 0) + ' samples.' : '') + '</p>', 'telemetry');
   }
 
   /* ---------- equipment ---------- */
@@ -119,7 +119,7 @@
     var spoil = '';
     if (c.spoilageRiskHours != null) {
       var left = c.spoilageRiskHours - (Date.now() - new Date(i.timestamp)) / 3600000;
-      spoil = '<div class="spoil' + (left < 1 ? ' late' : '') + '"><div class="nx-eyebrow">Spoilage clock</div><div class="spoil-n">' + (left > 0 ? left.toFixed(1) + ' h left' : 'Window exceeded') + '</div><div class="nx-faint nx-mono" style="font-size:11px">' + c.spoilageRiskHours + ' h window from event</div></div>';
+      spoil = '<div class="spoil' + (left < 1 ? ' late' : '') + '"><div class="nx-eyebrow">Spoilage clock</div><div class="spoil-n">' + (left > 0 ? left.toFixed(1) + ' h left' : 'Window exceeded') + '</div><div class="nx-faint nx-mono" style="font-size:12px">' + c.spoilageRiskHours + ' h window from event</div></div>';
     }
     var body = '<div class="load-top"><div class="load-w"><div class="nx-eyebrow">Estimated cargo weight</div><div class="load-n">≈' + num(L.estimatedWeightLb) + '<small> lb</small></div>' +
       (L.weightRangeLb ? '<div class="nx-mono nx-faint" style="font-size:11.5px">range ' + fmt.number(L.weightRangeLb[0]) + '–' + fmt.number(L.weightRangeLb[1]) + ' lb</div>' : '') + '</div>' + spoil + '</div>' + gauge(L, i.equipment) +
@@ -139,7 +139,7 @@
     var card = function (x, big) {
       return '<div class="dealer' + (big ? ' big' : '') + (S.dealerPick === x.id || (!S.dealerPick && big) ? ' is-picked' : '') + '" data-dealer="' + esc(x.id) + '"><div class="nx-grow"><div class="dealer-n">' + esc(x.name) + '</div><div class="nx-dim" style="font-size:12px">' + esc(x.address || '') + '</div>' +
         '<div class="nx-row" style="gap:5px;flex-wrap:wrap;margin-top:6px">' + (x.open24x7 ? '<span class="tag ok">24x7</span>' : x.hours ? '<span class="tag">' + esc(x.hours) + '</span>' : '') + (x.heavyDutyBays ? '<span class="tag ok">Heavy-duty bays</span>' : '<span class="tag warn">No HD bays</span>') + (x.hasPartsInStock === true ? '<span class="tag ok">Parts in stock</span>' : x.hasPartsInStock === false ? '<span class="tag warn">Parts on order</span>' : '') + '</div></div>' +
-        '<div class="eta"><b>' + (x.driveEtaMin != null ? Math.round(x.driveEtaMin) : '--') + '</b><span>MIN DRIVE</span><div class="nx-mono nx-faint" style="font-size:11px;margin-top:4px">' + num(x.distanceMi, 1) + ' mi</div></div></div>';
+        '<div class="eta"><b>' + (x.driveEtaMin != null ? Math.round(x.driveEtaMin) : '--') + '</b><span>MIN DRIVE</span><div class="nx-mono nx-faint" style="font-size:12px;margin-top:4px">' + num(x.distanceMi, 1) + ' mi</div></div></div>';
     };
     var pick = [n].concat(d.alternates || []).find(function (x) { return x.id === S.dealerPick; }) || n;
     var body = card(n, true) +

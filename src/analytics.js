@@ -102,6 +102,7 @@ function topFactors(m, portfolioAvgByKey) {
   });
 }
 
+const DATA_NOTE = 'Seeded synthetic demo data unless fleets were imported by the user';
 async function portfolio() {
   const incs = await all30();
   const metrics = activeFleets(incs).map((f) => fleetMetrics(f, incs));
@@ -124,7 +125,8 @@ async function portfolio() {
       verifiedEventPct: Math.round(metrics.reduce((s, m) => s + m.verifiedEventPct * m.events30d, 0) / Math.max(1, incs.length)),
       falsePositivesFiltered: metrics.reduce((s, m) => s + m.falsePositivesFiltered, 0), estLossUsd: loss, vendors: Object.keys(vendors).length,
     },
-    fleets, byVendor: Object.values(vendors).map((v) => ({ vendor: v.vendor, fleets: v.fleets, vehicles: v.vehicles, avgRisk: round(v.riskSum / v.fleets, 1) })), distribution,
+    fleets, byVendor: Object.values(vendors).map((v) => ({ vendor: v.vendor, fleets: v.fleets, vehicles: v.vehicles, avgRisk: round(v.riskSum / v.fleets, 1), basis: { metric: 'event-based risk score (last 30 days)', aggregation: 'unweighted mean of fleet scores', population: 'active fleets of this vendor', n: { fleets: v.fleets, vehicles: v.vehicles }, note: 'Differs from /api/predict/portfolio byVendor.avgRisk (predicted risk, vehicle-weighted).' } })), distribution,
+    basis: { period: 'last 30 days', population: 'active fleets in the in-memory store', illustrative: true, data: DATA_NOTE },
     portfolioAvgByComponent: avgByKey,
   };
 }

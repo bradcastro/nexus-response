@@ -13,3 +13,7 @@ services:
         value: "1"
       - key: REQUIRE_AUTH
         value: "0"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ENABLE_DEBUG
+        value: "0"

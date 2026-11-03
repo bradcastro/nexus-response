@@ -29,7 +29,7 @@ classifies them, and queues them for ops validation and dispatch.
 | GET | `/api/incidents` | Fetch all incidents (ops dashboard) |
 | POST | `/api/incidents/:id/dispatch` | Dispatch an incident |
 | POST | `/api/incidents/:id/dismiss` | Dismiss an incident |
-| POST | `/test/trigger-event` | Simulate a Motive event (no truck needed) |
+| POST | `/test/trigger-event` | Legacy: simulate a Motive event. Disabled (404) unless `ENABLE_DEBUG=1`; use `POST /api/demo/simulate` or `/tour/` instead |
 
 ---
 
@@ -65,7 +65,7 @@ node server.js
 ## Testing Without a Real Truck
 
 ```bash
-curl -X POST https://your-render-url.onrender.com/test/trigger-event
+# legacy, needs ENABLE_DEBUG=1: curl -X POST https://your-render-url.onrender.com/test/trigger-event
 ```
 
 This fires a simulated harsh brake event from Enterprise, AL.

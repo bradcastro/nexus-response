@@ -12,7 +12,7 @@
   --nx-font-display: "Barlow Condensed", "Arial Narrow", "IBM Plex Sans", system-ui, sans-serif;
   --nx-font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --nx-text-2xs: 10.5px; --nx-text-xs: 12px; --nx-text-sm: 13px; --nx-text-md: 14.5px;
+  --nx-text-2xs: 11px; --nx-text-xs: 12px; --nx-text-sm: 13px; --nx-text-md: 14.5px;
   --nx-text-lg: 17px; --nx-text-xl: 22px; --nx-text-2xl: 30px; --nx-text-3xl: 44px; --nx-text-4xl: 64px;
 
   --nx-sp-1: 4px; --nx-sp-2: 8px; --nx-sp-3: 12px; --nx-sp-4: 16px; --nx-sp-5: 24px;
@@ -39,7 +39,7 @@
   --nx-border-strong: #2C4063;
   --nx-text: #E8EEF7;
   --nx-text-dim: #93A3BC;
-  --nx-text-faint: #5F7190;
+  --nx-text-faint: #8196B3;
   --nx-accent: #FF6A1A;
   --nx-accent-hover: #FF8442;
   --nx-accent-ink: #1A0A00;
@@ -79,7 +79,7 @@
   --nx-border-strong: #BCC8DA;
   --nx-text: #0B1220;
   --nx-text-dim: #4A5B75;
-  --nx-text-faint: #7B8BA3;
+  --nx-text-faint: #5B6B85;
   --nx-accent: #F25C05;
   --nx-accent-hover: #D94F00;
   --nx-accent-ink: #FFFFFF;
@@ -114,7 +114,7 @@
     --nx-bg: #EEF2F7; --nx-bg-grid: rgba(20,40,80,.045);
     --nx-surface: #FFFFFF; --nx-surface-2: #F5F7FB; --nx-surface-3: #E9EEF6;
     --nx-border: #DAE1EC; --nx-border-strong: #BCC8DA;
-    --nx-text: #0B1220; --nx-text-dim: #4A5B75; --nx-text-faint: #7B8BA3;
+    --nx-text: #0B1220; --nx-text-dim: #4A5B75; --nx-text-faint: #5B6B85;
     --nx-accent: #F25C05; --nx-accent-hover: #D94F00; --nx-accent-ink: #FFFFFF; --nx-link: #0B63CE;
     --nx-sev-critical: #D61F36; --nx-sev-high: #D9690A; --nx-sev-medium: #A67C00; --nx-sev-low: #0F7DB8;
     --nx-st-pending: #5B6B84; --nx-st-validating: #7A4FD6; --nx-st-dispatched: #0F7DB8;
@@ -432,3 +432,17 @@ code, kbd, .nx-mono { font-family: var(--nx-font-mono); font-size: .92em; }
   .nx-card, .nx-kpi { box-shadow: none; break-inside: avoid; }
   a { color: #000; }
 }
+
+/* ---------- Capability badges (what is real) ----------
+   Four kinds, always glyph + label (never color alone). Use NX.badge('simulated') etc. */
+.nx-badge--cap { gap: 5px; }
+.nx-badge--cap::before { display: none; }
+.nx-badge--cap .nx-badge__g { font-family: var(--nx-font-ui); font-size: 11px; line-height: 1; letter-spacing: 0; }
+.nx-badge--working_verified { --c: var(--nx-ok); }
+.nx-badge--working_synthetic { --c: var(--nx-info); }
+.nx-badge--simulated { --c: var(--nx-warn); }
+.nx-badge--planned { --c: var(--nx-text-dim); border-style: dashed; background: transparent; }
+.nx-badge--synthetic-data { --c: var(--nx-info); }
+.nx-cap-legend { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.nx-cap-legend li { display: grid; gap: 4px; align-content: start; font-size: var(--nx-text-sm); color: var(--nx-text-dim); line-height: 1.45; }
+@media (max-width: 640px) { .nx-cap-legend { grid-template-columns: 1fr; } }

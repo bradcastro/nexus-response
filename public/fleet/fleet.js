@@ -3,7 +3,7 @@
   'use strict';
   var esc = NX.esc, fmt = NX.fmt;
   var VENDORS = { motive: 'Motive', samsara: 'Samsara', geotab: 'Geotab', lytx: 'Lytx', generic: 'Generic', mantis: 'Mantis' };
-  var S = { fleets: [], fleet: null, summary: null, incidents: [], view: 'overview', incFilter: 'open', vehFilter: 'all', openId: null, map: null, markers: null, sse: null, timer: null };
+  var S = { dtab: 'overview', dcomms: {}, feedN: 10, sseState: 'connecting', fleets: [], fleet: null, summary: null, incidents: [], view: 'overview', incFilter: 'open', vehFilter: 'all', openId: null, map: null, markers: null, sse: null, timer: null };
   var $ = function (id) { return document.getElementById(id); };
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
@@ -20,9 +20,19 @@
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawer(); });
     document.addEventListener('nx:theme', function () { if (S.summary) { renderMarkers(); } });
     window.addEventListener('hashchange', function () { var h = location.hash.slice(1); if (h && $('v-' + h)) show(h, true); });
-    NX.api('/api/fleets').then(function (res) {
+    $('drawer').addEventListener('click', function (e) {
+      var t = e.target.closest('[data-dtab]'); if (t) { S.dtab = t.dataset.dtab; var cur = S.incidents.filter(function (i) { return i.id === S.openId; })[0]; if (cur) { renderDrawer(cur); $('drawer').scrollTop = 0; } return; }
+      if (window.NXAudit && NXAudit.onClick(e)) { var c2 = S.incidents.filter(function (i) { return i.id === S.openId; })[0]; if (c2) renderDrawer(c2); }
+    });
+    $('conn-bar').addEventListener('click', function (e) { if (e.target.closest('[data-conn-retry]')) { if (!S.fleet) return loadFleets(); startStream(); load().catch(function () { paintConn(); }); } });
+    loadFleets();
+  }
+  function loadFleets() {
+    ['overview', 'predict', 'incidents', 'warranty', 'drivers', 'vehicles', 'loads'].forEach(function (v) { if (!$('v-' + v).firstChild) $('v-' + v).appendChild(NX.skeleton(4)); });
+    $('error').classList.add('nx-hide');
+    return NX.api('/api/fleets').then(function (res) {
       S.fleets = Array.isArray(res) ? res : (res && res.fleets) || [];
-      if (!S.fleets.length) throw new Error('No fleets returned by /api/fleets');
+      if (!S.fleets.length) throw new Error('No fleets are configured');
       var qp = new URLSearchParams(location.search).get('fleet');
       var pick = qp || lsGet('nx-fleet');
       var f = S.fleets.filter(function (x) { return x.id === pick || x.name === pick; })[0] || S.fleets[0];
@@ -31,11 +41,30 @@
       sel.addEventListener('change', function () { selectFleet(sel.value); });
       var h = location.hash.slice(1); if (h && $('v-' + h)) show(h, true);
       selectFleet(f.id);
-    }).catch(fatal);
+    }).catch(function (e) { $('fleet-name').textContent = 'Fleet data unavailable'; fatal(e, loadFleets); });
   }
-  function fatal(err) {
+  function fatal(err, retry) {
     var e = $('error'); e.classList.remove('nx-hide');
-    e.innerHTML = '<div class="nx-card nx-card--alert"><div class="nx-card__body"><b>Cannot load fleet data.</b> <span class="nx-dim">' + esc(err.message) + '</span><div style="margin-top:10px"><button class="nx-btn nx-btn--sm" onclick="location.reload()">Retry</button></div></div></div>';
+    ['overview', 'predict', 'incidents', 'warranty', 'drivers', 'vehicles', 'loads'].forEach(function (v) { $('v-' + v).innerHTML = ''; });
+    e.innerHTML = '<div class="nx-card nx-card--alert"><div class="nx-card__body"><b>Fleet data could not be loaded.</b> <span class="nx-dim">Nothing below is confirmed empty. Check your connection and try again.</span><div style="margin-top:10px"><button class="nx-btn nx-btn--sm nx-btn--primary" id="err-retry">Retry</button></div></div></div>';
+    $('err-retry').onclick = function () { retry ? retry() : location.reload(); };
+    paintConn();
+  }
+  function paintConn() {
+    var b = $('conn-bar'); if (!b) return;
+    var html = '', cls = '';
+    if (S.sseState === 'down') { cls = 'is-warn'; html = '<i class="conn-spin" aria-hidden="true"></i><span><b>Live updates disconnected.</b> Reconnecting automatically.' + (S.summary ? ' Figures shown may be out of date.' : '') + '</span><button class="nx-btn nx-btn--sm" data-conn-retry>Retry now</button>'; }
+    b.className = 'conn-bar' + (html ? ' ' + cls : ' nx-hide'); b.innerHTML = html;
+  }
+  function startStream() {
+    if (S.sse) S.sse.close();
+    clearTimeout(S._sseT); S.sseState = 'connecting'; NX.setLive('reconnecting'); paintConn();
+    S._sseT = setTimeout(function () { if (S.sseState === 'connecting') { S.sseState = 'down'; paintConn(); } }, 7000);
+    S.sse = NX.sse('/api/stream', onStream, { events: ['incident', 'alert'], onStatus: function (ok) {
+      clearTimeout(S._sseT);
+      var was = S.sseState === 'down'; S.sseState = ok ? 'live' : 'down'; paintConn();
+      if (ok && was && S.fleet) load().catch(function () { /* keep stale */ });
+    } });
   }
 
   function selectFleet(id) {
@@ -48,12 +77,12 @@
     $('region').textContent = S.fleet.region || 'Fleet';
     $('fleet-sub').textContent = fmt.number(S.fleet.vehicles) + ' vehicles · ' + fmt.number(S.fleet.drivers) + ' drivers';
     renderSource();
-    S.summary = null; S.incidents = []; S.comms = {}; S.feed = null;
+    S.summary = null; S.incidents = []; S.comms = {}; S.feed = null; S.feedComms = null; S.feedN = 10; S.dtab = 'overview'; S.dcomms = {}; S.pred = null;
+    ['cnt-pred', 'cnt-inc', 'cnt-war', 'cnt-drv', 'cnt-load', 'cnt-veh'].forEach(function (k) { $(k).textContent = '\u2014'; });
     ['overview', 'predict', 'incidents', 'warranty', 'drivers', 'vehicles', 'loads'].forEach(function (v) { $('v-' + v).innerHTML = ''; $('v-' + v).appendChild(NX.skeleton(4)); });
     $('error').classList.add('nx-hide');
-    load().catch(fatal);
-    if (S.sse) S.sse.close();
-    S.sse = NX.sse('/api/stream', onStream, { events: ['incident', 'alert'] });
+    load().catch(function (e) { fatal(e, function () { selectFleet(S.fleet.id); }); });
+    startStream();
   }
 
   function load() {
@@ -107,7 +136,7 @@
     $('source-badge').firstChild.insertAdjacentHTML('beforeend', '<span class="nx-dim">' + esc(cov) + '</span>');
     var ob = S.fleet.onboarding, bn = $('onboard');
     if (ob && ob.status === 'setup') { bn.hidden = false; bn.innerHTML = '<b>' + (ob.status === 'setup' ? 'Onboarding in progress.' : 'Demo data.') + '</b> ' + (ob.status === 'setup' ? 'This fleet is still being connected, so figures reflect partial data until the first events and history arrive.' : 'This fleet shows seeded demonstration data, not live vendor events.') + (S.fleet.id ? ' <a href="/onboarding/?fleet=' + encodeURIComponent(S.fleet.id) + '">Open setup checklist</a>' : ''); } else { bn.hidden = true; }
-    $('side-source').innerHTML = '<div class="nx-eyebrow" style="margin-bottom:6px">Data source</div><div class="fl-src" style="flex-wrap:wrap"><i></i><b>' + esc(v) + '</b><span class="tag">normalized by Nexus</span></div>';
+    $('side-source').innerHTML = '';
   }
   function renderCounts() {
     $('cnt-inc').textContent = S.incidents.filter(isOpen).length;
@@ -140,7 +169,7 @@
       '<div class="fl-legend"><span><i style="--c:var(--nx-ok)"></i>Rolling / healthy</span><span><i style="--c:var(--nx-text-faint)"></i>Idle / stopped</span><span><i style="--c:var(--nx-sev-medium)"></i>Open trouble codes</span><span><i style="--c:var(--nx-danger)"></i>Down / incident</span><span class="nx-faint">Badge number = open trouble codes</span></div></div>' +
       '<div class="nx-card" style="margin-bottom:16px"><div class="nx-card__head"><h3 class="nx-card__title">Cargo exposure by content</h3><span class="nx-dim nx-mono">estimated</span></div><div class="nx-card__body" id="cargo"></div></div>' +
       '<div class="fl-grid fl-grid--even"><div class="nx-card"><div class="nx-card__head"><h3 class="nx-card__title">Recent incidents</h3><button class="nx-btn nx-btn--sm nx-btn--ghost" data-go="incidents">View all</button></div><div class="nx-card__body nx-card--flush" id="recent"></div></div>' +
-      '<div class="nx-card"><div class="nx-card__head"><h3 class="nx-card__title">What Nexus did for you</h3><span class="fl-tag">simulated in demo</span></div><div class="nx-card__body nx-card--flush" id="feed"></div></div></div>' +
+      '<div class="nx-card"><div class="nx-card__head"><h3 class="nx-card__title">What Nexus did for you</h3>' + NXSim.pill() + '</div><div class="nx-card__body nx-card--flush" id="feed"></div></div></div>' +
       '<div class="nx-card" style="margin-bottom:16px"><div class="nx-card__head"><h3 class="nx-card__title">Data sources</h3></div><div class="nx-card__body" id="sources"></div></div>';
   }
   function renderKpis() {
@@ -274,7 +303,7 @@
     }
     var fh = $('inc-filters'); if (!fh) return;
     var tabs = [['open', 'Open', open.length], ['resolved', 'Resolved / dismissed', done.length], ['all', 'All', S.incidents.length]];
-    fh.innerHTML = '<div class="fl-filters"><div class="fl-pills nx-chips">' + tabs.map(function (t) { return '<button class="nx-chip' + (S.incFilter === t[0] ? ' is-active' : '') + '" data-f="' + t[0] + '">' + t[1] + ' ' + t[2] + '</button>'; }).join('') + '</div><span class="nx-dim" style="font-size:12px">Live updates on · ' + esc(S.fleet.name) + ' only</span></div>';
+    fh.innerHTML = '<div class="fl-filters"><div class="fl-pills nx-chips">' + tabs.map(function (t) { return '<button class="nx-chip' + (S.incFilter === t[0] ? ' is-active' : '') + '" data-f="' + t[0] + '">' + t[1] + ' ' + t[2] + '</button>'; }).join('') + '</div></div>';
     fh.querySelectorAll('[data-f]').forEach(function (b) { b.onclick = function () { S.incFilter = b.dataset.f; renderIncidentsTables(); }; });
     var rows = S.incFilter === 'open' ? open : S.incFilter === 'resolved' ? done : S.incidents;
     var host = $('inc-table');
@@ -286,10 +315,11 @@
 
   /* ---------------- drawer ---------------- */
   function openIncident(id) {
-    S.openId = id;
+    S.openId = id; S.dtab = 'overview';
     var local = S.incidents.filter(function (i) { return i.id === id; })[0];
     $('scrim').hidden = false; $('drawer').classList.add('is-open'); $('drawer').setAttribute('aria-hidden', 'false');
     if (local) renderDrawer(local); else $('drawer').innerHTML = '<div class="fl-d-body"></div>';
+    NX.api('/api/incidents/' + encodeURIComponent(id) + '/comms').then(function (r) { S.dcomms[id] = Array.isArray(r) ? r : (r && r.comms) || []; var cur = S.incidents.filter(function (i) { return i.id === id; })[0]; if (S.openId === id && cur) renderDrawer(cur); }).catch(function () { S.dcomms[id] = []; });
     NX.api('/api/incidents/' + encodeURIComponent(id)).then(function (full) {
       if (S.openId !== id) return;
       var k = S.incidents.findIndex(function (i) { return i.id === id; }); if (k >= 0) S.incidents[k] = full;
@@ -319,10 +349,11 @@
   function renderDrawer(inc) {
     var v = inc.vehicle || {}, d = inc.driver || {}, l = inc.location || {}, c = inc.camera, dx = inc.diagnostics, rs = inc.roadside, w = inc.warranty;
     var steps = stage(inc), firstOpen = steps.findIndex(function (s) { return !s.done; });
-    var h = '<div class="fl-d-head"><div class="nx-grow"><div class="nx-row" style="gap:6px;flex-wrap:wrap">' + NX.badgeHTML(inc.severity) + NX.badgeHTML(inc.status) + '<span class="nx-mono nx-faint" style="font-size:11px">' + esc(inc.id) + '</span></div><h2>' + esc(typeLabel(inc.eventType)) + '</h2><div class="nx-dim" style="font-size:13px">' + esc(vehLabel(inc)) + ' · ' + esc(vehSub(inc)) + ' · ' + esc(d.name || 'Driver unknown') + '</div><div class="nx-faint nx-mono" style="font-size:11px;margin-top:4px">' + esc(fmt.dateTime(inc.timestamp)) + ' · ' + esc(vendorName(inc.provider)) + ' · ' + esc(l.address || l.road || '') + '</div></div><button class="nx-icon-btn" aria-label="Close" id="d-close">✕</button></div><div class="fl-d-body">';
+    var head = '<div class="fl-d-head"><div class="nx-grow"><div class="nx-row" style="gap:6px;flex-wrap:wrap">' + NX.badgeHTML(inc.severity) + NX.badgeHTML(inc.status) + '<span class="nx-mono nx-faint" style="font-size:12px">' + esc(inc.id) + '</span></div><h2>' + esc(typeLabel(inc.eventType)) + '</h2><div class="nx-dim" style="font-size:13px">' + esc(vehLabel(inc)) + ' · ' + esc(vehSub(inc)) + ' · ' + esc(d.name || 'Driver unknown') + '</div><div class="nx-faint nx-mono" style="font-size:12px;margin-top:4px">' + esc(fmt.dateTime(inc.timestamp)) + ' · ' + esc(vendorName(inc.provider)) + ' · ' + esc(l.address || l.road || '') + '</div></div><button class="nx-icon-btn" aria-label="Close" id="d-close">✕</button></div>';
+    var h = '<div class="fl-d-body">';
 
     h += sec('What Nexus did', '', '<div class="fl-steps">' + steps.map(function (s, i) { return '<div class="fl-step' + (s.done ? ' done' : '') + (i === firstOpen ? ' now' : '') + '">' + s.k + '<small>' + (s.t ? fmt.time(s.t) : (s.done ? '' : (i === firstOpen ? 'in progress' : 'pending'))) + '</small></div>'; }).join('') + '</div>' +
-      ((inc.timeline && inc.timeline.length) ? '<ul class="nx-timeline" style="margin-top:16px">' + inc.timeline.slice().sort(function (a, b) { return new Date(a.t) - new Date(b.t); }).map(function (e, i, arr) { return '<li class="nx-timeline__item is-' + esc(e.actor || 'system') + (i === arr.length - 1 ? ' is-latest' : '') + '"><div class="nx-timeline__time">' + esc(fmt.dateTime(e.t)) + ' · ' + esc(e.actor || 'system') + '</div><div class="nx-timeline__action">' + esc(fmt.label(e.action)) + '</div>' + (e.note ? '<div class="nx-timeline__note">' + esc(e.note) + '</div>' : '') + '</li>'; }).join('') + '</ul>' : ''));
+      '<button class="nx-btn nx-btn--sm nx-btn--ghost" style="margin-top:14px" data-dtab="audit">View full audit trail</button>');
 
     h += contextSection(inc);
 
@@ -330,7 +361,7 @@
       var conf = c.confidence == null ? null : Math.round(c.confidence * 100);
       var media = (c.snapshots || []).map(function (s) { return mediaTile('img', s.url, 'Snapshot' + (s.type ? ' · ' + s.type : '')); }).concat((c.clips || []).map(function (s) { return mediaTile('video', s.url, (s.type === 'driver' ? 'Driver-facing' : 'Road-facing') + ' clip' + (s.durationSec ? ' · ' + s.durationSec + 's' : '')); }));
       h += sec('Camera evidence', c.verified ? NX.badgeHTML('Camera verified', 'ok') : NX.badgeHTML('Not verified', 'plain'),
-        '<div class="nx-row" style="justify-content:space-between;gap:12px"><div><div class="nx-faint" style="font:500 10px var(--nx-font-mono);letter-spacing:.1em;text-transform:uppercase">AI verdict</div><div style="font-weight:600">' + esc(/no.?video/i.test(c.aiVerdict || '') ? 'No camera footage for this event' : fmt.label(c.aiVerdict || 'pending')) + '</div></div>' + (!conf ? '' : '<div style="min-width:140px"><div class="nx-faint nx-mono" style="font-size:11px;text-align:right">' + (conf == null ? '' : conf + '% confidence') + '</div><div class="nx-meter" style="margin-top:6px"><i style="width:' + (conf || 0) + '%;--c:' + (c.verified ? 'var(--nx-ok)' : 'var(--nx-text-faint)') + '"></i></div></div>') + '</div>' +
+        '<div class="nx-row" style="justify-content:space-between;gap:12px"><div><div class="nx-faint" style="font:500 11px var(--nx-font-mono);letter-spacing:.1em;text-transform:uppercase">AI verdict</div><div style="font-weight:600">' + esc(/no.?video/i.test(c.aiVerdict || '') ? 'No camera footage for this event' : fmt.label(c.aiVerdict || 'pending')) + '</div></div>' + (!conf ? '' : '<div style="min-width:140px"><div class="nx-faint nx-mono" style="font-size:12px;text-align:right">' + (conf == null ? '' : conf + '% confidence') + '</div><div class="nx-meter" style="margin-top:6px"><i style="width:' + (conf || 0) + '%;--c:' + (c.verified ? 'var(--nx-ok)' : 'var(--nx-text-faint)') + '"></i></div></div>') + '</div>' +
         ((c.signals && c.signals.length) ? '<ul class="fl-signals">' + c.signals.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') +
         (media.length ? '<div class="fl-media">' + media.join('') + '</div>' : '') + '<p class="fl-note">Source: ' + esc(vendorName(c.provider || inc.provider)) + ' camera, verified by Nexus before any dispatch or claim.</p>');
     }
@@ -357,13 +388,17 @@
         '<div class="fl-kvs"><div><span>OEM</span><b>' + esc(w.oem || v.oem || '—') + '</b></div><div><span>Coverage</span><b>' + (w.inWarranty ? esc(fmt.label(w.coverage)) : 'Out of warranty') + '</b></div><div><span>Expires</span><b>' + (w.expiresAt ? esc(fmt.date(w.expiresAt)) : '—') + '</b></div><div><span>Miles remaining</span><b>' + (w.milesRemaining != null ? fmt.number(w.milesRemaining) : '—') + '</b></div>' +
         (cp ? '<div><span>Claim status</span><b>' + esc(claimLabel(cp.status)) + '</b></div>' + (cConfirm(inc) ? '<div><span>Confirmation</span><b class="nx-mono" style="font-size:12px">' + esc(cConfirm(inc)) + '</b></div>' : '') + '<div><span>Estimated value</span><b>' + fmt.currency(cp.estimatedValueUsd) + '</b></div>' : '') + '</div>' +
         (cp && cp.summary ? '<p class="nx-dim" style="font-size:13px;margin:10px 0 0">' + esc(cp.summary) + '</p>' : '') +
-        (w.claimEligible ? '<div style="margin-top:12px">' + claimStepper(inc) + '</div>' : '') + (w.claimEligible ? '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">' + (cStatus(inc) === 'ready' ? '<button class="nx-btn nx-btn--primary nx-btn--sm" id="d-submit">Submit claim</button>' : '') + '<a class="nx-btn nx-btn--sm" target="_blank" rel="noopener" href="/api/incidents/' + encodeURIComponent(inc.id) + '/warranty-packet?format=html">Open claim packet</a></div>' + (cStatus(inc) === 'ready' ? '<div class="fl-note">Submission is simulated in the demo.</div>' : '') : ''));
+        (w.claimEligible ? '<div style="margin-top:12px">' + claimStepper(inc) + '</div>' : '') + (w.claimEligible ? '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">' + (cStatus(inc) === 'ready' ? '<button class="nx-btn nx-btn--primary nx-btn--sm" id="d-submit">Submit claim</button>' : '') + '<a class="nx-btn nx-btn--sm" target="_blank" rel="noopener" href="/api/incidents/' + encodeURIComponent(inc.id) + '/warranty-packet?format=html">Open claim packet</a></div>' + NXSim.note('claim') : ''));
     }
 
     h += sec('Vehicle and driver', '', '<div class="fl-kvs"><div><span>Vehicle</span><b>' + esc(vehSub(inc) || '—') + '</b></div><div><span>Plate / VIN</span><b class="nx-mono" style="font-size:12px">' + esc(v.plate || '') + ' ' + esc(v.vin || '') + '</b></div><div><span>Odometer</span><b>' + (v.odometer_mi != null ? fmt.number(v.odometer_mi) + ' mi' : '—') + '</b></div><div><span>Speed at event</span><b>' + (l.speed_mph != null ? Math.round(l.speed_mph) + ' mph' : '—') + '</b></div><div><span>Driver</span><b>' + esc(d.name || '—') + '</b></div><div><span>Driver safety score</span><b>' + (d.safetyScore != null ? fmt.number(d.safetyScore) : '—') + '</b></div></div>');
     h += '</div>';
+    var dcm = S.dcomms[inc.id] || [], nAud = NXAudit.count(inc, dcm);
+    var tabs = '<div class="fl-d-tabs" role="tablist"><button role="tab" aria-selected="' + (S.dtab !== 'audit') + '" class="' + (S.dtab !== 'audit' ? 'is-active' : '') + '" data-dtab="overview">Overview</button><button role="tab" aria-selected="' + (S.dtab === 'audit') + '" class="' + (S.dtab === 'audit' ? 'is-active' : '') + '" data-dtab="audit">Audit trail <b>' + nAud + '</b></button></div>';
+    h = head + tabs + (S.dtab === 'audit' ? '<div class="fl-d-body">' + NXAudit.html(inc, dcm) + '</div>' : h);
     var dr = $('drawer'), top = dr.scrollTop;
     dr.innerHTML = h; dr.scrollTop = top;
+    var fh = dr.querySelector('.fl-d-head'); if (fh) dr.style.setProperty('--fl-head-h', fh.offsetHeight + 'px');
     $('d-close').onclick = closeDrawer;
     var ds = $('d-submit'); if (ds) ds.onclick = function () { submitClaim(inc.id, ds); };
     dr.querySelectorAll('.tile video, .tile img').forEach(function (m) { m.addEventListener('error', function () { m.remove(); }); });
@@ -429,14 +464,14 @@
     if (ld) {
       var c = ld.contents || {}, pct = ld.payloadPctOfMax, sl = spoilLeft(inc), open = isOpen(inc);
       h += '<div class="fl-ctx"><div class="fl-ctx__t">Estimated load <span class="nx-faint">· estimate, not scale weight</span></div>' +
-        '<div class="nx-row" style="justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><div><span class="fl-big">' + lb(ld.estimatedWeightLb) + '</span>' + (ld.weightRangeLb ? ' <span class="nx-dim nx-mono" style="font-size:11px">range ' + fmt.number(ld.weightRangeLb[0]) + '–' + fmt.number(ld.weightRangeLb[1]) + '</span>' : '') + '</div><div>' + (ld.overweightRisk ? NX.badgeHTML('Overweight risk', 'danger') : NX.badgeHTML('Within limits', 'ok')) + '</div></div>' +
-        (pct != null ? '<div class="nx-meter" style="margin:8px 0 4px"><i style="width:' + Math.min(100, pct) + '%;--c:' + (pct > 100 ? 'var(--nx-danger)' : pct > 90 ? 'var(--nx-sev-medium)' : 'var(--nx-ok)') + '"></i></div><div class="nx-dim nx-mono" style="font-size:11px">' + Math.round(pct) + '% of max payload' + (ld.grossVehicleWeightLb ? ' · GVW ' + lb(ld.grossVehicleWeightLb) : '') + '</div>' : '') +
+        '<div class="nx-row" style="justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><div><span class="fl-big">' + lb(ld.estimatedWeightLb) + '</span>' + (ld.weightRangeLb ? ' <span class="nx-dim nx-mono" style="font-size:12px">range ' + fmt.number(ld.weightRangeLb[0]) + '–' + fmt.number(ld.weightRangeLb[1]) + '</span>' : '') + '</div><div>' + (ld.overweightRisk ? NX.badgeHTML('Overweight risk', 'danger') : NX.badgeHTML('Within limits', 'ok')) + '</div></div>' +
+        (pct != null ? '<div class="nx-meter" style="margin:8px 0 4px"><i style="width:' + Math.min(100, pct) + '%;--c:' + (pct > 100 ? 'var(--nx-danger)' : pct > 90 ? 'var(--nx-sev-medium)' : 'var(--nx-ok)') + '"></i></div><div class="nx-dim nx-mono" style="font-size:12px">' + Math.round(pct) + '% of max payload' + (ld.grossVehicleWeightLb ? ' · GVW ' + lb(ld.grossVehicleWeightLb) : '') + '</div>' : '') +
         '<div style="margin-top:10px"><b>' + esc(c.label || catLabel(c.category)) + '</b> ' + (c.hazmat ? NX.badgeHTML('Hazmat', 'danger') : '') + (c.temperatureSensitive ? NX.badgeHTML('Temperature sensitive', 'info') : '') + (shiftRisk(inc) ? NX.badgeHTML('Shifting-load risk', 'warn') : '') + '</div>' +
         (c.examples && c.examples.length ? '<div class="nx-dim" style="font-size:12px">e.g. ' + esc(c.examples.join(', ')) + '</div>' : '') +
         (c.estimatedValueUsd ? '<div style="font-size:13px;margin-top:4px">Cargo value ' + usdRange(c.estimatedValueUsd) + '</div>' : '') +
         (sl != null && c.spoilageRiskHours != null ? '<div class="fl-clock ' + (sl < 0 ? 'bad' : sl < 2 ? 'warn' : '') + '">' + (open ? (sl <= 0 ? 'Spoilage window passed' : 'Spoilage clock: about ' + (sl < 1 ? Math.round(sl * 60) + ' min' : sl.toFixed(1) + ' h') + ' left') : 'Spoilage window was ' + c.spoilageRiskHours + ' h') + '</div>' : '') +
         (ld.cameraVisual && ld.cameraVisual.description ? '<div class="fl-note" style="margin-top:8px">Camera sees: ' + esc(ld.cameraVisual.description) + (ld.cameraVisual.confidence != null ? ' (' + Math.round(ld.cameraVisual.confidence * 100) + '%)' : '') + '</div>' : '') +
-        ((ld.basis && ld.basis.length) ? '<details class="fl-how"' + '><summary>How we know' + (ld.confidence != null ? ' · ' + Math.round(ld.confidence * 100) + '% confidence' : '') + '</summary><ul>' + ld.basis.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' + (ld.method ? '<div class="nx-faint nx-mono" style="font-size:10.5px">Method: ' + esc(fmt.label(ld.method)) + '</div>' : '') + '</details>' : '') + '</div>';
+        ((ld.basis && ld.basis.length) ? '<details class="fl-how"' + '><summary>How we know' + (ld.confidence != null ? ' · ' + Math.round(ld.confidence * 100) + '% confidence' : '') + '</summary><ul>' + ld.basis.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' + '' + '</details>' : '') + '</div>';
     }
     if (rs && rs.towDestination) { var td = rs.towDestination; h += '<div class="fl-ctx"><div class="fl-ctx__t">Tow destination</div><b>' + esc(td.name) + '</b> <span class="nx-dim">' + esc(fmt.label(td.kind)) + '</span><div class="nx-dim" style="font-size:12px">' + esc(td.address || '') + (td.distanceMi != null ? ' · ' + fmt.number(td.distanceMi, 1) + ' mi' : '') + '</div></div>'; }
     if (wd && wd.nearest) {
@@ -573,7 +608,7 @@
     var ind = (S.pred.fleet.leadingIndicators || []).slice().sort(function (a, b) { return num(b.contributionToRisk, 0) - num(a.contributionToRisk, 0); });
     var host = $('pr-ind'); if (!ind.length) { host.innerHTML = ''; host.appendChild(NX.empty('No indicators')); return; }
     var mx = Math.max.apply(null, ind.map(function (i) { return num(i.contributionToRisk, 0); })) || 1;
-    host.innerHTML = ind.map(function (i) { var c = num(i.contributionToRisk, 0); return '<div class="fl-ind"><div class="fl-ind__top"><span>' + esc(i.label || fmt.label(i.key)) + '</span><span class="nx-mono">' + (i.value != null ? esc(fmt.number(i.value, 1)) + ' ' + esc(i.unit || '') : '') + ' ' + trendArrow(i.direction, i.trendPct) + '</span></div><div class="nx-meter" title="Contribution to risk"><i style="width:' + (c / mx * 100) + '%"></i></div><div class="nx-faint nx-mono" style="font-size:10.5px">' + (c <= 1 ? Math.round(c * 100) : Math.round(c)) + (c <= 1 ? '%' : ' pts') + ' of risk</div></div>'; }).join('') + '<p class="fl-note">Contribution is each indicator\'s weighted share of the current risk score. Demo-calibrated model.</p>';
+    host.innerHTML = ind.map(function (i) { var c = num(i.contributionToRisk, 0); return '<div class="fl-ind"><div class="fl-ind__top"><span>' + esc(i.label || fmt.label(i.key)) + '</span><span class="nx-mono">' + (i.value != null ? esc(fmt.number(i.value, 1)) + ' ' + esc(i.unit || '') : '') + ' ' + trendArrow(i.direction, i.trendPct) + '</span></div><div class="nx-meter" title="Contribution to risk"><i style="width:' + (c / mx * 100) + '%"></i></div><div class="nx-faint nx-mono" style="font-size:11.5px">' + (c <= 1 ? Math.round(c * 100) : Math.round(c)) + (c <= 1 ? '%' : ' pts') + ' of risk</div></div>'; }).join('') + '<p class="fl-note">Contribution is each indicator\'s weighted share of the current risk score. Demo-calibrated model.</p>';
   }
   function whatIfLocal(keys) {
     var iv = S.pred.fleet.interventions || [], sel = iv.filter(function (i) { return keys.indexOf(i.key) > -1; });
@@ -606,7 +641,7 @@
     if (!al.length) { host.innerHTML = ''; host.appendChild(NX.empty('No alerts', 'Nexus will flag emerging risk before it becomes an incident.')); return; }
     host.innerHTML = al.map(function (a) {
       var act = a.status === 'open' ? '<button class="nx-btn nx-btn--sm" data-a="ack" data-id="' + esc(a.id) + '">Acknowledge</button> <button class="nx-btn nx-btn--sm nx-btn--primary" data-a="action" data-id="' + esc(a.id) + '">Take action</button> <button class="nx-btn nx-btn--sm nx-btn--ghost" data-a="dismiss" data-id="' + esc(a.id) + '">Dismiss</button>' : a.status === 'acknowledged' ? '<button class="nx-btn nx-btn--sm nx-btn--primary" data-a="action" data-id="' + esc(a.id) + '">Take action</button>' : '';
-      return '<div class="fl-alert' + (S.flashAlert === a.id ? ' nx-new' : '') + '"><div class="nx-row" style="gap:6px;flex-wrap:wrap">' + NX.badgeHTML(a.severity || 'medium') + '<span class="nx-mono nx-faint" style="font-size:11px">' + esc(KIND[a.kind] || fmt.label(a.kind)) + '</span><span class="nx-grow"></span>' + (a.status !== 'open' ? NX.badgeHTML(a.status, a.status === 'actioned' ? 'ok' : 'plain') : '') + '</div><b>' + esc(a.headline) + '</b>' +
+      return '<div class="fl-alert' + (S.flashAlert === a.id ? ' nx-new' : '') + '"><div class="nx-row" style="gap:6px;flex-wrap:wrap">' + NX.badgeHTML(a.severity || 'medium') + '<span class="nx-mono nx-faint" style="font-size:12px">' + esc(KIND[a.kind] || fmt.label(a.kind)) + '</span><span class="nx-grow"></span>' + (a.status !== 'open' ? NX.badgeHTML(a.status, a.status === 'actioned' ? 'ok' : 'plain') : '') + '</div><b>' + esc(a.headline) + '</b>' +
         ((a.rationale && a.rationale.length) ? '<ul class="fl-rat">' + a.rationale.slice(0, 3).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
         '<div class="nx-dim" style="font-size:12.5px">' + (a.probability != null ? '<span class="nx-mono">' + Math.round(a.probability <= 1 ? a.probability * 100 : a.probability) + '%</span> likelihood' + (a.horizonHours ? ' in ' + a.horizonHours + ' h' : '') + ' · ' : '') + (a.recommendedAction ? 'Do: ' + esc(a.recommendedAction) : '') + '</div>' + (a.expectedImpact ? '<div class="nx-faint" style="font-size:12px">Impact: ' + esc(a.expectedImpact) + '</div>' : '') + (act ? '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' + act + '</div>' : '') + '</div>';
     }).join('');
@@ -685,32 +720,48 @@
   var VERB = { sms: 'Texted', email: 'Emailed', call: 'Called', push: 'Sent a notification to' };
   function loadFeed() {
     var host = $('feed'); if (!host) return;
-    var fid = S.fleet.id, recent = S.incidents.slice(0, 10);
-    Promise.all(recent.map(function (i) {
-      if (S.comms[i.id]) return Promise.resolve(S.comms[i.id]);
-      return NX.api('/api/incidents/' + encodeURIComponent(i.id) + '/comms').then(function (r) { return (S.comms[i.id] = Array.isArray(r) ? r : (r && (r.comms || r.messages)) || []); }).catch(function () { return (S.comms[i.id] = []); });
-    })).then(function () { if (S.fleet.id === fid) renderFeed(recent); });
+    var fid = S.fleet.id, seq = S.feedSeq = (S.feedSeq || 0) + 1;
+    if (!S.feedComms) { host.innerHTML = ''; host.appendChild(NX.skeleton(4)); }
+    return NX.api('/api/comms', { query: { fleetId: fid, limit: 500 } }).then(function (r) {
+      if (S.fleet.id !== fid || seq !== S.feedSeq) return;
+      S.feedComms = Array.isArray(r) ? r : (r && (r.comms || r.messages)) || []; S.feedErr = false; renderFeed();
+    }).catch(function () {
+      if (S.fleet.id !== fid || seq !== S.feedSeq) return;
+      if (!S.feedComms) S.feedErr = true; renderFeed();
+    });
   }
   var TL_RE = /dispatch|notif|warranty|claim|fnol|submitted|eta_shared|authority|called|roadside_assigned|tow/i;
-  function renderFeed(recent) {
-    var host = $('feed'); if (!host) return;
-    var rows = [];
-    recent.forEach(function (i) {
-      var cm = S.comms[i.id] || [], veh = vehLabel(i);
-      cm.forEach(function (c) { var to = c.to && (c.to.name || c.to.type) || 'contact'; rows.push({ t: c.at || c.t, icon: { sms: 'SMS', email: 'MAIL', call: 'CALL', push: 'PUSH' }[c.channel] || 'MSG', title: (VERB[c.channel] || 'Contacted') + ' ' + to, text: (c.subject || c.body || '') + ' · ' + veh, id: i.id, sim: true }); });
+  var CH = { sms: 'SMS', email: 'MAIL', call: 'CALL', push: 'PUSH' };
+  function feedRows() {
+    var rows = [], byInc = {}, has = {};
+    S.incidents.forEach(function (i) { byInc[i.id] = i; });
+    (S.feedComms || []).forEach(function (c) {
+      var i = byInc[c.incidentId]; if (!i) return; has[i.id] = 1;
+      var to = c.to && (c.to.name || c.to.type) || 'contact';
+      rows.push({ t: c.at || c.t, icon: CH[c.channel] || 'MSG', title: (VERB[c.channel] || 'Contacted') + ' ' + to, text: (c.subject || c.body || '') + ' · ' + vehLabel(i), id: i.id, sim: true });
+    });
+    S.incidents.forEach(function (i) {
       (i.timeline || []).forEach(function (e) {
         if ((e.actor === 'fleet' && !/warranty|claim|submitted/i.test(e.action || '')) || !TL_RE.test(e.action || '')) return;
-        if (cm.length && /notif|sms|call|email/i.test(e.action || '')) return;
+        if (has[i.id] && /notif|sms|call|email|eta_shared/i.test(e.action || '')) return;
         var a = String(e.action || '');
-        rows.push({ t: e.t, icon: /warranty|claim|submitted/i.test(a) ? 'CLAIM' : /dispatch|tow|roadside/i.test(a) ? 'TOW' : 'NX', title: fmt.label(a), text: (e.note || '') + ' · ' + veh, id: i.id, sim: /warranty|claim|submitted|fnol|notif|call/i.test(a) });
+        var isClaim = /warranty_(submitted|under|approved|denied|more|paid)|claim|submitted/i.test(a);
+        rows.push({ t: e.t, icon: isClaim ? 'CLAIM' : /dispatch|tow|roadside/i.test(a) ? 'TOW' : 'NX', title: fmt.label(a), text: (e.note || '').replace(/\s*\(simulated\)/ig, '') + ' · ' + vehLabel(i), id: i.id, sim: isClaim || /fnol|notif|call|dispatch|eta_shared|job_link/i.test(a) });
       });
     });
     rows.sort(function (a, b) { return new Date(b.t) - new Date(a.t); });
-    rows = rows.slice(0, S.feedAll ? 40 : 5);
-    if (!rows.length) { host.innerHTML = ''; host.appendChild(NX.empty('Nothing yet', 'Texts, calls, dispatches and claims Nexus handles for you will show here.')); return; }
-    host.innerHTML = rows.map(function (r) { return '<div class="fl-feed__row fl-row-click" data-id="' + esc(r.id) + '"><span class="fl-feed__ic">' + r.icon + '</span><div class="nx-grow"><b>' + esc(r.title) + '</b>' + (r.sim ? ' <span class="fl-tag">simulated</span>' : '') + '<div class="nx-dim" style="font-size:12.5px">' + esc(r.text) + '</div></div><span class="nx-faint nx-mono" style="font-size:11px;white-space:nowrap">' + fmt.ago(r.t) + '</span></div>'; }).join('') + (S.feedAll ? '' : '<button class="nx-btn nx-btn--ghost nx-btn--sm nx-btn--block" id="feed-more">Show more</button>');
-    bindRows(host); host.querySelectorAll('.fl-feed__row').forEach(function (n) { n.onclick = function () { openIncident(n.dataset.id); }; });
-    var m = $('feed-more'); if (m) m.onclick = function () { S.feedAll = true; renderFeed(recent); };
+    return rows;
+  }
+  function renderFeed() {
+    var host = $('feed'); if (!host) return;
+    if (S.feedErr) { host.innerHTML = ''; var e = NX.empty('Activity could not be loaded', 'Nothing here is confirmed empty.', '!'); e.appendChild(NX.el('button.nx-btn.nx-btn--sm', { onclick: loadFeed }, 'Retry')); host.appendChild(e); return; }
+    var all = feedRows(), rows = all.slice(0, S.feedN);
+    if (!all.length) { host.innerHTML = ''; host.appendChild(NX.empty('Nothing yet', 'Texts, calls, dispatches and claims Nexus handles for you will show here.')); return; }
+    host.innerHTML = rows.map(function (r) { return '<div class="fl-feed__row fl-row-click" data-id="' + esc(r.id) + '" tabindex="0" role="button"><span class="fl-feed__ic">' + r.icon + '</span><div class="nx-grow"><div class="fl-feed__t"><b>' + esc(r.title) + '</b>' + (r.sim ? NXSim.pill() : '') + '</div><div class="nx-dim" style="font-size:12.5px">' + esc(r.text) + '</div></div><span class="nx-faint nx-mono" style="font-size:12px;white-space:nowrap">' + fmt.ago(r.t) + '</span></div>'; }).join('') +
+      '<div class="fl-feed__foot"><span class="nx-dim nx-mono" style="font-size:12px">Showing ' + rows.length + ' of ' + all.length + '</span>' + (rows.length < all.length ? '<button class="nx-btn nx-btn--ghost nx-btn--sm" id="feed-more">Show 20 more</button>' : '') + (S.feedN > 10 ? '<button class="nx-btn nx-btn--ghost nx-btn--sm" id="feed-less">Show fewer</button>' : '') + '</div>';
+    host.querySelectorAll('.fl-feed__row').forEach(function (n) { n.onclick = function () { openIncident(n.dataset.id); }; n.onkeydown = function (ev) { if (ev.key === 'Enter') openIncident(n.dataset.id); }; });
+    var m = $('feed-more'); if (m) m.onclick = function () { S.feedN += 20; renderFeed(); };
+    var l = $('feed-less'); if (l) l.onclick = function () { S.feedN = 10; renderFeed(); };
   }
 
   /* ---------------- warranty ---------------- */
@@ -731,7 +782,7 @@
     return NX.api('/api/incidents/' + encodeURIComponent(id) + '/warranty/submit', { method: 'POST', body: { actor: 'fleet' } }).then(function (res) {
       var inc = S.incidents.filter(function (x) { return x.id === id; })[0];
       if (inc && inc.warranty) { var cp = inc.warranty.claimPacket = inc.warranty.claimPacket || {}; cp.status = (res && res.status) || 'submitted'; if (res && res.confirmation) cp.confirmation = res.confirmation; if (res && res.submittedTo) cp.submittedTo = res.submittedTo; if (res && res.submittedAt) cp.submittedAt = res.submittedAt; }
-      NX.toast('Claim submitted' + (res && res.confirmation ? ' · ' + res.confirmation : '') + ' (simulated in demo)', 'success');
+      NX.toast(NXSim.toast('Claim recorded' + (res && res.confirmation ? ': <b class="nx-mono">' + esc(res.confirmation) + '</b>' : ''), 'claim'), 'success', 8000);
       refreshClaims();
       NX.api('/api/incidents/' + encodeURIComponent(id)).then(function (full) { var k = S.incidents.findIndex(function (x) { return x.id === id; }); if (k >= 0) S.incidents[k] = full; if (S.openId === id) renderDrawer(full); refreshClaims(); }).catch(function () { /* keep local */ });
     }).catch(function (e) { if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); } NX.toast(e.message, 'error'); });
@@ -740,11 +791,11 @@
     btn.disabled = true; btn.classList.add('is-loading');
     return NX.api('/api/fleets/' + encodeURIComponent(S.fleet.id) + '/warranty/submit-ready', { method: 'POST', body: { actor: 'fleet' } }).then(function (res) {
       var n = res && (res.submitted != null ? (Array.isArray(res.submitted) ? res.submitted.length : res.submitted) : res.count);
-      NX.toast((n != null ? n + ' claim' + (n === 1 ? '' : 's') : 'Claims') + ' submitted (simulated in demo)', 'success');
+      NX.toast(NXSim.toast((n != null ? n + ' claim' + (n === 1 ? '' : 's') : 'Claims') + ' recorded', 'claim'), 'success', 8000);
       return NX.api('/api/incidents', { query: { fleetId: S.fleet.id, limit: 500 } }).then(function (r) { S.incidents = (r && r.incidents) || r || []; sortIncidents(); refreshClaims(); renderIncidentsTables(); });
     }).catch(function (e) { btn.disabled = false; btn.classList.remove('is-loading'); NX.toast(e.message, 'error'); });
   }
-  function refreshClaims() { renderWarranty(); renderAttention(); renderCounts(); S.comms = {}; loadFeed(); }
+  function refreshClaims() { renderWarranty(); renderAttention(); renderCounts(); loadFeed(); }
   function renderWarranty() {
     var host = $('war-body'); if (!host) return;
     var cs = claims();
@@ -755,12 +806,12 @@
     var pendVal = pend.reduce(function (a, i) { return a + cVal(i); }, 0);
     var ready = cs.filter(function (i) { return cStatus(i) === 'ready'; }), info = cs.filter(function (i) { return cStatus(i) === 'more_info_needed'; });
     var readyVal = ready.reduce(function (a, i) { return a + cVal(i); }, 0);
-    var html = '<div class="fl-sim">Claim submission is <b>simulated in the demo</b>: Nexus returns a confirmation number and logs it, but nothing is sent to an OEM.</div>' +
+    var html = '<div class="fl-sim">' + NXSim.line('claim') + '<span class="nx-dim"> Nexus records a confirmation number and the audit trail, but nothing is sent to an OEM.</span></div>' +
       '<div class="nx-kpis"><div class="nx-kpi nx-kpi--ok"><div class="nx-kpi__label">Recovered</div><div class="nx-kpi__value">' + fmt.currency(recovered) + '</div><div class="nx-kpi__delta">paid by OEMs</div></div>' +
       '<div class="nx-kpi nx-kpi--accent"><div class="nx-kpi__label">Pending value</div><div class="nx-kpi__value">' + fmt.currency(pendVal) + '</div><div class="nx-kpi__delta">' + pend.length + ' open claims</div></div>' +
       '<div class="nx-kpi"><div class="nx-kpi__label">Ready to file</div><div class="nx-kpi__value">' + ready.length + '</div><div class="nx-kpi__delta">' + fmt.currency(readyVal) + ' evidence complete</div></div>' +
       '<div class="nx-kpi ' + (info.length ? 'nx-kpi--critical' : '') + '"><div class="nx-kpi__label">Need your input</div><div class="nx-kpi__value">' + info.length + '</div><div class="nx-kpi__delta">OEM asked for more info</div></div></div>';
-    if (ready.length) html += '<div class="fl-bulk"><div><b>' + ready.length + ' claim' + (ready.length > 1 ? 's' : '') + ' ready to file</b><div class="nx-dim" style="font-size:13px">Worth ' + fmt.currency(readyVal) + '. Packets are already assembled with evidence, codes and coverage.</div></div><button class="nx-btn nx-btn--primary" id="submit-all">Submit all ready (' + ready.length + ')</button></div>';
+    if (ready.length) html += '<div class="fl-bulk"><div><b>' + ready.length + ' claim' + (ready.length > 1 ? 's' : '') + ' ready to file</b><div class="nx-dim" style="font-size:13px">Worth ' + fmt.currency(readyVal) + '. Packets are already assembled with evidence, codes and coverage.</div></div><div class="fl-bulk__act"><button class="nx-btn nx-btn--primary" id="submit-all">Submit all ready (' + ready.length + ')</button>' + NXSim.note('claim') + '</div></div>';
     if (!cs.length) { host.innerHTML = html; host.appendChild(NX.empty('No eligible claims', 'Warranty-eligible failures will appear with a ready claim packet.')); return; }
     var order = { more_info_needed: 0, ready: 1, draft: 2, submitted: 3, under_review: 3, approved: 4, paid: 4, denied: 4 };
     cs = cs.slice().sort(function (a, b) { return (order[cStatus(a)] == null ? 5 : order[cStatus(a)]) - (order[cStatus(b)] == null ? 5 : order[cStatus(b)]); });
@@ -851,5 +902,23 @@
     bindRows(host);
   }
 
+  /* tables become cards on phones: label every cell from its column header */
+  function cardify() {
+    document.querySelectorAll('#main table.nx-table').forEach(function (t) {
+      var heads = Array.prototype.map.call(t.querySelectorAll('thead th'), function (th) { return th.textContent.trim(); });
+      t.classList.add('fl-cardable');
+      var card = t.closest('.nx-card'); if (card) card.classList.add('fl-cardhost');
+      t.querySelectorAll('tbody tr').forEach(function (tr) {
+        Array.prototype.forEach.call(tr.children, function (td, k) {
+          if (td.dataset.carded) return; td.dataset.carded = 1;
+          td.setAttribute('data-label', k === 0 ? '' : (heads[k] || ''));
+          if (k === 0) td.classList.add('fl-c-first');
+          if (td.classList.contains('wrap') || td.querySelector('.fl-steps, .nx-meter, button, a.nx-btn') || td.textContent.trim().length > 34) td.classList.add('fl-c-wide');
+          if (td.querySelector('button, a.nx-btn')) td.classList.add('fl-c-act');
+        });
+      });
+    });
+  }
+  var cardT; new MutationObserver(function () { clearTimeout(cardT); cardT = setTimeout(cardify, 60); }).observe(document.getElementById('main'), { childList: true, subtree: true });
   init();
 })();

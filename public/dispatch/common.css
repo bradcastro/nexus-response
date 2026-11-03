@@ -1,0 +1,50 @@
+/* Shared by Dispatch and Fleet: contrast overrides, simulated notes, audit trail, loading/connection states. */
+
+/* Contrast: the base faint text token falls under 4.5:1 on its surfaces. Lift it inside these portals. */
+:root, :root[data-theme="dark"] { --nx-text-faint: #8DA0BD; }
+:root[data-theme="light"] { --nx-text-faint: #56677F; --nx-text-dim: #3F4F68; }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --nx-text-faint: #56677F; --nx-text-dim: #3F4F68; } }
+
+/* Simulated */
+.sim-line { display: inline-flex; align-items: flex-start; gap: 8px; flex-wrap: nowrap; font-size: 12.5px; color: var(--nx-text-dim); line-height: 1.35; }
+.sim-line .nx-badge { flex: none; margin-top: -1px; }
+.sim-line__t { font-weight: 500; color: var(--nx-text); }
+.sim-block { margin-top: 8px; padding: 7px 10px; border-radius: 8px; border: 1px dashed color-mix(in srgb, var(--nx-warn) 55%, var(--nx-border-strong)); background: color-mix(in srgb, var(--nx-warn) 8%, transparent); }
+.sim-toast { display: flex; flex-direction: column; gap: 5px; }
+.sim-toast__m { font-weight: 500; }
+.sim-toast .sim-line__t { color: inherit; }
+
+/* Audit trail */
+.au-legend { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--nx-text-dim); padding: 10px 12px; border: 1px solid var(--nx-border); border-radius: 8px; background: var(--nx-surface-2); margin-bottom: 10px; }
+.au-legend b { color: var(--nx-text); font-weight: 600; margin-right: 4px; }
+.au-legend .nx-badge { margin-right: 4px; vertical-align: middle; }
+.au-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.au-filters .nx-chip { height: 28px; font-size: 12.5px; }
+.au-filters .nx-chip b { font: 600 11.5px var(--nx-font-mono); opacity: .85; margin-left: 2px; }
+.au-list { list-style: none; margin: 0; padding: 0 0 0 4px; }
+.au-row { position: relative; display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; padding: 0 0 14px 16px; border-left: 2px solid var(--nx-border-strong); margin-left: 5px; }
+.au-row::before { content: ""; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--nx-surface); border: 2px solid var(--nx-text-faint); }
+.au-row.au-user::before { border-color: var(--nx-accent); background: var(--nx-accent); }
+.au-row.au-external::before { border-color: var(--nx-info); }
+.au-row.is-sim::before { border-style: dashed; }
+.au-row:last-child { border-left-color: transparent; padding-bottom: 0; }
+.au-time { font-size: 12px; color: var(--nx-text-dim); padding-top: 1px; line-height: 1.35; }
+.au-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.au-title { font-size: 14px; font-weight: 600; }
+.au-who { font: 500 11.5px var(--nx-font-mono); letter-spacing: .04em; color: var(--nx-text-dim); border: 1px solid var(--nx-border-strong); border-radius: 4px; padding: 2px 6px; }
+.au-who--user { color: var(--nx-text); border-color: color-mix(in srgb, var(--nx-accent) 60%, var(--nx-border-strong)); }
+.au-note { margin-top: 3px; font-size: 13px; color: var(--nx-text-dim); overflow-wrap: anywhere; }
+.au-detail { margin-top: 5px; padding: 7px 10px; border-radius: 6px; background: var(--nx-surface-2); border: 1px solid var(--nx-border); font-size: 12.5px; color: var(--nx-text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+.au-simline { margin-top: 5px; font-size: 12px; color: var(--nx-text-dim); font-style: italic; }
+.au-empty { padding: 12px 0; }
+@media (max-width: 640px) { .au-row { grid-template-columns: 1fr; gap: 3px; } }
+
+/* Loading / connection */
+.conn-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 14px; font-size: 13px; border-bottom: 1px solid var(--nx-border); }
+.conn-bar.is-warn { background: color-mix(in srgb, var(--nx-warn) 16%, var(--nx-surface)); color: var(--nx-text); border-bottom-color: color-mix(in srgb, var(--nx-warn) 50%, var(--nx-border)); }
+.conn-bar.is-error { background: color-mix(in srgb, var(--nx-danger) 14%, var(--nx-surface)); color: var(--nx-text); border-bottom-color: color-mix(in srgb, var(--nx-danger) 50%, var(--nx-border)); }
+.conn-bar .conn-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--nx-text) 25%, transparent); border-top-color: var(--nx-text); animation: conn-rot .8s linear infinite; flex: none; }
+.conn-bar .nx-btn { margin-left: auto; }
+@keyframes conn-rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .conn-bar .conn-spin { animation: none; } }
+.is-pending-val { color: var(--nx-text-faint) !important; }

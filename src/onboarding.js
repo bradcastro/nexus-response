@@ -185,7 +185,7 @@ router.put('/api/onboarding/fleets/:id/alerts', async (req, res) => {
   const b = req.body || {};
   f.alertConfig = { emails: b.emails || [], sms: b.sms || [], minSeverity: b.minSeverity || 'high', configuredAt: new Date().toISOString() };
   await persistFleet(f);
-  res.json({ alertConfig: f.alertConfig });
+  res.json({ alertConfig: f.alertConfig, used: false, status: 'stored_not_used', note: 'NOT YET USED: these recipients are stored only. No alert is sent to them; notifications in this build are simulated and do not read this list.' });
 });
 
 // Remove an onboarded/imported (custom or prospect) fleet and everything hanging off it. Seeded demo fleets are protected.

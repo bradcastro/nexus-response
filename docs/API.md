@@ -165,9 +165,26 @@ Risk score 0-100 (higher = riskier): weighted components collisions 35%, harsh e
 `curl -XPOST $BASE/api/demo/simulate -H 'content-type: application/json' -d '{"scenario":"collision_camera"}'`
 **POST /api/demo/seed?reset=1** -> `{ok,fleets,incidents,skipped}` (without reset it is a no-op when data exists). **GET /api/demo/scenarios**.
 
+### Demo reset, state, guided scenario, capability matrix (defensibility endpoints)
+All data is synthetic; every outbound action is simulated.
+
+- **POST /api/demo/reset** -> `{ok,resetAt,seeded,predict,counts,note}`. Restores the in-memory store to the deterministic seeded state: drops custom/prospect fleets, all incidents (imports included), comms, jobs, reports, assessments, import jobs, ingest log, API keys/tokens, predictive alerts and caches; reseeds; rebuilds predictive state; broadcasts SSE `event: reset` `{resetAt,counts}` (clients should reload). Gate: allowed when `DEMO_MODE=1`, or `DEMO_MODE` unset with `NODE_ENV!=production`; **403 `reset_disabled`** when `DEMO_MODE=0`, when `NODE_ENV=production` without `DEMO_MODE=1`, or whenever `DATABASE_URL` is set (override only with `ALLOW_DEMO_RESET_ON_DATABASE=1`).
+- **GET /api/demo/state** -> `{bootAt,resetAt,resets,mantisScenariosCreated,resetEnabled,resetDisabledReason,store,counts{fleets,customFleets,vehicles,drivers,incidents,importedIncidents,demoScenarioIncidents,comms,jobs,reports,assessments,importJobs,ingestLog,apiKeys,predictiveAlerts,sseClients},data:"synthetic",simulated:true}`. `resetAt` is `null` until the first reset.
+- **POST /api/demo/mantis-scenario** `{fleetId?: fleet_redline|fleet_magnolia}` -> 201 `{incidentId,demoTag,synthetic,simulated,payloadAssumed,illustrative,label,fleet,vehicle,driver,event{signals,camera},deepLinks{dispatch:"/dispatch/#<id>",fleet,insurerFleet,insurerProjection,api,predictFleet},recommendedResponse{priority,actions[],rationale[],disclaimer}}`. Each call creates a NEW incident through the Mantis adapter (phone use, eyes-off-road 3.6 s, following distance 0.8 s, forward-collision warning, camera AI verdict `distraction`), stored with `incident.demo = {tag,synthetic:true,scenario,payloadAssumed:true,label}` and a `demo_scenario` timeline entry. Without `fleetId` it alternates between the two Mantis fleets. The Mantis payload shape is ASSUMED (docs/MANTIS.md).
+- **GET /api/capabilities** -> `{generatedAt,statuses{},honesty[],total,counts{},capabilities:[{id,area,name,status,evidence,notes,simulated?,illustrative?,assumedPayload?}]}`; currently `total` = 35 entries (7 working_verified, 16 working_synthetic, 7 simulated, 5 planned; the endpoint's `total`/`counts` are authoritative; an earlier note of 36 was a miscount); `status` is one of `working_verified` (exercised end to end; `scripts/check-consistency.js` does it), `working_synthetic`, `simulated`, `planned`.
+
+**Simulated markers.** Outbound action responses (`/dispatch`, `/notify`, `/fnol`, `/warranty/submit`, `/warranty/status`, `/fleets/:id/warranty/submit-ready`, `/authority-brief`, `/fleets/:id/contacts`, job tickets) include `simulated:true` and `deliveredTo:"no external recipient"`; comms log rows carry the same fields. The dispatch timeline entry says "(simulated: no provider is actually contacted)".
+
+**Predictive payload labeling.** `/api/predict/{portfolio,backtest,fleet/:id,model,simulate-what-if}` responses include `illustrative:true`, `label`, `disclaimer` and `provenance{data:"synthetic",validated:false,method,assumptions[],limitations[]}`; alert rows carry `illustrative,label,disclaimer`; all `/api/predict/*` responses set header `X-Nexus-Data: synthetic-illustrative`. `portfolio.comparison` (Mantis vs all other vendors pooled) and `byVendor[]` come from one calculation (docs/PREDICT.md section 7). Insurer `GET /api/insurer/portfolio` `byVendor[].basis` states that its `avgRisk` is the event-based score (unweighted fleet mean), a different metric from predict's vehicle-weighted predicted risk.
+
+**Consistency check.** `node scripts/check-consistency.js` (spawns its own server with `DEMO_MODE=1`, or `BASE_URL=http://host:port`; NOTE it calls `POST /api/demo/reset` on the target).
+
 ## Misc
 - **GET /health** -> `{status,service,version,demoMode,store,incidents,sseClients,timestamp}`
 - **GET /api/config** -> `{mapsKey,mapboxToken,demoMode,providers}`
 - **GET /media/snap/:incidentId/:road|driver.svg** - generated dashcam placeholder frame.
-- Legacy: `GET /dashboard`, `POST /test/trigger-event` (fires a random scenario), `/api/debug/*`. Legacy pollers only start when `DEMO_MODE=0` or `ENABLE_LEGACY_POLLERS=1` and API keys are set.
+- Legacy: `GET /dashboard`, `POST /test/trigger-event` (fires a random scenario) and `/api/debug/*` (these call third-party APIs with server-held keys): **404 unless `ENABLE_DEBUG=1`** (default off). Legacy pollers only start when `DEMO_MODE=0` or `ENABLE_LEGACY_POLLERS=1` and API keys are set.
 - Static: everything in `public/` is served at `/` (`/dispatch/`, `/fleet/`, `/insurer/`).
+
+- Onboarding alert recipients (`PUT /api/onboarding/fleets/:id/alerts`): stored only. The response carries `used:false, status:"stored_not_used"` and a note; notifications in this build are simulated and never read this list.
+- Predict determinism: all predictive windows are anchored to the newest live event (rounded up to the hour), not wall-clock time, so `/api/predict/*` figures are identical across calls for the same store state (`generatedAt`/`computeMs` excepted).
