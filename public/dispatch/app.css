@@ -4,7 +4,7 @@
 .pane { min-width: 0; min-height: 0; position: relative; display: flex; flex-direction: column; }
 .pane-queue { border-right: 1px solid var(--nx-border); background: var(--nx-surface); }
 .pane-detail { border-left: 1px solid var(--nx-border); background: var(--nx-surface); overflow-y: auto; }
-.pane-map { background: var(--nx-bg); }
+.pane-map { background: var(--nx-bg); isolation: isolate; z-index: 0; overflow: hidden; }
 .view-tabs { display: none; }
 
 /* topbar extras */
@@ -47,7 +47,7 @@
 .tag.acc { color: var(--nx-accent); border-color: color-mix(in srgb, var(--nx-accent) 50%, transparent); }
 
 /* map */
-#map { position: absolute; inset: 0; background: #0a1220; }
+#map { position: absolute; inset: 0; background: #0a1220; z-index: 0; }
 .leaflet-container { font-family: var(--nx-font-ui); }
 :root[data-theme="dark"] .osm-tiles { filter: invert(1) hue-rotate(195deg) brightness(.78) contrast(.92) saturate(.45); }
 .leaflet-control-attribution { background: color-mix(in srgb, var(--nx-surface) 80%, transparent) !important; color: var(--nx-text-faint) !important; font-size: 11px; }
