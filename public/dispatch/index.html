@@ -16,7 +16,11 @@
   <div id="nx-topbar"></div>
   <main class="nx-main nx-main--flush">
     <div class="conn-bar nx-hide" id="conn-bar" role="status" aria-live="polite"></div>
-    <div class="dc" id="dc" data-view="queue">
+    <nav class="dc-tabs" id="dc-tabs" role="tablist" aria-label="Dispatch view">
+      <button role="tab" data-tab="work" class="is-active">Incidents</button>
+      <button role="tab" data-tab="map">Map</button>
+    </nav>
+    <div class="dc" id="dc" data-view="queue" data-tab="work">
       <!-- QUEUE -->
       <section class="pane pane-queue" aria-label="Incident queue">
         <div class="q-head">

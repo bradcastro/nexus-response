@@ -387,3 +387,16 @@ kbd { background: var(--nx-surface-3); border: 1px solid var(--nx-border-strong)
 .d-tabs .d-hist { margin: auto 0 auto auto; font: 600 12.5px var(--nx-font-ui); color: var(--nx-accent); text-decoration: none; padding: 8px 4px; }
 .d-tabs .d-hist:hover { text-decoration: underline; }
 @media (max-width: 640px) { .d-tabs .tb-hide-tablet { display: none; } }
+
+/* Incidents | Map sub-tabs (desktop). Map is a tab; incidents view gives the detail pane the room. */
+.dc-tabs { display: flex; gap: 4px; padding: 0 16px; background: var(--nx-surface); border-bottom: 1px solid var(--nx-border); }
+.dc-tabs button { border: 0; background: none; color: var(--nx-text-dim); font: 600 13px var(--nx-font-ui); padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.dc-tabs button:hover { color: var(--nx-text); }
+.dc-tabs button.is-active { color: var(--nx-text); border-bottom-color: var(--nx-accent); }
+.d-fleet { font: 600 14px var(--nx-font-ui); color: var(--nx-text); margin-top: 3px; }
+@media (min-width: 1101px) {
+  .dc[data-tab="work"] { grid-template-columns: minmax(380px, 440px) minmax(0, 1fr); }
+  .dc[data-tab="work"] .pane-map { display: none; }
+  .dc[data-tab="map"] { grid-template-columns: 340px minmax(0,1fr) 440px; }
+}
+@media (max-width: 1100px) { .dc-tabs { display: none; } }

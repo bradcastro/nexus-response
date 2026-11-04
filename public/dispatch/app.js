@@ -268,6 +268,12 @@
   }
 
   /* ---------- selection / data ---------- */
+  function setTab(t) {
+    var dc = $('#dc'); dc.dataset.tab = t;
+    try { localStorage.setItem('nx_dc_tab', t); } catch (e) {}
+    document.querySelectorAll('#dc-tabs button').forEach(function (b) { var on = b.dataset.tab === t; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on); });
+    if (t === 'map' && map) setTimeout(function () { map.invalidateSize(); if (S.mode === 'proactive') NXPro.drawMap(true); else if (S.sel) focusSelection(); else fitAll(); }, 60);
+  }
   function setView(v) {
     $('#dc').dataset.view = v;
     document.querySelectorAll('.view-tabs button').forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === v); });
@@ -551,7 +557,7 @@
     if (!i) { detailEl.innerHTML = S.detailError ? '' : '<div class="sk"><span class="nx-skel nx-skel--lg"></span><span class="nx-skel nx-skel--block"></span><span class="nx-skel nx-skel--block"></span></div>'; if (S.detailError) detailEl.appendChild(NX.empty('Incident not found', S.detailError)); return; }
     var closed = isClosed(i), fp = isFP(i);
     var head = '<header class="d-head" style="--c:' + sevColor(i.severity) + '"><div class="d-id">' + NX.badgeHTML(i.severity) + NX.badgeHTML(i.status) + '<span class="nx-mono">' + esc(i.id) + '</span><span class="nx-mono" style="margin-left:auto">' + esc(fmt.ago(i.receivedAt || i.timestamp)) + '</span></div>' +
-      '<div class="d-titlerow"><div class="nx-grow"><h2 class="d-title">' + esc(title(i)) + ' &middot; ' + esc(unit(i)) + '</h2><div class="d-sub">' + esc(addr(i)) + '</div></div>' + NXAct.ring(i) +
+      '<div class="d-titlerow"><div class="nx-grow"><h2 class="d-title">' + esc(title(i)) + ' &middot; ' + esc(unit(i)) + '</h2><div class="d-fleet">' + esc(i.fleetName || 'Fleet') + ' &middot; ' + esc((i.driver || {}).name || 'Unassigned driver') + '</div><div class="d-sub">' + esc(addr(i)) + '</div></div>' + NXAct.ring(i) +
       '<div class="d-mini">' + (closed ? '' : btn('Dismiss <kbd>x</kbd>', 'nx-btn--sm nx-btn--ghost', 'dismissopen', '', 'dismiss')) + '<button class="nx-btn nx-btn--sm nx-btn--ghost" data-act="center">Map</button></div></div>' + NXAct.strip(i) + '</header>';
     var na = NXAct.next(i)[0] || {}; S.forceOpen = {};
     if (na.key === 'oem') S.forceOpen.oemclaim = 1;
@@ -582,7 +588,7 @@
     if (a === 'dispatch') doDispatch();
     else if (a === 'dismissopen') doDismiss();
     else if (a === 'fpdismiss') doDismiss('False positive - camera AI verdict ' + fmt.label(verdict(i)) + (pct(i.camera.confidence) != null ? ' (' + pct(i.camera.confidence) + '%)' : ''));
-    else if (a === 'center') { focusSelection(); if (window.innerWidth <= 1100) setView('map'); }
+    else if (a === 'center') { focusSelection(); if (window.innerWidth <= 1100) setView('map'); else setTab('map'); }
     else if (a === 'status') setStatus(b.dataset.st);
     else if (a === 'note') addNote();
     else if (a === 'towdealer') towToDealer();
@@ -608,6 +614,8 @@
   $('#btn-refresh').addEventListener('click', load);
   $('#btn-fit').addEventListener('click', fitAll);
   $('#btn-follow').addEventListener('click', function (e) { S.follow = !S.follow; e.target.setAttribute('aria-pressed', S.follow); if (S.follow) focusSelection(); });
+  document.querySelectorAll('#dc-tabs button').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+  try { if (localStorage.getItem('nx_dc_tab') === 'map') setTab('map'); } catch (e) {}
   document.querySelectorAll('.view-tabs button').forEach(function (b) { b.addEventListener('click', function () { setView(b.dataset.view); }); });
   window.addEventListener('hashchange', function () { var h = decodeURIComponent(location.hash.slice(1)); if (h && h !== S.sel) select(h, { noHash: true, view: 'detail' }); });
   var modalAtKey = false; // Esc that closes a modal must not also clear the selected incident
