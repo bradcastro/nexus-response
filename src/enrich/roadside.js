@@ -64,6 +64,21 @@ function listHazmatTeams(lat, lng, limit = 3) {
     return { ...t, phone: teamPhone(t), available24x7: true, distanceMi: d == null ? null : round(d, 1), etaMin: d == null ? null : etaFor(d) + 12 };
   }).sort((a, b) => (a.distanceMi ?? 1e9) - (b.distanceMi ?? 1e9)).slice(0, limit);
 }
+// Hazmat load: recommend the nearest hazmat-certified tow provider, even if a non-certified one is closer.
+function preferHazmat(inc) {
+  const rs = inc.roadside, ld = inc.load;
+  if (!rs || !rs.needed || rs.assignedProvider || !(ld && ld.contents && ld.contents.hazmat) || !inc.location || inc.location.lat == null) return;
+  if (!String(rs.serviceType).startsWith('tow')) return;
+  const list = listNear(inc.location.lat, inc.location.lng, rs.serviceType);
+  const cert = list.filter((p) => p.hazmatCertified);
+  if (!cert.length) { rs.rationale += ' Hazmat load: no hazmat-certified provider on file nearby; request a hazmat team.'; return; }
+  const slim = (p) => ({ hazmatCertified: !!p.hazmatCertified, id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st });
+  const rest = list.filter((p) => !p.hazmatCertified);
+  const ordered = [...cert, ...rest];
+  const nearestOverall = list[0];
+  rs.recommendedProvider = slim(ordered[0]); rs.etaMin = ordered[0].etaMin; rs.alternatives = ordered.slice(1, 3).map(slim);
+  rs.rationale += nearestOverall.id !== ordered[0].id ? ` Hazmat load: nearest hazmat-certified provider chosen over the closer ${nearestOverall.name}.` : ' Hazmat load: nearest provider is hazmat-certified.';
+}
 const isHazmatCertified = (id) => !!(providers.find((p) => p.id === id) || {}).hazmatCertified;
 
-module.exports = { listHazmatTeams, isHazmatCertified, recommend, listNear, serviceFor, setProviders, getProviders, etaFor };
+module.exports = { preferHazmat, listHazmatTeams, isHazmatCertified, recommend, listNear, serviceFor, setProviders, getProviders, etaFor };

@@ -166,6 +166,7 @@ async function attach(inc, opts = {}) {
   inc.warrantyDealer = warrantyDealerFor(inc, heavy);
   const td = towDestination(inc, inc.warrantyDealer);
   if (td && inc.roadside) inc.roadside.towDestination = td;
+  require('../enrich/roadside').preferHazmat(inc);
   // ---- risk tags + packet ----
   const base = risk.score(inc);
   inc.risk = base;

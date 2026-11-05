@@ -309,7 +309,8 @@
         S.providers = listFrom(d, 'providers');
         var rr = i.roadside || {};
         [rr.assignedProvider, rr.recommendedProvider].concat(rr.alternatives || []).forEach(function (x) { if (x && x.id && !S.providers.some(function (p) { return p.id === x.id; })) { var full = x; S.providers.push(full); } });
-        S.providers.sort(function (a, b) { return (a.etaMin == null) - (b.etaMin == null) || a.etaMin - b.etaMin; });
+        var hzL = hazLoad(i);
+        S.providers.sort(function (a, b) { return (hzL ? (!!b.hazmatCertified - !!a.hazmatCertified) : 0) || (a.etaMin == null) - (b.etaMin == null) || a.etaMin - b.etaMin; });
         var r = i.roadside || {};
         S.pick = (r.assignedProvider || r.recommendedProvider || S.providers[0] || {}).id || null;
         renderDetail(); drawSelection();
