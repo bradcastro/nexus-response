@@ -133,7 +133,11 @@ app.post('/api/incidents/:id/dispatch', wrap(async (req, res) => {
     if (chosen) rs.etaMin = chosen.etaMin;
     inc.status = 'dispatched';
     if (chosen) { const jl = await opsMod.createJob(inc, chosen, actor, req); if (jl) { inc.jobLink = jl; addTimeline(inc, actor || 'dispatcher', 'job_link_sent', `Job link ${jl.url} texted to ${chosen.name} (simulated)`); } }
-    addTimeline(inc, actor || 'dispatcher', 'dispatched', `${chosen ? `Dispatched ${chosen.name} (${rs.serviceType}${chosen.etaMin ? `, ETA ${chosen.etaMin} min` : ''})` : 'Marked dispatched (no roadside provider)'}${note ? ' - ' + note : ''} (simulated: no provider is actually contacted)`);
+    if (chosen && inc.load && inc.load.contents && inc.load.contents.hazmat) {
+      const ok = roadside.isHazmatCertified(chosen.id);
+      addTimeline(inc, 'system', 'hazmat_check', ok ? `Hazmat check: ${chosen.name} is hazmat-certified for this load.` : `Hazmat check: ${chosen.name} is NOT hazmat-certified. Provider told hazmat is required (simulated); hazmat response team needed on scene.`);
+    }
+    addTimeline(inc, actor || 'dispatcher', 'dispatched', `${chosen ? `Dispatched ${chosen.name} at the owner's request (${rs.serviceType}${chosen.etaMin ? `, ETA ${chosen.etaMin} min` : ''})` : 'Marked dispatched (no roadside provider)'}${note ? ' - ' + note : ''} (simulated: no provider is actually contacted)`);
   }, { simulated: true, deliveredTo: 'no external recipient' });
 }));
 

@@ -1,8 +1,8 @@
 // Roadside recommender: service type from event/DTC, provider list with ETA from haversine distance.
-const { PROVIDERS } = require('../data/ref');
+const { PROVIDERS, HAZMAT_TEAMS, HAZMAT_CERTIFIED } = require('../data/ref');
 const { haversineMi, round } = require('../util');
 
-let providers = PROVIDERS.map((p) => ({ ...p, phone: `+1${p.lat.toFixed(3).replace(/\D/g, '').slice(0, 3)}555${String(Math.abs(Math.round(p.lng * 100)) % 10000).padStart(4, '0')}`, available24x7: true }));
+let providers = PROVIDERS.map((p) => ({ ...p, phone: `+1${p.lat.toFixed(3).replace(/\D/g, '').slice(0, 3)}555${String(Math.abs(Math.round(p.lng * 100)) % 10000).padStart(4, '0')}`, available24x7: true, hazmatCertified: HAZMAT_CERTIFIED.includes(p.id) }));
 const setProviders = (p) => { providers = p; };
 const getProviders = () => providers;
 
@@ -50,11 +50,20 @@ function recommend(inc, vehicleCls) {
   if (!base.needed || !inc.location || inc.location.lat == null) return base;
   const list = listNear(inc.location.lat, inc.location.lng, serviceType);
   if (!list.length) return base;
-  const slim = (p) => ({ id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st });
+  const slim = (p) => ({ hazmatCertified: !!p.hazmatCertified, id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st });
   base.recommendedProvider = slim(list[0]);
   base.etaMin = list[0].etaMin;
   base.alternatives = list.slice(1, 3).map(slim);
   return base;
 }
 
-module.exports = { recommend, listNear, serviceFor, setProviders, getProviders, etaFor };
+const teamPhone = (t) => `+1${String(Math.abs(Math.round(t.lat * 1000)) % 1000).padStart(3, '0')}555${String(Math.abs(Math.round(t.lng * 100)) % 10000).padStart(4, '0')}`;
+function listHazmatTeams(lat, lng, limit = 3) {
+  return HAZMAT_TEAMS.map((t) => {
+    const d = lat != null && lng != null ? haversineMi(lat, lng, t.lat, t.lng) : null;
+    return { ...t, phone: teamPhone(t), available24x7: true, distanceMi: d == null ? null : round(d, 1), etaMin: d == null ? null : etaFor(d) + 12 };
+  }).sort((a, b) => (a.distanceMi ?? 1e9) - (b.distanceMi ?? 1e9)).slice(0, limit);
+}
+const isHazmatCertified = (id) => !!(providers.find((p) => p.id === id) || {}).hazmatCertified;
+
+module.exports = { listHazmatTeams, isHazmatCertified, recommend, listNear, serviceFor, setProviders, getProviders, etaFor };

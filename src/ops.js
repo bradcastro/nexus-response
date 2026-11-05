@@ -58,6 +58,23 @@ function authorities(inc) {
   return ['state_patrol', 'county_sheriff', 'ems', 'fire', 'dot', 'hazmat_response'].map((k) => ({ agency: agency[k], kind: k, phone: D.phone(k + p.city + p.st, p.st), jurisdiction: juris[k], recommended: r[k].urgency !== 'no', urgency: r[k].urgency, reason: r[k].reason }));
 }
 
+
+// Recovery status for scripts and the dispatcher: who is coming, on whose request, and can they handle this load.
+function recoveryCheck(inc) {
+  const rs = inc.roadside || {}, ld = inc.load, hz = !!(ld && ld.contents && ld.contents.hazmat);
+  const prov = rs.assignedProvider;
+  const owner = inc.fleetName;
+  const teams = hz && inc.location && inc.location.lat != null ? roadside.listHazmatTeams(inc.location.lat, inc.location.lng, 3) : [];
+  if (!prov) return { assigned: false, hazmatRequired: hz, ownersRequest: true, owner, hazmatTeams: teams, summary: hz ? 'No tow provider assigned yet. Hazmat load: pick a hazmat-certified provider.' : 'No tow provider assigned yet.' };
+  const certified = roadside.isHazmatCertified(prov.id);
+  const capable = hz ? certified : true;
+  return {
+    assigned: true, provider: { id: prov.id, name: prov.name, phone: prov.phone, etaMin: rs.etaMin || prov.etaMin || null }, ownersRequest: true, owner, hazmatRequired: hz, hazmatCertified: certified, capable,
+    hazmatNotified: hz && !certified, hazmatTeams: teams,
+    summary: !hz ? `${prov.name} dispatched at the owner's request (${owner}).` : certified ? `${prov.name} is hazmat-certified and dispatched at the owner's request (${owner}).` : `${prov.name} is NOT hazmat-certified. They have been told hazmat is required; a hazmat response team is needed on scene.`,
+  };
+}
+
 function brief(inc) {
   const auth = authorities(inc);
   const p = place(inc), l = inc.location, ld = inc.load, tr = inc.equipment && inc.equipment.trailer;
@@ -74,15 +91,19 @@ function brief(inc) {
     `Driver: ${inc.driver.name}${inc.driver.phone ? ', ' + inc.driver.phone : ''}`,
     inc.diagnostics ? `Fault codes: ${inc.diagnostics.dtcs.map((d) => d.code).join(', ')}; drivable: ${inc.diagnostics.drivable}` : null,
   ].filter(Boolean);
+  const rc = recoveryCheck(inc);
   const rec = auth.filter((a) => a.recommended).map((a) => ({ agency: a.agency, kind: a.kind, reason: a.reason, urgency: a.urgency }));
   const script = `This is Nexus Response dispatch calling for ${inc.fleetName}. We are reporting a ${inc.eventType.replace(/_/g, ' ')} on ${p.road}${p.direction ? ' ' + p.direction : ''} near ${p.city}, ${p.st} (GPS ${l.lat}, ${l.lng}). `
     + `Vehicle: ${veh}${trailer ? ' pulling a ' + trailer : ''}. Injuries: ${airbag ? 'unknown - airbag deployed, please send EMS' : 'unknown, driver being contacted'}. `
     + (hz ? `HAZMAT: ${ld.contents.label.replace(' (likely)', '')} aboard, placard unconfirmed - request hazmat response. ` : '')
+    + (rc.assigned ? `Recovery: ${rc.provider.name} has been dispatched at the request of the vehicle's owner, ${rc.owner}, and is en route${rc.provider.etaMin ? ', ETA ' + Math.round(rc.provider.etaMin) + ' min' : ''}. ${hz ? (rc.hazmatCertified ? 'The tow company is hazmat-certified.' : 'The tow company is not hazmat-certified and has been notified that hazmat is required; please send hazmat response.') + ' ' : ''}` : `Recovery: tow provider not yet assigned; owner is ${rc.owner}. `)
+    + (hz && rc.hazmatTeams[0] ? `Nearest private hazmat team: ${rc.hazmatTeams[0].name}. ` : '')
     + `Lanes blocked: unknown, driver to confirm. Driver ${inc.driver.name}${inc.driver.phone ? ' (' + inc.driver.phone + ')' : ''}. Callback: ${D.phone('dispatch', p.st)}. (Simulated call script)`;
   return {
     recommended: rec, needsAuthorities: rec.some((x) => x.urgency === 'now' || x.urgency === 'soon'), script,
     location: { lat: l.lat, lng: l.lng, address: l.address, road: p.road, direction: p.direction, city: p.city, state: p.st, nearestMileMarker: null, crossStreet: null },
     facts, hazmat: hz ? { present: true, notes: `${ld.contents.label.replace(' (likely)', '')}; est. ${ld.estimatedWeightLb.toLocaleString('en-US')} lb; placard/UN number NOT confirmed - ask driver to read the placard from a safe distance. Isolate and deny entry; wait for hazmat team.` } : null,
+    recovery: rc, hazmatTeams: rc.hazmatTeams,
     authorities: auth, ...SIMMARK, note: 'Simulated: no call is placed and no agency is contacted.',
   };
 }
@@ -133,7 +154,7 @@ function varsFor(inc, req) {
     camera: inc.camera.verified ? `Camera-verified (${inc.camera.aiVerdict.replace(/_/g, ' ')}, ${Math.round(inc.camera.confidence * 100)}%).` : 'No camera confirmation.',
     cargo: ld && ld.contents && ld.estimatedWeightLb > 300 ? `~${ld.estimatedWeightLb.toLocaleString('en-US')} lb ${ld.contents.label.replace(' (likely)', '').toLowerCase()}` : 'none / empty', cargoOwner: c.cargoOwner ? c.cargoOwner.name : 'shipper',
     response: rs.needed ? `${(rs.serviceType || '').replace(/_/g, ' ')} via ${prov ? prov.name : 'TBD'}, ETA ${rs.etaMin || 'TBD'} min` : 'monitoring; no roadside needed',
-    towDestination: td ? `${td.name} (${td.distanceMi} mi)` : 'TBD', jobLink: link, hazards: hz ? `HAZMAT: ${ld.contents.label.replace(' (likely)', '')}. ` : (inc.diagnostics && inc.diagnostics.drivable === 'no' ? 'Non-drivable. ' : ''),
+    towDestination: td ? `${td.name} (${td.distanceMi} mi)` : 'TBD', jobLink: link, hazards: hz ? `HAZMAT: ${ld.contents.label.replace(' (likely)', '')}. Hazmat-certified recovery required${prov && !roadside.isHazmatCertified(prov.id) ? ' - if you cannot handle hazmat, tell us now and stand by for the hazmat team' : ''}. This is a request from the vehicle owner (${inc.fleetName}). ` : `Request from the vehicle owner (${inc.fleetName}). ` + (inc.diagnostics && inc.diagnostics.drivable === 'no' ? 'Non-drivable. ' : ''),
     codes: inc.diagnostics ? inc.diagnostics.dtcs.map((d) => d.code).join(', ') : 'n/a', policyNo: c.insurer.policyNo, trailer: tr && tr.attached ? ` pulling a ${tr.lengthFt}ft ${tr.type.replace('_', ' ')}` : '',
     injuries: 'unknown - driver being contacted', hazmatLine: hz ? `Hazmat aboard (${ld.contents.label.replace(' (likely)', '')}). ` : '', lanes: 'unknown, driver to confirm', callback: c.dispatchCallback,
     spoilage: ld && ld.contents && ld.contents.spoilageRiskHours ? `Estimated spoilage window: ${ld.contents.spoilageRiskHours} hours.` : '', reefer: rf ? `${rf.setpointF}F, unit ${rf.unitRunning ? 'running' : 'NOT running'}` : 'n/a', claimRef: inc.fnol ? inc.fnol.claimRef : '(pending)',
@@ -285,7 +306,8 @@ function ticket(job, inc, req) {
   const p = place(inc), ld = inc.load, tr = inc.equipment && inc.equipment.trailer, rs = inc.roadside || {};
   const hz = ld && ld.contents && ld.contents.hazmat;
   const hazards = [];
-  if (hz) hazards.push(`HAZMAT: ${ld.contents.label.replace(' (likely)', '')} - placard unconfirmed, keep clear until hazmat team clears`);
+  if (hz) hazards.push(`HAZMAT: ${ld.contents.label.replace(' (likely)', '')} - placard unconfirmed, keep clear until hazmat team clears. Hazmat-certified recovery required: tell dispatch immediately if you cannot handle it`);
+  hazards.push(`Requested by the vehicle owner (${inc.fleetName})`);
   if ((inc.risk.tags || []).includes('airbag_deployed')) hazards.push('Airbag deployed - possible fluid leaks');
   if (inc.eventType === 'rollover') hazards.push('Rolled vehicle - heavy recovery equipment (rotator) likely required');
   if (ld && ld.contents && ld.contents.temperatureSensitive) hazards.push('Perishable cargo - time sensitive');
@@ -509,4 +531,4 @@ async function seedOps({ now = new Date() } = {}) {
 }
 function claimsPre(inc) { const cp = inc.warranty.claimPacket; cp.preAuthNumber = `PA-${inc.warranty.oem.slice(0, 3).toUpperCase()}-${String(inc.id).replace(/\D/g, '')}`; inc.warrantyDealer.preAuthNumber = cp.preAuthNumber; }
 
-module.exports = { router, contacts, authorities, brief, sop, notify, varsFor, createJob, seedOps, submitClaim, sendFnol, logComms };
+module.exports = { recoveryCheck, router, contacts, authorities, brief, sop, notify, varsFor, createJob, seedOps, submitClaim, sendFnol, logComms };

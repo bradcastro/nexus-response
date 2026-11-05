@@ -120,4 +120,23 @@ const MODELS = {
 const FIRST = ['James','Marcus','Luis','Tyrone','Derek','Carlos','Brandon','Wesley','Terrell','Kevin','Antonio','Jamal','Ray','Dale','Travis','Cody','Hector','Raymond','Calvin','Darnell','Shawn','Greg','Miguel','Andre','Lamar','Nate','Robert','Chris','Keith','Dwayne','Maria','Tasha','Angela','Denise','Brittany','Keisha','Sandra','Latoya','Rachel','Monica'];
 const LAST = ['Johnson','Williams','Brown','Jones','Garcia','Miller','Davis','Rodriguez','Martinez','Hernandez','Wilson','Anderson','Thomas','Taylor','Moore','Jackson','Martin','Lee','Thompson','White','Harris','Clark','Lewis','Robinson','Walker','Young','Allen','King','Wright','Scott','Hill','Green','Adams','Baker','Nelson','Carter','Mitchell','Perez','Roberts','Turner'];
 
-module.exports = { FLEETS, LOCATIONS, PROVIDERS, MODELS, FIRST, LAST };
+// Hazmat response teams (SYNTHETIC names/locations for the demo; replace with a vetted directory later).
+const HAZMAT_TEAMS = [
+  { id: 'hz_gulf', name: 'Gulf Coast Hazmat Response', city: 'Mobile', st: 'AL', lat: 30.6954, lng: -88.0399, capabilities: ['spill_containment', 'decontamination', 'cargo_transfer'], rating: 4.8 },
+  { id: 'hz_capital', name: 'Capital Region Hazmat & Spill', city: 'Montgomery', st: 'AL', lat: 32.3792, lng: -86.3077, capabilities: ['spill_containment', 'decontamination', 'foam_suppression'], rating: 4.7 },
+  { id: 'hz_magic', name: 'Magic City Environmental Response', city: 'Birmingham', st: 'AL', lat: 33.5207, lng: -86.8025, capabilities: ['spill_containment', 'cargo_transfer', 'air_monitoring'], rating: 4.6 },
+  { id: 'hz_peach', name: 'Peach State Emergency Environmental', city: 'Atlanta', st: 'GA', lat: 33.749, lng: -84.388, capabilities: ['spill_containment', 'decontamination', 'air_monitoring'], rating: 4.7 },
+  { id: 'hz_coastalga', name: 'Coastal Georgia Spill Response', city: 'Savannah', st: 'GA', lat: 32.0809, lng: -81.0912, capabilities: ['spill_containment', 'cargo_transfer'], rating: 4.5 },
+  { id: 'hz_panhandle', name: 'Panhandle Hazmat Services', city: 'Pensacola', st: 'FL', lat: 30.4213, lng: -87.2169, capabilities: ['spill_containment', 'decontamination'], rating: 4.6 },
+  { id: 'hz_jax', name: 'First Coast Hazmat Response', city: 'Jacksonville', st: 'FL', lat: 30.3322, lng: -81.6557, capabilities: ['spill_containment', 'foam_suppression', 'cargo_transfer'], rating: 4.6 },
+  { id: 'hz_magnolia', name: 'Magnolia State Hazmat Team', city: 'Jackson', st: 'MS', lat: 32.2988, lng: -90.1848, capabilities: ['spill_containment', 'decontamination', 'cargo_transfer'], rating: 4.5 },
+  { id: 'hz_volunteer', name: 'Volunteer Emergency Environmental', city: 'Nashville', st: 'TN', lat: 36.1627, lng: -86.7816, capabilities: ['spill_containment', 'air_monitoring', 'cargo_transfer'], rating: 4.7 },
+  { id: 'hz_bluegrass', name: 'Bluegrass Hazmat & Remediation', city: 'Louisville', st: 'KY', lat: 38.2527, lng: -85.7585, capabilities: ['spill_containment', 'decontamination', 'foam_suppression'], rating: 4.6 },
+  { id: 'hz_buckeye', name: 'Buckeye Hazmat Response', city: 'Columbus', st: 'OH', lat: 39.9612, lng: -83.0007, capabilities: ['spill_containment', 'cargo_transfer', 'air_monitoring'], rating: 4.7 },
+  { id: 'hz_queencity', name: 'Queen City Environmental Response', city: 'Cincinnati', st: 'OH', lat: 39.1031, lng: -84.512, capabilities: ['spill_containment', 'decontamination', 'foam_suppression'], rating: 4.8 },
+  { id: 'hz_carolina', name: 'Carolinas Hazmat Response', city: 'Charlotte', st: 'NC', lat: 35.2271, lng: -80.8431, capabilities: ['spill_containment', 'decontamination', 'cargo_transfer'], rating: 4.6 },
+];
+// Heavy-recovery providers certified to handle hazmat loads (synthetic). Others must be told hazmat is needed.
+const HAZMAT_CERTIFIED = ['prov_elite', 'prov_magic', 'prov_metroatl', 'prov_derby', 'prov_buckeye', 'prov_queen'];
+
+module.exports = { FLEETS, LOCATIONS, PROVIDERS, HAZMAT_TEAMS, HAZMAT_CERTIFIED, MODELS, FIRST, LAST };
