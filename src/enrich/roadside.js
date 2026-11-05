@@ -1,8 +1,8 @@
 // Roadside recommender: service type from event/DTC, provider list with ETA from haversine distance.
-const { PROVIDERS, HAZMAT_TEAMS, HAZMAT_CERTIFIED } = require('../data/ref');
+const { PROVIDERS, HAZMAT_TEAMS, HAZMAT_CERTIFIED, RISC_CERTIFIED, CLEARANCE_RULES } = require('../data/ref');
 const { haversineMi, round } = require('../util');
 
-let providers = PROVIDERS.map((p) => ({ ...p, phone: `+1${p.lat.toFixed(3).replace(/\D/g, '').slice(0, 3)}555${String(Math.abs(Math.round(p.lng * 100)) % 10000).padStart(4, '0')}`, available24x7: true, hazmatCertified: HAZMAT_CERTIFIED.includes(p.id) }));
+let providers = PROVIDERS.map((p) => ({ ...p, phone: `+1${p.lat.toFixed(3).replace(/\D/g, '').slice(0, 3)}555${String(Math.abs(Math.round(p.lng * 100)) % 10000).padStart(4, '0')}`, available24x7: true, hazmatCertified: HAZMAT_CERTIFIED.includes(p.id), riscCertified: RISC_CERTIFIED.includes(p.id) }));
 const setProviders = (p) => { providers = p; };
 const getProviders = () => providers;
 
@@ -50,7 +50,7 @@ function recommend(inc, vehicleCls) {
   if (!base.needed || !inc.location || inc.location.lat == null) return base;
   const list = listNear(inc.location.lat, inc.location.lng, serviceType);
   if (!list.length) return base;
-  const slim = (p) => ({ hazmatCertified: !!p.hazmatCertified, id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st });
+  const slim = (p) => ({ hazmatCertified: !!p.hazmatCertified, riscCertified: !!p.riscCertified, id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st });
   base.recommendedProvider = slim(list[0]);
   base.etaMin = list[0].etaMin;
   base.alternatives = list.slice(1, 3).map(slim);
@@ -64,21 +64,38 @@ function listHazmatTeams(lat, lng, limit = 3) {
     return { ...t, phone: teamPhone(t), available24x7: true, distanceMi: d == null ? null : round(d, 1), etaMin: d == null ? null : etaFor(d) + 12 };
   }).sort((a, b) => (a.distanceMi ?? 1e9) - (b.distanceMi ?? 1e9)).slice(0, limit);
 }
-// Hazmat load: recommend the nearest hazmat-certified tow provider, even if a non-certified one is closer.
-function preferHazmat(inc) {
-  const rs = inc.roadside, ld = inc.load;
-  if (!rs || !rs.needed || rs.assignedProvider || !(ld && ld.contents && ld.contents.hazmat) || !inc.location || inc.location.lat == null) return;
-  if (!String(rs.serviceType).startsWith('tow')) return;
+// What this scene demands of the recovery vendor: hazmat certification and/or a state clearance program (FL RISC).
+function stateOf(inc) { const m = /,\s*([A-Z]{2})\s*$/.exec((inc.location && inc.location.address) || ''); return m ? m[1] : null; }
+function clearanceFor(inc) {
+  const st = stateOf(inc), rule = st && CLEARANCE_RULES[st];
+  if (!rule) return null;
+  const interstate = /^I-\d+/.test((inc.location && inc.location.address) || '');
+  if (rule.interstateOnly && !interstate) return null;
+  return { state: st, program: rule.program, fullName: rule.fullName, requires: rule.requires, targetMin: rule.targetMin, note: rule.note };
+}
+function requirementsFor(inc) {
+  const ld = inc.load;
+  return { hazmat: !!(ld && ld.contents && ld.contents.hazmat), clearance: clearanceFor(inc) };
+}
+const unmetFor = (req, p) => (req.hazmat && !p.hazmatCertified ? 1 : 0) + (req.clearance && req.clearance.requires === 'risc' && !p.riscCertified ? 1 : 0);
+// Recommend the nearest provider that meets the scene requirements, even if an unqualified one is closer.
+function preferQualified(inc) {
+  const rs = inc.roadside;
+  if (!rs || !rs.needed || !inc.location || inc.location.lat == null) return;
+  const req = requirementsFor(inc);
+  rs.requirements = { hazmat: req.hazmat, clearance: req.clearance };
+  if (rs.assignedProvider || !String(rs.serviceType).startsWith('tow') || (!req.hazmat && !req.clearance)) return;
   const list = listNear(inc.location.lat, inc.location.lng, rs.serviceType);
-  const cert = list.filter((p) => p.hazmatCertified);
-  if (!cert.length) { rs.rationale += ' Hazmat load: no hazmat-certified provider on file nearby; request a hazmat team.'; return; }
-  const slim = (p) => ({ hazmatCertified: !!p.hazmatCertified, id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st });
-  const rest = list.filter((p) => !p.hazmatCertified);
-  const ordered = [...cert, ...rest];
-  const nearestOverall = list[0];
-  rs.recommendedProvider = slim(ordered[0]); rs.etaMin = ordered[0].etaMin; rs.alternatives = ordered.slice(1, 3).map(slim);
-  rs.rationale += nearestOverall.id !== ordered[0].id ? ` Hazmat load: nearest hazmat-certified provider chosen over the closer ${nearestOverall.name}.` : ' Hazmat load: nearest provider is hazmat-certified.';
+  if (!list.length) return;
+  const slim = (p) => ({ hazmatCertified: !!p.hazmatCertified, riscCertified: !!p.riscCertified, id: p.id, name: p.name, etaMin: p.etaMin, distanceMi: p.distanceMi, phone: p.phone, rating: p.rating, city: p.city, st: p.st });
+  const ordered = list.map((p, i) => ({ p, i })).sort((a, b) => unmetFor(req, a.p) - unmetFor(req, b.p) || a.i - b.i).map((x) => x.p);
+  const top = ordered[0], nearest = list[0], why = [];
+  if (req.hazmat) why.push('hazmat');
+  if (req.clearance) why.push(`${req.clearance.program}`);
+  if (unmetFor(req, top)) rs.rationale += ` Scene needs ${why.join(' + ')} qualification: no fully qualified provider on file nearby; escalate to dispatch.`;
+  else rs.rationale += nearest.id !== top.id ? ` Scene needs ${why.join(' + ')} qualification: nearest qualified provider chosen over the closer ${nearest.name}.` : ` Scene needs ${why.join(' + ')} qualification: nearest provider is qualified.`;
+  rs.recommendedProvider = slim(top); rs.etaMin = top.etaMin; rs.alternatives = ordered.slice(1, 3).map(slim);
 }
 const isHazmatCertified = (id) => !!(providers.find((p) => p.id === id) || {}).hazmatCertified;
 
-module.exports = { preferHazmat, listHazmatTeams, isHazmatCertified, recommend, listNear, serviceFor, setProviders, getProviders, etaFor };
+module.exports = { preferQualified, preferHazmat: preferQualified, requirementsFor, clearanceFor, unmetFor, listHazmatTeams, isHazmatCertified, recommend, listNear, serviceFor, setProviders, getProviders, etaFor };

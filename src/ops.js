@@ -67,11 +67,13 @@ function recoveryCheck(inc) {
   const teams = hz && inc.location && inc.location.lat != null ? roadside.listHazmatTeams(inc.location.lat, inc.location.lng, 3) : [];
   if (!prov) return { assigned: false, hazmatRequired: hz, ownersRequest: true, owner, hazmatTeams: teams, summary: hz ? 'No tow provider assigned yet. Hazmat load: pick a hazmat-certified provider.' : 'No tow provider assigned yet.' };
   const certified = roadside.isHazmatCertified(prov.id);
-  const capable = hz ? certified : true;
+  const clr = roadside.clearanceFor(inc), risc = !!(clr && clr.requires === 'risc');
+  const riscOk = !risc || !!(roadside.getProviders().find((x) => x.id === prov.id) || {}).riscCertified;
+  const capable = (hz ? certified : true) && riscOk;
   return {
     assigned: true, provider: { id: prov.id, name: prov.name, phone: prov.phone, etaMin: rs.etaMin || prov.etaMin || null }, ownersRequest: true, owner, hazmatRequired: hz, hazmatCertified: certified, capable,
-    hazmatNotified: hz && !certified, hazmatTeams: teams,
-    summary: !hz ? `${prov.name} dispatched at the owner's request (${owner}).` : certified ? `${prov.name} is hazmat-certified and dispatched at the owner's request (${owner}).` : `${prov.name} is NOT hazmat-certified. They have been told hazmat is required; a hazmat response team is needed on scene.`,
+    hazmatNotified: hz && !certified, hazmatTeams: teams, clearance: clr, riscRequired: risc, riscQualified: riscOk,
+    summary: (risc && !riscOk) ? `${prov.name} is NOT ${clr.program}-qualified. This is a ${clr.state} interstate scene: dispatch a ${clr.program}-qualified vendor${hz && !certified ? ' and a hazmat team' : ''}.` : !hz ? `${prov.name} dispatched at the owner's request (${owner}).` : certified ? `${prov.name} is hazmat-certified and dispatched at the owner's request (${owner}).` : `${prov.name} is NOT hazmat-certified. They have been told hazmat is required; a hazmat response team is needed on scene.`,
   };
 }
 
@@ -97,6 +99,7 @@ function brief(inc) {
     + `Vehicle: ${veh}${trailer ? ' pulling a ' + trailer : ''}. Injuries: ${airbag ? 'unknown - airbag deployed, please send EMS' : 'unknown, driver being contacted'}. `
     + (hz ? `HAZMAT: ${ld.contents.label.replace(' (likely)', '')} aboard, placard unconfirmed - request hazmat response. ` : '')
     + (rc.assigned ? `Recovery: ${rc.provider.name} has been dispatched at the request of the vehicle's owner, ${rc.owner}, and is en route${rc.provider.etaMin ? ', ETA ' + Math.round(rc.provider.etaMin) + ' min' : ''}. ${hz ? (rc.hazmatCertified ? 'The tow company is hazmat-certified.' : 'The tow company is not hazmat-certified and has been notified that hazmat is required; please send hazmat response.') + ' ' : ''}` : `Recovery: tow provider not yet assigned; owner is ${rc.owner}. `)
+    + (rc.riscRequired ? (rc.riscQualified ? `${rc.clearance.program}-qualified recovery is on the way (${rc.clearance.state} interstate clearance program). ` : `This is a ${rc.clearance.state} interstate: the dispatched tow company is not ${rc.clearance.program}-qualified, a qualified vendor is being arranged. `) : '')
     + (hz && rc.hazmatTeams[0] ? `Nearest private hazmat team: ${rc.hazmatTeams[0].name}. ` : '')
     + `Lanes blocked: unknown, driver to confirm. Driver ${inc.driver.name}${inc.driver.phone ? ' (' + inc.driver.phone + ')' : ''}. Callback: ${D.phone('dispatch', p.st)}. (Simulated call script)`;
   return {
@@ -136,6 +139,11 @@ async function templatesFor(kind) {
   const over = new Map((await db.list('template', { limit: 1000 })).map((o) => [o.id, o]));
   return D.TEMPLATES.filter((t) => !kind || t.kind === kind).map((t) => ({ ...t, ...(over.get(t.key) ? { subject: over.get(t.key).subject !== undefined ? over.get(t.key).subject : t.subject, body: over.get(t.key).body || t.body, edited: true } : { edited: false }) }));
 }
+function riscTxt(inc, prov) {
+  const c = roadside.clearanceFor(inc); if (!c || c.requires !== 'risc') return '';
+  const ok = prov && (roadside.getProviders().find((x) => x.id === prov.id) || {}).riscCertified;
+  return `${c.state} interstate: ${c.program}-qualified vendor required, clearance target ${c.targetMin} min${ok ? '' : ' - if you are not qualified, tell us now'}. `;
+}
 function varsFor(inc, req) {
   const p = place(inc), rs = inc.roadside || {}, prov = rs.assignedProvider || rs.recommendedProvider;
   const ld = inc.load, c = contacts(inc);
@@ -154,7 +162,7 @@ function varsFor(inc, req) {
     camera: inc.camera.verified ? `Camera-verified (${inc.camera.aiVerdict.replace(/_/g, ' ')}, ${Math.round(inc.camera.confidence * 100)}%).` : 'No camera confirmation.',
     cargo: ld && ld.contents && ld.estimatedWeightLb > 300 ? `~${ld.estimatedWeightLb.toLocaleString('en-US')} lb ${ld.contents.label.replace(' (likely)', '').toLowerCase()}` : 'none / empty', cargoOwner: c.cargoOwner ? c.cargoOwner.name : 'shipper',
     response: rs.needed ? `${(rs.serviceType || '').replace(/_/g, ' ')} via ${prov ? prov.name : 'TBD'}, ETA ${rs.etaMin || 'TBD'} min` : 'monitoring; no roadside needed',
-    towDestination: td ? `${td.name} (${td.distanceMi} mi)` : 'TBD', jobLink: link, hazards: hz ? `HAZMAT: ${ld.contents.label.replace(' (likely)', '')}. Hazmat-certified recovery required${prov && !roadside.isHazmatCertified(prov.id) ? ' - if you cannot handle hazmat, tell us now and stand by for the hazmat team' : ''}. This is a request from the vehicle owner (${inc.fleetName}). ` : `Request from the vehicle owner (${inc.fleetName}). ` + (inc.diagnostics && inc.diagnostics.drivable === 'no' ? 'Non-drivable. ' : ''),
+    towDestination: td ? `${td.name} (${td.distanceMi} mi)` : 'TBD', jobLink: link, hazards: hz ? `HAZMAT: ${ld.contents.label.replace(' (likely)', '')}. Hazmat-certified recovery required${prov && !roadside.isHazmatCertified(prov.id) ? ' - if you cannot handle hazmat, tell us now and stand by for the hazmat team' : ''}. This is a request from the vehicle owner (${inc.fleetName}). ` + riscTxt(inc, prov) : `Request from the vehicle owner (${inc.fleetName}). ` + riscTxt(inc, prov) + (inc.diagnostics && inc.diagnostics.drivable === 'no' ? 'Non-drivable. ' : ''),
     codes: inc.diagnostics ? inc.diagnostics.dtcs.map((d) => d.code).join(', ') : 'n/a', policyNo: c.insurer.policyNo, trailer: tr && tr.attached ? ` pulling a ${tr.lengthFt}ft ${tr.type.replace('_', ' ')}` : '',
     injuries: 'unknown - driver being contacted', hazmatLine: hz ? `Hazmat aboard (${ld.contents.label.replace(' (likely)', '')}). ` : '', lanes: 'unknown, driver to confirm', callback: c.dispatchCallback,
     spoilage: ld && ld.contents && ld.contents.spoilageRiskHours ? `Estimated spoilage window: ${ld.contents.spoilageRiskHours} hours.` : '', reefer: rf ? `${rf.setpointF}F, unit ${rf.unitRunning ? 'running' : 'NOT running'}` : 'n/a', claimRef: inc.fnol ? inc.fnol.claimRef : '(pending)',
@@ -328,6 +336,51 @@ function ticket(job, inc, req) {
     notes: (inc.timeline || []).filter((e) => e.action === 'note' && e.actor === 'dispatcher').map((e) => ({ t: e.t, note: e.note })).slice(-5),
     etaMin: (rs.assignedProvider && rs.assignedProvider.etaMin) || rs.etaMin || null, events: job.events, actions: ['accept', 'decline', 'eta', 'arrived', 'complete'],
     incidentStatus: inc.status,
+    briefing: briefing(job, inc),
+  };
+}
+function briefing(job, inc) {
+  const rs = inc.roadside || {}, ld = inc.load, tr = inc.equipment && inc.equipment.trailer, cam = inc.camera || {};
+  const prov = rs.assignedProvider || { id: job.providerId, name: job.providerName };
+  const pv = roadside.getProviders().find((x) => x.id === prov.id) || {};
+  const req = roadside.requirementsFor(inc);
+  const hz = req.hazmat, clr = req.clearance;
+  const calls = (inc.timeline || []).filter((e) => e.action === 'notified_authority');
+  const called = calls.map((e) => { const m = /^\w+ to (.+?)(?: \+\d| - )/.exec(e.note || ''); return { t: e.t, agency: m ? m[1] : (e.note || 'Authority'), kind: e.meta && e.meta.agencyKind || null, note: e.note }; });
+  const calledKinds = new Set(called.map((c) => c.kind).filter(Boolean));
+  let recommended = [];
+  try { recommended = authorities(inc).filter((a) => a.recommended).map((a) => ({ agency: a.agency, kind: a.kind, urgency: a.urgency })); } catch (e) { /* none */ }
+  const pending = recommended.filter((a) => !calledKinds.has(a.kind) && !called.some((c) => c.agency === a.agency));
+  const hasMedia = (cam.clips && cam.clips.length) || (cam.snapshots && cam.snapshots.length) || cam.verified;
+  const base = `/api/jobs/${job.token}/media`;
+  const frames = hasMedia && inc.camera.aiVerdict !== 'false_positive' ? [
+    { key: 'before', label: 'About 8 s before', type: 'road', url: `${base}/before.svg` },
+    { key: 'event', label: 'At the event', type: 'road', url: `${base}/event.svg` },
+    { key: 'after', label: 'About 20 s after', type: 'road', url: `${base}/after.svg` },
+    ...((cam.clips || []).some((c) => c.type === 'driver') ? [{ key: 'driver', label: 'Driver-facing', type: 'driver', url: `${base}/driver.svg` }] : []),
+  ] : [];
+  const dx = inc.diagnostics;
+  const codes = dx && dx.dtcs ? dx.dtcs.map((d) => ({ code: d.code, desc: d.desc, system: d.system, severity: d.severity, fix: d.recommendedAction, parts: d.partsHint, drivable: d.drivable, estCostUsd: d.estCostUsd })) : [];
+  const parts = [...new Set(codes.map((c) => c.parts).filter((x) => x && !/^TBD/.test(x)))];
+  const bring = [];
+  const st = rs.serviceType || '';
+  if (st === 'tow_heavy') bring.push(`Heavy wrecker${inc.eventType === 'rollover' ? ' or rotator, with recovery rigging' : ''}`);
+  else if (st === 'tow_light') bring.push('Light-duty tow truck or flatbed');
+  else if (st === 'mobile_mechanic') bring.push('Service truck with scan tool, fluids and hand tools');
+  else if (st === 'tire') bring.push('Tire service truck with matching tire and mounting gear');
+  else if (st === 'jump_start') bring.push('Jump pack and battery load tester');
+  parts.forEach((x) => bring.push(`Parts to consider: ${x}`));
+  if (st.startsWith('tow') && tr && tr.attached && ld && ld.estimatedWeightLb > 20000) bring.push('Plan for a loaded trailer: separate trailer tow or load transfer may be needed');
+  if (hz) bring.push('Hazmat PPE, absorbents and containment (placard unconfirmed)');
+  if (inc.eventType === 'rollover') bring.push('Spill and fluid containment; extra rigging for the trailer');
+  const acc = called.length;
+  return {
+    owner: { name: inc.fleetName, requested: true, statement: acc ? `${inc.fleetName} (the vehicle owner) requested your company. Authorities have been told that ${prov.name} was requested by the owner and is en route.` : `${inc.fleetName} (the vehicle owner) requested your company. When authorities are called, ${prov.name} will be named as the owner-requested recovery provider.`, namedToAuthorities: acc > 0 },
+    requirements: { hazmat: hz, hazmatCertified: !!pv.hazmatCertified, clearance: clr, clearanceQualified: clr ? !!pv.riscCertified : null },
+    camera: { verified: !!cam.verified, verdict: cam.aiVerdict || null, confidence: cam.confidence != null ? Math.round(cam.confidence * 100) : null, frames, clips: (cam.clips || []).map((c) => ({ type: c.type, durationSec: c.durationSec, url: c.url })), note: frames.length ? 'Demo frames. With a live camera vendor these are the real frames and clips from before and after the event.' : 'No camera media for this event.' },
+    service: { codes, parts, drivable: dx ? dx.drivable : null, faultLampOn: dx ? !!dx.faultLampOn : null, reason: rs.rationale || null },
+    authorities: { called, pending },
+    bring,
   };
 }
 
@@ -447,6 +500,12 @@ async function loadJob(req, res) {
   if (!inc) { res.status(404).json({ error: 'Incident not found' }); return {}; }
   return { job, inc };
 }
+router.get('/api/jobs/:token/media/:kind.svg', wrap(async (req, res) => {
+  const { job, inc } = await loadJob(req, res); if (!job) return;
+  const K = { before: ['road', { phase: 'before', tag: 'T-8s' }], event: ['road', { tag: 'EVENT' }], after: ['road', { phase: 'after', tag: 'T+20s' }], driver: ['driver', { tag: 'EVENT' }] }[req.params.kind];
+  if (!K) return res.status(404).json({ error: 'Unknown frame' });
+  res.type('image/svg+xml').set('Cache-Control', 'private, max-age=300').send(require('./media').frame(inc, K[0], K[1]));
+}));
 router.get('/api/jobs/:token', wrap(async (req, res) => { const { job, inc } = await loadJob(req, res); if (job) res.json(ticket(job, inc, req)); }));
 const JOB_ACTIONS = {
   accept: { job: 'accepted', inc: 'en_route', action: 'en_route', note: (b) => `Provider accepted the job${b.etaMin ? `, ETA ${b.etaMin} min` : ''}` },

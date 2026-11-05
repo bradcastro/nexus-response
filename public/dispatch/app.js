@@ -310,7 +310,7 @@
         var rr = i.roadside || {};
         [rr.assignedProvider, rr.recommendedProvider].concat(rr.alternatives || []).forEach(function (x) { if (x && x.id && !S.providers.some(function (p) { return p.id === x.id; })) { var full = x; S.providers.push(full); } });
         var hzL = hazLoad(i);
-        S.providers.sort(function (a, b) { return (hzL ? (!!b.hazmatCertified - !!a.hazmatCertified) : 0) || (a.etaMin == null) - (b.etaMin == null) || a.etaMin - b.etaMin; });
+        S.providers.sort(function (a, b) { return (hzL ? (!!b.hazmatCertified - !!a.hazmatCertified) : 0) || (needsOf(i).clearance ? (!!b.riscCertified - !!a.riscCertified) : 0) || (a.etaMin == null) - (b.etaMin == null) || a.etaMin - b.etaMin; });
         var r = i.roadside || {};
         S.pick = (r.assignedProvider || r.recommendedProvider || S.providers[0] || {}).id || null;
         renderDetail(); drawSelection();
@@ -496,6 +496,13 @@
       '<div class="drive" style="--c:' + dr[0] + '"><span class="lamp" style="' + (d.faultLampOn ? '' : 'background:var(--nx-text-faint);box-shadow:none') + '" title="Fault lamp"></span><div><b>' + dr[1] + '</b><br><span>' + dr[2] + (d.faultLampOn ? ' Fault lamp on.' : '') + '</span></div></div>' +
       '<table class="dtc"><thead><tr><th>Code</th><th>Decoded</th><th>System</th><th>Sev</th></tr></thead><tbody>' + rows + '</tbody></table>');
   }
+  function needsOf(i) { var q = (i.roadside || {}).requirements || {}; return { hazmat: q.hazmat != null ? q.hazmat : hazLoad(i), clearance: q.clearance || null }; }
+  function qualBadges(i, p) {
+    var n = needsOf(i), out = '';
+    if (n.hazmat) out += '<div class="pm" style="color:' + (p.hazmatCertified ? 'var(--nx-success)' : 'var(--nx-danger)') + '">' + (p.hazmatCertified ? 'Hazmat-certified' : 'Not hazmat-certified') + '</div>';
+    if (n.clearance) out += '<div class="pm" style="color:' + (p.riscCertified ? 'var(--nx-success)' : 'var(--nx-danger)') + '">' + (p.riscCertified ? n.clearance.program + '-qualified' : 'Not ' + n.clearance.program + '-qualified') + '</div>';
+    return out;
+  }
   function hazLoad(i) { return !!(i && i.load && i.load.contents && i.load.contents.hazmat); }
   function roadsideHTML(i) {
     var r = i.roadside || {}, asg = r.assignedProvider, rec = r.recommendedProvider, closed = isClosed(i);
@@ -503,11 +510,16 @@
     var shown = asg || rec;
     var top = shown ? '<div class="rec-prov"><div class="nx-grow"><div class="nx-eyebrow">' + (asg ? 'Assigned provider' : 'Recommended provider') + '</div><div style="font-weight:600;margin-top:5px">' + esc(shown.name) + '</div><div class="nx-dim" style="font-size:12px">' + esc(fmt.label(r.serviceType || 'service')) + (shown.distanceMi != null ? ' &middot; ' + shown.distanceMi + ' mi' : '') + '</div></div><div class="eta"><b>' + (shown.etaMin != null ? Math.round(shown.etaMin) : (r.etaMin != null ? Math.round(r.etaMin) : '--')) + '</b><span>ETA MIN</span></div></div>' : '<p class="nx-dim">Service type: ' + esc(fmt.label(r.serviceType || 'unspecified')) + '. No provider recommended yet.</p>';
     var provs = S.providers.slice(0, 6).map(function (p) {
-      return '<div class="prov' + (S.pick === p.id ? ' is-picked' : '') + '" data-prov="' + esc(p.id) + '"><span class="radio"></span><div class="nx-grow"><div class="pn">' + esc(p.name) + '</div><div class="pm">' + esc([p.distanceMi != null ? p.distanceMi + ' mi' : '', (p.services || []).slice(0, 3).join(', ')].filter(Boolean).join(' | ')) + '</div>' + (hazLoad(i) ? '<div class="pm" style="color:' + (p.hazmatCertified ? 'var(--nx-success)' : 'var(--nx-danger)') + '">' + (p.hazmatCertified ? 'Hazmat-certified' : 'Not hazmat-certified') + '</div>' : '') + '</div><div class="pe">' + (p.etaMin != null ? Math.round(p.etaMin) + ' min' : '') + '</div></div>';
+      return '<div class="prov' + (S.pick === p.id ? ' is-picked' : '') + '" data-prov="' + esc(p.id) + '"><span class="radio"></span><div class="nx-grow"><div class="pn">' + esc(p.name) + '</div><div class="pm">' + esc([p.distanceMi != null ? p.distanceMi + ' mi' : '', (p.services || []).slice(0, 3).join(', ')].filter(Boolean).join(' | ')) + '</div>' + qualBadges(i, p) + '</div><div class="pe">' + (p.etaMin != null ? Math.round(p.etaMin) + ' min' : '') + '</div></div>';
     }).join('');
     var pickedP = S.providers.find(function (p) { return p.id === S.pick; });
-    var hzWarn = '';
-    if (hazLoad(i)) { var chk = pickedP || S.providers.find(function (p) { return asg && p.id === asg.id; }) || shown; if (chk && chk.hazmatCertified === false) hzWarn = '<div class="verif warn" style="margin-top:10px"><b>Hazmat load, provider not certified</b><span>' + esc(chk.name) + ' is not hazmat-certified. They will be told hazmat is required; request a hazmat team via Call authorities.</span></div>'; else if (chk && chk.hazmatCertified) hzWarn = '<div class="verif ok" style="margin-top:10px"><b>Hazmat check passed</b><span>' + esc(chk.name) + ' is hazmat-certified.</span></div>'; }
+    var hzWarn = '', nd = needsOf(i), chk = pickedP || S.providers.find(function (p) { return asg && p.id === asg.id; }) || shown;
+    if (chk && (nd.hazmat || nd.clearance)) {
+      var bad = [];
+      if (nd.hazmat && !chk.hazmatCertified) bad.push('hazmat-certified');
+      if (nd.clearance && !chk.riscCertified) bad.push(nd.clearance.program + '-qualified');
+      hzWarn = bad.length ? '<div class="verif warn" style="margin-top:10px"><b>Provider not ' + esc(bad.join(' or ')) + '</b><span>' + esc(chk.name) + ' does not meet this scene\'s requirements. They will be told what is needed' + (nd.clearance ? ' (' + esc(nd.clearance.state) + ' interstate, target ' + nd.clearance.targetMin + ' min)' : '') + '. Prefer a qualified provider' + (nd.hazmat ? ' and request a hazmat team via Call authorities' : '') + '.</span></div>' : '<div class="verif ok" style="margin-top:10px"><b>Requirements met</b><span>' + esc(chk.name) + ' is ' + [nd.hazmat ? 'hazmat-certified' : '', nd.clearance ? nd.clearance.program + '-qualified' : ''].filter(Boolean).join(' and ') + '.</span></div>';
+    }
     var lbl = asg ? 'Re-dispatch' : 'Dispatch' + (pickedP ? ' ' + esc(pickedP.name) : '');
     var dis = closed ? ' disabled' : '';
     return panel('Roadside', NX.badgeHTML(asg ? 'Assigned' : r.needed ? 'Needed' : 'Optional', asg ? 'ok' : r.needed ? 'accent' : 'plain'),

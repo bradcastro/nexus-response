@@ -30,7 +30,7 @@
       eventType: pick(j, 'eventType') || inc.eventType, fleet: pick(j, 'fleetName', 'fleet.name') || inc.fleetName, loc: loc, veh: veh, eq: eq, ld: ld, drop: drop,
       contact: contact, notes: pick(j, 'notes', 'note', 'instructions'), eta: num(pick(j, 'etaMin', 'eta')), expiresAt: pick(j, 'expiresAt'), driver: pick(j, 'driver') || inc.driver || null,
       provider: pick(j, 'providerName', 'provider.name'), simulated: true, hazardsIn: j.hazards || null, tags: (inc.risk && inc.risk.tags) || j.tags || [], sev: pick(j, 'severity') || inc.severity,
-      equipmentNeeded: pick(j, 'equipmentNeeded', 'whatToBring', 'equipmentClass'), warranty: wd, dtcs: (inc.diagnostics && inc.diagnostics.dtcs) || j.dtcs || null, drivable: pick(j, 'drivable') || (inc.diagnostics && inc.diagnostics.drivable) || null
+      brief: j.briefing || null, equipmentNeeded: pick(j, 'equipmentNeeded', 'whatToBring', 'equipmentClass'), warranty: wd, dtcs: (inc.diagnostics && inc.diagnostics.dtcs) || j.dtcs || null, drivable: pick(j, 'drivable') || (inc.diagnostics && inc.diagnostics.drivable) || null
     };
     // server job status stays 'accepted' after an ETA post and uses 'arrived'; derive the stages this page shows
     if (out.status === 'arrived') out.status = 'on_scene';
@@ -129,6 +129,14 @@
     var hz = hazards(j);
     if (hz.length && !closed) app.appendChild(el('div', { class: 'jb-hazard' + (hz.some(function (h) { return h.crit; }) ? ' is-crit' : ''), role: 'alert' }, el('b', 'Read before you roll'), el('ul', hz.map(function (h) { return el('li', h.t); }))));
 
+    var B = j.brief;
+    if (B && !closed) {
+      app.appendChild(el('div.jb-card.jb-owner', el('h2', 'Requested by the owner'), el('div.jb-big', B.owner.name), el('p.jb-sub', B.owner.statement)));
+      var rq = B.requirements || {}, lines = [];
+      if (rq.hazmat) lines.push({ ok: rq.hazmatCertified, t: rq.hazmatCertified ? 'Hazmat load. Your company is on file as hazmat-certified.' : 'Hazmat load. Your company is NOT on file as hazmat-certified. Tell dispatch right away if you cannot handle it. A hazmat team is being arranged.' });
+      if (rq.clearance) lines.push({ ok: rq.clearanceQualified, t: rq.clearance.program + ' scene (' + rq.clearance.state + ' interstate). ' + (rq.clearanceQualified ? 'Your company is on file as ' + rq.clearance.program + '-qualified.' : 'Your company is NOT on file as ' + rq.clearance.program + '-qualified. Tell dispatch right away.') + ' Clearance target: ' + rq.clearance.targetMin + ' min from notification.' });
+      if (lines.length) app.appendChild(el('div', { class: 'jb-req' }, el('b', 'Scene requirements'), el('ul', lines.map(function (l) { return el('li', { class: l.ok ? 'ok' : 'bad' }, (l.ok ? '✓ ' : '! ') + l.t); }))));
+    }
     if (done) {
       app.appendChild(el('div.jb-card.jb-done', el('div.tick', '✓'), el('div.jb-title', 'Job complete'), el('p.jb-sub', 'Thank you. Dispatch has been notified.')));
     }
@@ -160,8 +168,37 @@
       el('div', { style: { marginTop: '12px' } }, el('a.jb-btn.jb-btn--pri', { href: nav, target: '_blank', rel: 'noopener' }, 'Navigate'))));
 
     // bring
-    app.appendChild(el('div.jb-card', el('h2', 'What to bring'), el('div.jb-big', equipment(j)),
-      j.dtcs && j.dtcs.length ? el('div.jb-note', { style: { marginTop: '8px' } }, 'Fault codes: ' + j.dtcs.slice(0, 4).map(function (d) { return d.code + (d.desc ? ' ' + d.desc : ''); }).join('; ')) : null));
+    var bringList = B && B.bring && B.bring.length ? B.bring : null;
+    var bc = el('div.jb-card', el('h2', 'What to bring'), bringList ? el('ul.jb-list', bringList.map(function (x) { return el('li', x); })) : el('div.jb-big', equipment(j)));
+    if (B && B.service && B.service.drivable) bc.appendChild(el('div.jb-note', { style: { marginTop: '8px' } }, 'Drivable: ' + plain(B.service.drivable) + (B.service.faultLampOn ? '. Fault lamp is on.' : '')));
+    app.appendChild(bc);
+
+    // fault codes, fixes, parts
+    if (B && B.service && B.service.codes && B.service.codes.length) {
+      app.appendChild(el('div.jb-card', el('h2', 'Fault codes, likely fixes and parts'), el('div.jb-codes', B.service.codes.map(function (c) {
+        return el('div.jb-code', el('div.jb-code-h', el('b', c.code), el('span', { class: 'jb-sev sev-' + (c.severity || '') }, plain(c.severity || ''))), el('div', c.desc || ''),
+          c.fix ? el('div.jb-note', el('b', 'Likely fix: '), c.fix) : null, c.parts && !/^TBD/.test(c.parts) ? el('div.jb-note', el('b', 'Parts: '), c.parts) : null,
+          el('div.jb-note', [c.system ? c.system : '', c.drivable ? 'Drivable: ' + c.drivable : ''].filter(Boolean).join(' · ')));
+      })), el('div.jb-note', { style: { marginTop: '8px' } }, 'Decoded from the truck. Confirm on site before ordering parts.')));
+    }
+
+    // camera evidence
+    if (B && B.camera && (B.camera.frames.length || B.camera.verified)) {
+      var cam = B.camera, cc = el('div.jb-card', el('h2', 'Camera evidence'),
+        cam.verdict ? el('div.jb-sub', 'AI verdict: ' + plain(cam.verdict) + (cam.confidence != null ? ' (' + cam.confidence + '% confidence)' : '')) : null,
+        cam.frames.length ? el('div.jb-frames', cam.frames.map(function (f) { return el('a', { href: f.url, target: '_blank', rel: 'noopener', class: 'jb-frame' }, el('img', { src: f.url, alt: f.label, loading: 'lazy' }), el('span', f.label)); })) : el('div.jb-note', 'No frames available.'),
+        cam.clips.length ? el('div.jb-row', { style: { marginTop: '10px' } }, cam.clips.map(function (c, i) { return /^https?:/.test(c.url || '') ? el('a.jb-btn.jb-btn--sm', { href: c.url, target: '_blank', rel: 'noopener' }, 'Open ' + (c.type || 'road') + ' clip' + (c.durationSec ? ' (' + c.durationSec + 's)' : '')) : null; })) : null,
+        el('div.jb-note', { style: { marginTop: '8px' } }, cam.note));
+      app.appendChild(cc);
+    }
+
+    // authorities
+    if (B && B.authorities) {
+      var au = B.authorities, items = [];
+      au.called.forEach(function (a) { items.push(el('li', { class: 'ok' }, '✓ Called: ' + a.agency)); });
+      au.pending.forEach(function (a) { items.push(el('li', 'Recommended, not called yet: ' + a.agency + (a.urgency ? ' (' + a.urgency + ')' : ''))); });
+      app.appendChild(el('div.jb-card', el('h2', 'Authorities'), items.length ? el('ul.jb-list', items) : el('div.jb-note', 'No authorities called or recommended at this time.')));
+    }
 
     // vehicle
     var kv = el('dl.jb-kv');

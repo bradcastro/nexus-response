@@ -139,4 +139,9 @@ const HAZMAT_TEAMS = [
 // Heavy-recovery providers certified to handle hazmat loads (synthetic). Others must be told hazmat is needed.
 const HAZMAT_CERTIFIED = ['prov_elite', 'prov_magic', 'prov_metroatl', 'prov_derby', 'prov_buckeye', 'prov_queen'];
 
-module.exports = { FLEETS, LOCATIONS, PROVIDERS, HAZMAT_TEAMS, HAZMAT_CERTIFIED, MODELS, FIRST, LAST };
+// Florida RISC (Rapid Incident Scene Clearance): on FL interstates, major incidents need a RISC-qualified heavy-recovery vendor.
+// SYNTHETIC qualification flags for the demo. Program rules and targets below are illustrative; confirm against FDOT/FHP before relying on them.
+const RISC_CERTIFIED = ['prov_panhandle', 'prov_capitalfl'];
+const CLEARANCE_RULES = { FL: { program: 'RISC', fullName: 'Rapid Incident Scene Clearance (Florida)', interstateOnly: true, requires: 'risc', targetMin: 90, note: 'Florida interstate: a RISC-qualified recovery vendor must be sent. Clearance targets apply (demo value 90 min; confirm program rules).' } };
+
+module.exports = { FLEETS, LOCATIONS, PROVIDERS, HAZMAT_TEAMS, HAZMAT_CERTIFIED, RISC_CERTIFIED, CLEARANCE_RULES, MODELS, FIRST, LAST };

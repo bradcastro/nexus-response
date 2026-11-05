@@ -133,9 +133,10 @@ app.post('/api/incidents/:id/dispatch', wrap(async (req, res) => {
     if (chosen) rs.etaMin = chosen.etaMin;
     inc.status = 'dispatched';
     if (chosen) { const jl = await opsMod.createJob(inc, chosen, actor, req); if (jl) { inc.jobLink = jl; addTimeline(inc, actor || 'dispatcher', 'job_link_sent', `Job link ${jl.url} texted to ${chosen.name} (simulated)`); } }
-    if (chosen && inc.load && inc.load.contents && inc.load.contents.hazmat) {
-      const ok = roadside.isHazmatCertified(chosen.id);
-      addTimeline(inc, 'system', 'hazmat_check', ok ? `Hazmat check: ${chosen.name} is hazmat-certified for this load.` : `Hazmat check: ${chosen.name} is NOT hazmat-certified. Provider told hazmat is required (simulated); hazmat response team needed on scene.`);
+    if (chosen) {
+      const need = roadside.requirementsFor(inc), pv = roadside.getProviders().find((x) => x.id === chosen.id) || {};
+      if (need.hazmat) addTimeline(inc, 'system', 'hazmat_check', pv.hazmatCertified ? `Hazmat check: ${chosen.name} is hazmat-certified for this load.` : `Hazmat check: ${chosen.name} is NOT hazmat-certified. Provider told hazmat is required (simulated); hazmat response team needed on scene.`);
+      if (need.clearance) addTimeline(inc, 'system', 'clearance_check', pv.riscCertified ? `${need.clearance.program} check: ${chosen.name} is ${need.clearance.program}-qualified for this ${need.clearance.state} interstate scene. Clearance target ${need.clearance.targetMin} min.` : `${need.clearance.program} check: ${chosen.name} is NOT ${need.clearance.program}-qualified. ${need.clearance.state} interstate scene needs a qualified vendor; provider told (simulated), dispatch a qualified vendor.`);
     }
     addTimeline(inc, actor || 'dispatcher', 'dispatched', `${chosen ? `Dispatched ${chosen.name} at the owner's request (${rs.serviceType}${chosen.etaMin ? `, ETA ${chosen.etaMin} min` : ''})` : 'Marked dispatched (no roadside provider)'}${note ? ' - ' + note : ''} (simulated: no provider is actually contacted)`);
   }, { simulated: true, deliveredTo: 'no external recipient' });
