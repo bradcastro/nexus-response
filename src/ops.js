@@ -8,6 +8,7 @@ const stream = require('./stream');
 const claims = require('./claims');
 const roadside = require('./enrich/roadside');
 const D = require('./data/ops');
+const sceneMod = require('./scene');
 const { rngFrom, hashStr, round } = require('./util');
 
 const SIM = 'delivered (simulated)';
@@ -91,6 +92,7 @@ function brief(inc) {
     trailer ? `Trailer: ${trailer}${ld && ld.contents ? `, cargo ~${ld.estimatedWeightLb.toLocaleString('en-US')} lb ${ld.contents.label.replace(' (likely)', '').toLowerCase()} (inferred)` : ''}` : 'No trailer attached',
     `Speed at event: ${l.speed_mph != null ? l.speed_mph + ' mph' : 'unknown'}${airbag ? '; airbag deployment detected' : ''}`,
     `Driver: ${inc.driver.name}${inc.driver.phone ? ', ' + inc.driver.phone : ''}`,
+    inc.scene ? `Position: ${sceneMod.label(inc.scene)}${inc.scene.estimate ? ' (estimate)' : ' (reported)'}` : null,
     inc.diagnostics ? `Fault codes: ${inc.diagnostics.dtcs.map((d) => d.code).join(', ')}; drivable: ${inc.diagnostics.drivable}` : null,
   ].filter(Boolean);
   const rc = recoveryCheck(inc);
@@ -373,6 +375,8 @@ function briefing(job, inc) {
   if (st.startsWith('tow') && tr && tr.attached && ld && ld.estimatedWeightLb > 20000) bring.push('Plan for a loaded trailer: separate trailer tow or load transfer may be needed');
   if (hz) bring.push('Hazmat PPE, absorbents and containment (placard unconfirmed)');
   if (inc.eventType === 'rollover') bring.push('Spill and fluid containment; extra rigging for the trailer');
+  const sc = inc.scene || (inc.location ? sceneMod.estimate(inc) : null);
+  sceneMod.access(sc).forEach((x) => bring.push(x));
   const acc = called.length;
   return {
     owner: { name: inc.fleetName, requested: true, statement: acc ? `${inc.fleetName} (the vehicle owner) requested your company. Authorities have been told that ${prov.name} was requested by the owner and is en route.` : `${inc.fleetName} (the vehicle owner) requested your company. When authorities are called, ${prov.name} will be named as the owner-requested recovery provider.`, namedToAuthorities: acc > 0 },
@@ -380,6 +384,7 @@ function briefing(job, inc) {
     camera: { verified: !!cam.verified, verdict: cam.aiVerdict || null, confidence: cam.confidence != null ? Math.round(cam.confidence * 100) : null, frames, clips: (cam.clips || []).map((c) => ({ type: c.type, durationSec: c.durationSec, url: c.url })), note: frames.length ? 'Demo frames. With a live camera vendor these are the real frames and clips from before and after the event.' : 'No camera media for this event.' },
     service: { codes, parts, drivable: dx ? dx.drivable : null, faultLampOn: dx ? !!dx.faultLampOn : null, reason: rs.rationale || null },
     authorities: { called, pending },
+    scene: sc ? { ...sc, label: sceneMod.label(sc), access: sceneMod.access(sc) } : null,
     bring,
   };
 }
@@ -432,6 +437,29 @@ router.get('/api/comms', wrap(async (req, res) => {
   res.json({ comms: rows.slice(0, limit) });
 }));
 
+router.post('/api/incidents/:id/scene', wrap(async (req, res) => {
+  const i = await getInc(req, res); if (!i) return;
+  const b = req.body || {};
+  const POS = ['on_roadway', 'shoulder', 'off_road'], TER = ['paved', 'embankment', 'ditch', 'wooded', 'flat_field'], SUR = ['paved', 'gravel', 'grass', 'mud', 'soft_soil'];
+  const unit = { m: 1, yd: sceneMod.M_PER_YD, ft: 0.3048 }[b.unit || 'm'];
+  if (!unit) return res.status(422).json({ error: 'validation_failed', message: 'unit must be m, yd or ft' });
+  const dist = b.offRoadDistance == null || b.offRoadDistance === '' ? null : +b.offRoadDistance;
+  if (dist != null && !(Number.isFinite(dist) && dist >= 0 && dist <= 5000)) return res.status(422).json({ error: 'validation_failed', message: 'offRoadDistance must be 0-5000' });
+  if (b.position && !POS.includes(b.position)) return res.status(422).json({ error: 'validation_failed', message: 'position must be ' + POS.join('|') });
+  if (b.terrain && !TER.includes(b.terrain)) return res.status(422).json({ error: 'validation_failed', message: 'terrain must be ' + TER.join('|') });
+  if (b.surface && !SUR.includes(b.surface)) return res.status(422).json({ error: 'validation_failed', message: 'surface must be ' + SUR.join('|') });
+  const dropFt = b.dropFt == null || b.dropFt === '' ? null : +b.dropFt;
+  if (dropFt != null && !(Number.isFinite(dropFt) && dropFt >= 0 && dropFt <= 500)) return res.status(422).json({ error: 'validation_failed', message: 'dropFt must be 0-500' });
+  const out = await db.updateIncident(i.id, (inc) => {
+    const cur = inc.scene || sceneMod.estimate(inc);
+    const m = dist == null ? cur.offRoadDistanceM : Math.round(dist * unit);
+    const position = b.position || (m > 8 ? 'off_road' : m > 0 ? 'shoulder' : cur.position);
+    inc.scene = { ...cur, position, offRoadDistanceM: m, terrain: b.terrain || cur.terrain, surface: b.surface || cur.surface, dropFt: dropFt != null ? dropFt : cur.dropFt, notes: b.notes ? String(b.notes).slice(0, 500) : cur.notes, source: 'driver_reported', confidence: 'high', reported: true, estimate: false, reportedBy: b.actor || 'dispatcher', reportedAt: new Date().toISOString(), basis: 'Reported by the driver or dispatcher.' };
+    inc.timeline.push({ t: new Date().toISOString(), actor: b.actor || 'dispatcher', action: 'scene_reported', note: `Scene position recorded: ${sceneMod.label(inc.scene)}${inc.scene.terrain && inc.scene.position === 'off_road' ? `, ${inc.scene.terrain.replace('_', ' ')}${inc.scene.dropFt ? ', about ' + inc.scene.dropFt + ' ft drop' : ''}` : ''}${inc.scene.notes ? ' - ' + inc.scene.notes : ''}` });
+  });
+  stream.publish(out, 'update');
+  res.json(out);
+}));
 router.get('/api/incidents/:id/sop', wrap(async (req, res) => { const i = await getInc(req, res); if (i) res.json(sop(i)); }));
 router.post('/api/incidents/:id/sop/:stepKey', wrap(async (req, res) => {
   const i = await getInc(req, res); if (!i) return;

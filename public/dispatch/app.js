@@ -504,6 +504,17 @@
     return out;
   }
   function hazLoad(i) { return !!(i && i.load && i.load.contents && i.load.contents.hazmat); }
+  function sceneHTML(i) {
+    var sc = i.scene; if (!sc) return '';
+    var lab = sc.position === 'on_roadway' ? 'On the roadway' : sc.position === 'shoulder' ? 'On the shoulder, ~' + sc.offRoadDistanceM + ' m off the lane' : 'Off the road, ~' + sc.offRoadDistanceM + ' m (' + Math.round(sc.offRoadDistanceM / 0.9144) + ' yd) from pavement';
+    var badge = NX.badgeHTML(sc.reported ? 'Reported' : 'Estimate: ' + sc.confidence + ' confidence', sc.reported ? 'ok' : 'warn');
+    var det = [sc.position === 'off_road' ? fmt.label(sc.terrain || '') + (sc.dropFt ? ', ~' + sc.dropFt + ' ft drop' : '') : '', sc.surface && sc.position !== 'on_roadway' ? 'surface: ' + fmt.label(sc.surface) : '', 'GPS \u00b1' + sc.gpsAccuracyM + ' m (' + (sc.source === 'eld' ? 'ELD only' : 'camera + GPS') + ')'].filter(Boolean).join(' &middot; ');
+    var opt = function (a) { return a.map(function (o) { return '<option value="' + o[0] + '"' + (o[2] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join(''); };
+    var form = isClosed(i) ? '' : '<div class="scene-form" style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-top:10px"><input class="nx-input" id="sc-dist" type="number" min="0" placeholder="Distance from road (driver report)"><select class="nx-select" id="sc-unit"><option value="yd">yards</option><option value="m">meters</option><option value="ft">feet</option></select>' +
+      '<select class="nx-select" id="sc-ter">' + opt([['', 'Terrain (unchanged)'], ['embankment', 'Embankment'], ['ditch', 'Ditch'], ['wooded', 'Wooded'], ['flat_field', 'Flat field'], ['paved', 'Paved']]) + '</select><input class="nx-input" id="sc-drop" type="number" min="0" placeholder="Drop (ft)">' +
+      '<input class="nx-input" id="sc-note" placeholder="Notes: landmarks, access road, gate" style="grid-column:1/-1"><button class="nx-btn nx-btn--sm" data-act="scenesave" style="grid-column:1/-1">Save driver report</button></div>';
+    return panel('Scene position', badge, '<div style="font-weight:600">' + esc(lab) + '</div><div class="nx-dim" style="font-size:12px;margin-top:3px">' + det + '</div>' + (sc.notes ? '<div style="margin-top:6px">' + esc(sc.notes) + '</div>' : '') + '<p class="nx-dim" style="font-size:12px;margin-top:6px">' + esc(sc.basis || '') + ' Shared with the tow provider.</p>' + form, 'scene-position');
+  }
   function roadsideHTML(i) {
     var r = i.roadside || {}, asg = r.assignedProvider, rec = r.recommendedProvider, closed = isClosed(i);
     if (!r.needed && !asg && !rec && !S.providers.length) return panel('Roadside', NX.badgeHTML('Not needed', 'plain'), '<p class="nx-dim">No roadside service required for this event type.</p>');
@@ -578,12 +589,13 @@
     var na = NXAct.next(i)[0] || {}; S.forceOpen = {};
     if (na.key === 'oem') S.forceOpen.oemclaim = 1;
     if (i.load && i.load.contents && i.load.contents.hazmat) S.forceOpen.load = 1;
-    var C = window.NXCtx, cam = camHTML(i), dtc = dtcHTML(i), road = roadsideHTML(i), war = warrantyHTML(i), veh = vehicleHTML(i), tl = timelineHTML(i);
+    var C = window.NXCtx, scn = sceneHTML(i), cam = camHTML(i), dtc = dtcHTML(i), road = roadsideHTML(i), war = warrantyHTML(i), veh = vehicleHTML(i), tl = timelineHTML(i);
     var sop = NXAct.sop(i, panel), oem = NXAct.oem(i, panel), coord = NXAct.coord(i, panel), load = C.load(i, panel), dealer = C.dealer(i, panel, btn, S), eq = C.equipment(i, panel), trip = C.trip(i, panel), tele = C.telemetry(i, panel);
     var haz = !!(i.load && i.load.contents && i.load.contents.hazmat);
     // triage order: hazmat/severity context first, then verification, what is on the truck, how to respond, then history
     var raw = i.raw ? panel('Source event (raw vendor payload)', '<span class="nx-mono nx-faint" style="font-size:12px">' + esc(fmt.label(i.provider || 'vendor')) + '</span>', '<pre class="raw-pre">' + esc(typeof i.raw === 'string' ? i.raw : JSON.stringify(i.raw, null, 2)) + '</pre>', 'rawpayload') : '';
     var sections = fp ? [cam, tl, road, dtc, sop, coord, veh, war, raw] : haz ? [road, cam, load, dtc, dealer, oem, tl, sop, eq, trip, tele, coord, war, veh, raw] : [road, cam, dtc, tl, load, dealer, oem, sop, eq, trip, tele, coord, war, veh, raw];
+    if (scn) sections.splice(Math.max(0, sections.indexOf(road)) + 1, 0, scn);
     sections.unshift(C.chips(i)); sections.unshift(C.hazBanner(i)); sections.unshift(NXPro.banner(i));
     var nAudit = NXAudit.count(i, NXAct.comms(i));
     var tabs = '<div class="d-tabs" role="tablist"><button role="tab" aria-selected="' + (S.dtab !== 'audit') + '" class="' + (S.dtab !== 'audit' ? 'is-active' : '') + '" data-dtab="overview">Overview</button><button role="tab" aria-selected="' + (S.dtab === 'audit') + '" class="' + (S.dtab === 'audit' ? 'is-active' : '') + '" data-dtab="audit">Audit trail <b>' + nAudit + '</b></button><a class="d-hist" href="/records/#incidents?fleet=' + encodeURIComponent(i.fleetId || '') + '&open=inc:' + encodeURIComponent(i.id) + '" target="_blank" rel="noopener">Full history</a></div>';
@@ -605,6 +617,7 @@
     else if (a === 'dismissopen') doDismiss();
     else if (a === 'fpdismiss') doDismiss('False positive - camera AI verdict ' + fmt.label(verdict(i)) + (pct(i.camera.confidence) != null ? ' (' + pct(i.camera.confidence) + '%)' : ''));
     else if (a === 'center') { focusSelection(); if (window.innerWidth <= 1100) setView('map'); else setTab('map'); }
+    else if (a === 'scenesave') { var g = function (id) { var x = detailEl.querySelector('#' + id); return x ? x.value : ''; }; var dist = g('sc-dist'); if (dist === '' && !g('sc-ter') && !g('sc-drop') && !g('sc-note')) return NX.toast('Enter at least one detail from the driver', 'warn'); act('scene', '/scene', { offRoadDistance: dist, unit: g('sc-unit') || 'yd', terrain: g('sc-ter') || undefined, dropFt: g('sc-drop'), notes: g('sc-note'), actor: 'dispatcher' }, 'Scene position saved. The tow provider will see it.'); }
     else if (a === 'status') setStatus(b.dataset.st);
     else if (a === 'note') addNote();
     else if (a === 'towdealer') towToDealer();

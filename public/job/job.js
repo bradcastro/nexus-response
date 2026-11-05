@@ -182,6 +182,16 @@
       })), el('div.jb-note', { style: { marginTop: '8px' } }, 'Decoded from the truck. Confirm on site before ordering parts.')));
     }
 
+    // scene position
+    if (B && B.scene) {
+      var sc = B.scene, sl = el('div.jb-card.jb-scene', el('h2', 'Where the truck is'), el('div.jb-big', sc.label),
+        el('div.jb-sub', [sc.position === 'off_road' ? plain(sc.terrain) + (sc.dropFt ? ', about ' + sc.dropFt + ' ft drop' : '') : '', sc.surface && sc.position !== 'on_roadway' ? 'Ground: ' + plain(sc.surface) : ''].filter(Boolean).join(' · ')),
+        el('div.jb-note', { style: { marginTop: '6px' } }, (sc.reported ? 'Reported by the driver or dispatcher.' : 'Estimate, ' + sc.confidence + ' confidence. ') + (sc.reported ? '' : sc.basis) + ' GPS accuracy about ±' + sc.gpsAccuracyM + ' m.'),
+        sc.notes ? el('div', { style: { marginTop: '6px', whiteSpace: 'pre-wrap' } }, sc.notes) : null,
+        sc.access && sc.access.length ? el('ul.jb-list', sc.access.map(function (x) { return el('li', x); })) : null);
+      app.appendChild(sl);
+    }
+
     // camera evidence
     if (B && B.camera && (B.camera.frames.length || B.camera.verified)) {
       var cam = B.camera, cc = el('div.jb-card', el('h2', 'Camera evidence'),

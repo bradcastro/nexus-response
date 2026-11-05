@@ -167,6 +167,7 @@ async function attach(inc, opts = {}) {
   const td = towDestination(inc, inc.warrantyDealer);
   if (td && inc.roadside) inc.roadside.towDestination = td;
   require('../enrich/roadside').preferQualified(inc);
+  if (!(inc.scene && inc.scene.reported)) inc.scene = require('../scene').estimate(inc);
   // ---- risk tags + packet ----
   const base = risk.score(inc);
   inc.risk = base;
