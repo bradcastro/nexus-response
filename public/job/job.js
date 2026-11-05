@@ -30,7 +30,7 @@
       eventType: pick(j, 'eventType') || inc.eventType, fleet: pick(j, 'fleetName', 'fleet.name') || inc.fleetName, loc: loc, veh: veh, eq: eq, ld: ld, drop: drop,
       contact: contact, notes: pick(j, 'notes', 'note', 'instructions'), eta: num(pick(j, 'etaMin', 'eta')), expiresAt: pick(j, 'expiresAt'), driver: pick(j, 'driver') || inc.driver || null,
       provider: pick(j, 'providerName', 'provider.name'), simulated: true, hazardsIn: j.hazards || null, tags: (inc.risk && inc.risk.tags) || j.tags || [], sev: pick(j, 'severity') || inc.severity,
-      brief: j.briefing || null, equipmentNeeded: pick(j, 'equipmentNeeded', 'whatToBring', 'equipmentClass'), warranty: wd, dtcs: (inc.diagnostics && inc.diagnostics.dtcs) || j.dtcs || null, drivable: pick(j, 'drivable') || (inc.diagnostics && inc.diagnostics.drivable) || null
+      brief: j.briefing || null, tkTrailer: j.trailer || null, tkLoad: j.load || null, driverC: (j.contact && j.contact.driver) || null, equipmentNeeded: pick(j, 'equipmentNeeded', 'whatToBring', 'equipmentClass'), warranty: wd, dtcs: (inc.diagnostics && inc.diagnostics.dtcs) || j.dtcs || null, drivable: pick(j, 'drivable') || (inc.diagnostics && inc.diagnostics.drivable) || null
     };
     // server job status stays 'accepted' after an ETA post and uses 'arrived'; derive the stages this page shows
     if (out.status === 'arrived') out.status = 'on_scene';
@@ -203,11 +203,21 @@
     // vehicle
     var kv = el('dl.jb-kv');
     function row(k, val) { if (val) { kv.appendChild(el('dt', k)); kv.appendChild(el('dd', val)); } }
-    row('Truck', veh); row('Unit', v.unit); row('Plate', v.plate); row('VIN', v.vin);
-    var tr = (j.eq && j.eq.trailer) || {}; if (tr.attached) row('Trailer', [plain(tr.type), tr.lengthFt ? tr.lengthFt + ' ft' : ''].filter(Boolean).join(', '));
-    if (j.ld && j.ld.estimatedWeightLb) row('Est. load', '~' + lb(j.ld.estimatedWeightLb) + (j.ld.contents && j.ld.contents.label ? ', ' + j.ld.contents.label : ''));
-    if (j.driver && (j.driver.name || j.driver.phone)) row('Driver', j.driver.name);
-    app.appendChild(el('div.jb-card', el('h2', 'Vehicle'), kv, j.driver && j.driver.phone ? el('div', { style: { marginTop: '12px' } }, el('a.jb-btn.jb-btn--sm', { href: tel(j.driver.phone) }, 'Call driver ' + j.driver.phone)) : null));
+    var T = j.tkTrailer || (j.eq && j.eq.trailer && j.eq.trailer.attached ? j.eq.trailer : null), L = j.tkLoad;
+    var dr = j.driverC || j.driver || {};
+    var desc = v.description || veh;
+    row('Truck', desc); row('Engine', v.engine);
+    row('Class', [v.class ? plain(String(v.class).replace(/^class(\d+)/, 'Class $1')) : '', v.gvwrLb ? 'GVWR ' + lb(v.gvwrLb) : ''].filter(Boolean).join(', '));
+    row('Axles / fuel', [v.axles ? v.axles + ' axles' : '', v.fuelType ? plain(v.fuelType) : ''].filter(Boolean).join(', '));
+    row('Odometer', v.odometerMi != null ? Number(v.odometerMi).toLocaleString() + ' mi' : '');
+    row('Unit', v.unit); row('Plate', v.plate); row('VIN', v.vin);
+    if (T) { row('Trailer', [plain(T.type), T.lengthFt ? T.lengthFt + ' ft' : '', T.unitId].filter(Boolean).join(', ')); row('Trailer weight', [T.tareLb ? 'tare ' + lb(T.tareLb) : '', T.maxPayloadLb ? 'max payload ' + lb(T.maxPayloadLb) : ''].filter(Boolean).join(', ')); if (T.reefer) row('Reefer', T.reefer.setpointF + ' F, unit ' + (T.reefer.unitRunning ? 'running' : 'NOT running')); }
+    var ldw = (L && L.estimatedWeightLb) || (j.ld && j.ld.estimatedWeightLb);
+    if (ldw) row('Est. load', '~' + lb(ldw) + ((L && L.contents) || (j.ld && j.ld.contents && j.ld.contents.label) ? ', ' + (L && L.contents || j.ld.contents.label) : '') + (L && L.weightRangeLb ? ' (range ' + lb(L.weightRangeLb[0]) + ' to ' + lb(L.weightRangeLb[1]) + ')' : ''));
+    if (v.grossLb) row('Est. gross weight', '~' + lb(v.grossLb) + (L && L.overweightRisk ? ', may be over legal weight' : ''));
+    row('Fleet', j.fleet);
+    if (dr.name) row('Driver', dr.name);
+    app.appendChild(el('div.jb-card', el('h2', 'Vehicle'), kv, dr.phone ? el('div', { style: { marginTop: '12px' } }, el('a.jb-btn.jb-btn--sm', { href: tel(dr.phone) }, 'Call driver ' + dr.phone)) : null));
 
     // drop-off
     if (j.drop) {
