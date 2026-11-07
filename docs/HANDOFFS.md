@@ -253,3 +253,12 @@ Status: DONE on UI side; one OPEN request
 
 ## Records UI request: comma-separated fleetId - DONE
 `/api/records/{search,claims,entities}` accept `fleetId` or `fleetIds` as one id or a comma list (union); facets and `summary` (incl. `medianDaysToDecision`) are computed over the union; unknown ids return 400 `invalid_fleet` (`field:"fleetId"`). Covered in `scripts/check-consistency.js`. `/risk-history` takes a single `id` (unchanged). :3000 needs a restart.
+
+## [polish -> owner, Claude] Dispatch scope, connection vs theme, vendor-verdict copy (2026-11-07)
+Status: DONE on `cursor/demo-journey-polish-c00c` (PR targets `poc-mantis-demo`). Earlier OPEN headers above were left as written.
+- `GET /api/incidents` now returns `page` and `totals`. `totals` ignores the status filter so chips can show the whole operational set. `totals.matched` is the count after status. `offset` pages newest-first. `q` and `severity` are server filters. A negative offset is 400.
+- Dispatch no longer treats a 300-row client fetch as the population. The open queue requests every open incident (cap 1000, which the seed does not reach). All / resolved / other statuses load 80 at a time with "N loaded of M" and Load more. HUD open / critical / unassigned / in progress use `totals`, so they stay true while a closed page is on screen.
+- The topbar connection badge starts as Checking and is named as the connection. The moon control is a Theme button with an accessible name that says it is the color theme. Reports still has no connection badge (`live: false`).
+- Dispatch, Fleet, Records, the public report, insurer evidence, the job ticket, onboarding column labels, and the launcher say the camera verdict comes from the vendor payload. They do not say Nexus analyzes video. Outbound actions are still simulated.
+- Dispatch no longer hides the portal switcher at 640px, so a phone can still reach Fleet and Records.
+- Checked by `scripts/check-consistency.js` section `[0] incident list scope`, on a local server only.

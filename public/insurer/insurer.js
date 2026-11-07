@@ -182,7 +182,7 @@
       '<div class="ins-stat"><div class="nx-eyebrow">Camera-verified</div><div class="ins-stat__v">' + fmt.number(s.verified) + ' <span class="nx-dim" style="font-size:var(--nx-text-md)">' + p(s.verified).toFixed(0) + '%</span></div>' +
         '<div class="ins-stack"><i style="width:' + p(s.verified) + '%;--c:var(--nx-ok)"></i><i style="width:' + p(s.unverified || 0) + '%;--c:var(--nx-text-faint)"></i><i style="width:' + p(s.fp || 0) + '%;--c:var(--nx-warn)"></i></div>' +
         '<div class="ins-stat__s">' + fmt.number(s.unverified) + ' unverified' + (s.fp != null ? ' · ' + fmt.number(s.fp) + ' false positives screened out' : '') + '</div></div>' +
-      '<div class="ins-stat"><div class="nx-eyebrow">False positives filtered</div><div class="ins-stat__v">' + (s.fp == null ? '—' : fmt.number(s.fp)) + '</div><div class="ins-stat__s">Events the camera AI ruled out before they became claims signals</div></div>' +
+      '<div class="ins-stat"><div class="nx-eyebrow">False positives filtered</div><div class="ins-stat__v">' + (s.fp == null ? '—' : fmt.number(s.fp)) + '</div><div class="ins-stat__s">Events whose vendor verdict was a false positive. Nexus does not analyze video.</div></div>' +
       '<div class="ins-stat"><div class="nx-eyebrow">Evidence packets available</div><div class="ins-stat__v">' + (s.packets == null ? '—' : fmt.number(s.packets)) + '</div><div class="ins-stat__s">Verified events with video or snapshot attached</div></div>' +
       '<div class="ins-stat"><div class="nx-eyebrow">Median time to first notice</div><div class="ins-stat__v">' + ttfn + '</div><div class="ins-stat__s">Event occurrence to Nexus receipt</div></div></div>';
   }
@@ -295,7 +295,7 @@
       '<span class="nx-mono nx-dim" style="margin-left:auto">' + esc(i.id) + ' <button class="nx-btn nx-btn--sm nx-btn--ghost nx-no-print" data-share="incident:' + esc(i.id) + '" type="button">Share</button></span></div><div class="ins-ev__row">' +
       (i.snapshot ? '<img class="ins-ev__img" loading="lazy" alt="Camera frame for ' + esc(i.id) + '" src="' + esc(i.snapshot) + '">' : '') + '<div>' +
       '<div class="ins-note nx-dim">' + esc(fmt.dateTime(i.timestamp)) + (i.address ? ' · ' + esc(i.address) : '') + (i.driver ? ' · ' + esc(i.driver) : '') + (i.vehicle ? ' · ' + esc(i.vehicle) : '') + '</div>' +
-      (i.aiVerdict ? '<div style="margin-top:6px;font-size:var(--nx-text-sm)">AI verdict: <b>' + esc(fmt.label(i.aiVerdict)) + '</b>' + (i.confidence != null ? ' at ' + Math.round(i.confidence * 100) + '% confidence' : '') + '</div>' : '') +
+      (i.aiVerdict ? '<div style="margin-top:6px;font-size:var(--nx-text-sm)">Vendor verdict: <b>' + esc(fmt.label(i.aiVerdict)) + '</b>' + (i.confidence != null ? ' at ' + Math.round(i.confidence * 100) + '% confidence' : '') + '</div>' : '') +
       (sig.length ? '<ul class="ins-ev__sig">' + sig.slice(0, 4).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>' : '') + '</div></div>' +
       '<div class="ins-ev__load" data-load-for="' + esc(i.id) + '">' + loadHTML(i) + '</div><div class="ins-ev__meta"><span>Video clip: ' + (i.clip ? 'yes' : 'no') + '</span><span>Snapshot: ' + (i.snapshot ? 'yes' : 'no') + '</span><span>Evidence packet: ' + (i.clip || i.snapshot ? 'available' : 'not available') + '</span></div></div>';
   }
@@ -387,7 +387,7 @@
       }).join('') + '</div></div>' : '<span class="nx-dim">No breakdown reported.</span>') + '</div></section>';
     h += cargoSection(D);
     h += '<section class="nx-card ins-span2"><div class="nx-card__head"><h2 class="nx-card__title">Camera-verified incidents</h2><span class="nx-dim ins-note">' + incs.length + ' most recent</span></div><div class="nx-card__body">' +
-      '<div class="ins-fraud"><b>Camera-backed evidence (simulated).</b> Each event below was flagged by camera AI with snapshots, GPS trail and sensor signals. Such records can support checking a loss against what the camera recorded; the frames and verdicts in this demo are generated.</div>' +
+      '<div class="ins-fraud"><b>Camera evidence (synthetic).</b> Verdicts below were supplied with the demo event. Nexus does not analyze video. Frames, GPS trails and sensor signals are generated, and nothing was sent to a carrier.</div>' +
       (incs.length ? '<div class="ins-ev">' + incs.slice(0, 6).map(incidentHTML).join('') + '</div>' : '<span class="nx-dim">No recent verified incidents.</span>') + '</div></section>';
     h += '<section class="nx-card"><div class="nx-card__head"><h2 class="nx-card__title">Highest-risk drivers</h2></div><div class="nx-card__body nx-card--flush">' +
       (drivers.length ? '<div class="nx-table-wrap"><table class="nx-table"><thead><tr><th>#</th><th>Driver</th><th class="num">Safety score</th><th class="num">Events</th><th class="num">Collisions</th><th>Main behavior</th></tr></thead><tbody>' + drivers.slice(0, 8).map(function (d, i) {

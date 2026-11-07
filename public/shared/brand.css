@@ -208,7 +208,11 @@ code, kbd, .nx-mono { font-family: var(--nx-font-mono); font-size: .92em; }
 .nx-live-dot { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--nx-ok); display: inline-block; flex: none; }
 .nx-live-dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1px solid var(--nx-ok); opacity: 0; animation: nx-ping 2s var(--nx-ease) infinite; }
 .nx-live-dot--off { background: var(--nx-text-faint); } .nx-live-dot--off::after { animation: none; }
+.nx-live-dot--wait { background: var(--nx-text-faint); } .nx-live-dot--wait::after { animation: none; }
 .nx-live-dot--warn { background: var(--nx-warn); } .nx-live-dot--warn::after { border-color: var(--nx-warn); }
+.nx-theme-btn { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--nx-border); border-radius: var(--nx-radius); background: var(--nx-surface-2); color: var(--nx-text-dim); cursor: pointer; font: 600 11px/1 var(--nx-font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.nx-theme-btn:hover { color: var(--nx-text); border-color: var(--nx-border-strong); background: var(--nx-surface-3); }
+.nx-theme-btn__icon { font-size: 14px; line-height: 1; }
 @keyframes nx-ping { 0% { transform: scale(.5); opacity: .9; } 100% { transform: scale(1.8); opacity: 0; } }
 
 /* ---------- Sidebar ---------- */
@@ -408,7 +412,6 @@ code, kbd, .nx-mono { font-family: var(--nx-font-mono); font-size: .92em; }
   .nx-grid--2, .nx-grid--3, .nx-grid--4 { grid-template-columns: minmax(0, 1fr); }
   .nx-brand__name { display: none; }
   .nx-switcher a { padding: 5px 6px; font-size: 12px; }
-  .nx-live__text { display: none; }
   .nx-topbar { gap: var(--nx-sp-2); padding: 0 var(--nx-sp-3); min-width: 0; }
   .nx-switcher { min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; }
   .nx-switcher::-webkit-scrollbar { display: none; }
@@ -418,7 +421,7 @@ code, kbd, .nx-mono { font-family: var(--nx-font-mono); font-size: .92em; }
   .nx-modal-backdrop { align-items: end; padding: 0; }
   .nx-modal { border-radius: var(--nx-radius-lg) var(--nx-radius-lg) 0 0; max-height: 92vh; }
 }
-@media (max-width: 480px) { .nx-live { display: none; } .nx-switcher a { padding: 5px 5px; } }
+@media (max-width: 480px) { .nx-switcher a { padding: 5px 5px; } }
 
 /* ---------- Motion preference ---------- */
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }

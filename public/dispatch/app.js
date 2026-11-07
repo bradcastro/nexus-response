@@ -7,6 +7,8 @@
   var CLOSED = { resolved: 1, dismissed: 1 };
   var STATUS_LIST = ['pending', 'validating', 'dispatched', 'en_route', 'on_scene', 'resolved', 'dismissed'];
   var CATS = ['collision', 'safety', 'diagnostic', 'roadside'];
+  var PAGE = 80, OPEN_CAP = 1000;
+  var OPEN_STATUS = 'pending,validating,dispatched,en_route,on_scene';
 
   var S = {
     inc: new Map(),          // id -> incident
@@ -16,7 +18,8 @@
     providers: [],           // providers near selected incident
     provFor: null,
     pick: null,              // picked providerId
-    loading: true, loaded: false, error: null, sseState: 'connecting', dtab: 'overview', forceOpen: {},
+    loading: true, loaded: false, loadingMore: false, error: null, sseState: 'connecting', dtab: 'overview', forceOpen: {},
+    totals: null, pageInfo: null, serverRows: 0,
     sound: true, follow: false,
     noteDraft: {}, busy: {}, camTab: 'road', coll: {}, dealerPick: null, towLocal: {},
     newIds: new Set()
@@ -79,8 +82,43 @@
   function counts() {
     var c = { all: 0, open: 0 };
     STATUS_LIST.forEach(function (s) { c[s] = 0; });
+    var t = S.totals;
+    if (t && t.byStatus) {
+      c.all = t.all || 0;
+      c.open = t.open || 0;
+      STATUS_LIST.forEach(function (s) { c[s] = t.byStatus[s] || 0; });
+      return c;
+    }
     S.inc.forEach(function (i) { if (isHist(i)) return; c.all++; c[i.status] = (c[i.status] || 0) + 1; if (!isClosed(i)) c.open++; });
     return c;
+  }
+  function listQuery(offset) {
+    var f = S.filters, open = f.status === 'open';
+    var q = {
+      limit: open ? OPEN_CAP : PAGE,
+      offset: open ? 0 : offset,
+      fleetId: f.fleet || null,
+      category: f.cat || null,
+      provider: f.vendor || null,
+      severity: f.sev || null,
+      q: f.q.trim() || null
+    };
+    if (open) q.status = OPEN_STATUS;
+    else if (f.status && f.status !== 'all') q.status = f.status;
+    return q;
+  }
+  function scopeText(list) {
+    var t = S.totals;
+    if (!t) return list.length + ' shown';
+    var matched = t.matched != null ? t.matched : t.all;
+    var hist = t.excludes === 'historical_import' ? ' in the operational history' : '';
+    if (S.filters.status === 'open') {
+      var tail = t.open > list.length ? ' Showing ' + list.length + ' of ' + t.open + '.' : '';
+      return t.open + ' open · ' + fmt.number(t.all) + hist + tail;
+    }
+    var shown = S.serverRows || list.length;
+    if (!shown) return '0 of ' + fmt.number(matched);
+    return fmt.number(shown) + ' loaded of ' + fmt.number(matched) + ' · newest first';
   }
   function filtered() {
     var f = S.filters, q = f.q.trim().toLowerCase();
@@ -125,7 +163,7 @@
     var a = ageMin(i), late = !isClosed(i) && (i.status === 'pending' || i.status === 'validating') && ((i.severity === 'critical' && a > 2) || (i.severity === 'high' && a > 5));
     var cam = i.camera && i.camera.aiVerdict !== 'no_video' ? i.camera : null, tags = '';
     if (isFP(i)) tags += '<span class="tag bad">False positive</span>';
-    else if (cam && cam.verified) tags += '<span class="tag ok">Cam verified ' + (pct(cam.confidence) != null ? pct(cam.confidence) + '%' : '') + '</span>';
+    else if (cam && cam.verified) tags += '<span class="tag ok" title="Verdict supplied with the vendor event. Nexus does not analyze the video.">Vendor verdict ' + (pct(cam.confidence) != null ? pct(cam.confidence) + '%' : '') + '</span>';
     else if (cam) tags += '<span class="tag warn">Cam review</span>';
     var dt = i.diagnostics && i.diagnostics.dtcs;
     if (dt && dt.length) tags += '<span class="tag warn">' + dt.length + ' DTC</span>';
@@ -144,18 +182,25 @@
     if (S.mode === 'proactive') return NXPro.renderList();
     chips();
     var list = filtered(), box = $('#q-list');
-    $('#q-shown').textContent = S.loaded ? list.length + ' shown' : '';
+    $('#q-shown').textContent = S.loaded ? scopeText(list) : '';
     if (S.loading && !S.loaded) { box.innerHTML = '<div class="sk">' + [1, 2, 3, 4, 5].map(function () { return '<span class="nx-skel nx-skel--block"></span>'; }).join('') + '</div>'; return; }
     if (S.error && !S.loaded) { box.innerHTML = ''; box.appendChild(NX.empty('Incidents could not be loaded', 'The incident list did not load, so nothing here is confirmed empty. Check your connection and try again.', '!')); var b = NX.el('button.nx-btn.nx-btn--primary.nx-btn--sm', { onclick: load }, 'Retry'); box.firstChild.appendChild(b); return; }
     if (!list.length) {
       box.innerHTML = '';
       var open = S.filters.status === 'open' && !S.filters.sev && !S.filters.cat && !S.filters.fleet && !S.filters.vendor && !S.filters.q.trim();
-      box.appendChild(open ? NX.empty('No open incidents', 'Confirmed by the server just now. New events appear here as they arrive.') : NX.empty('No incidents match', 'Adjust the filters above.'));
+      box.appendChild(open ? NX.empty('No open incidents', 'The server reports none in this scope. New events appear here as they arrive.') : NX.empty('No incidents match', 'Adjust the filters above, or open Records for the full history.'));
       return;
     }
     var top = box.scrollTop;
-    box.innerHTML = list.map(rowHTML).join('');
+    var more = '';
+    var matched = S.totals && S.totals.matched != null ? S.totals.matched : list.length;
+    if (S.filters.status !== 'open' && S.serverRows < matched) {
+      more = '<div class="q-more"><button type="button" class="nx-btn nx-btn--sm" id="q-more"' + (S.loadingMore ? ' disabled' : '') + '>' + (S.loadingMore ? 'Loading…' : 'Load more') + '</button><span class="nx-faint">Newest first. Counts above are the full match, not this page.</span></div>';
+    }
+    box.innerHTML = list.map(rowHTML).join('') + more;
     box.scrollTop = top;
+    var moreBtn = $('#q-more');
+    if (moreBtn) moreBtn.onclick = function () { load({ append: true }); };
     S.newIds.clear();
     var el = box.querySelector('.is-selected'); if (el && S._scrollSel) { el.scrollIntoView({ block: 'nearest' }); S._scrollSel = false; }
   }
@@ -164,7 +209,9 @@
     var o = [], crit = 0, un = 0, act = 0;
     S.inc.forEach(function (i) { if (isHist(i) || isClosed(i)) return; o.push(i); if (i.severity === 'critical') crit++; if (i.status === 'pending' || i.status === 'validating') un++; else act++; });
     var D = '\u2014', ok = S.loaded, alertsOk = S.alerts && !S.alertsLoading && !S.alertsError;
-    $('#hud-stats').innerHTML = [['Open', ok ? o.length : D], ['Critical', ok ? crit : D], ['Unassigned', ok ? un : D], ['In progress', ok ? act : D], ['Watch', '<span id="hud-watch">' + (alertsOk ? Array.from(S.alerts.values()).filter(function (a) { return a.status === 'open'; }).length : D) + '</span>']].map(function (x) { return '<div class="hud-stat"><b' + (x[0] === 'Critical' && x[1] && x[1] !== D ? ' style="color:var(--nx-sev-critical)"' : (x[1] === D ? ' class="is-pending-val"' : '')) + '>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
+    var t = S.totals;
+    var openN = t ? t.open : o.length, critN = t ? t.openCritical : crit, unN = t ? t.openUnassigned : un, actN = t ? t.openInProgress : act;
+    $('#hud-stats').innerHTML = [['Open', ok ? openN : D], ['Critical', ok ? critN : D], ['Unassigned', ok ? unN : D], ['In progress', ok ? actN : D], ['Watch', '<span id="hud-watch">' + (alertsOk ? Array.from(S.alerts.values()).filter(function (a) { return a.status === 'open'; }).length : D) + '</span>']].map(function (x) { return '<div class="hud-stat"><b' + (x[0] === 'Critical' && x[1] && x[1] !== D ? ' style="color:var(--nx-sev-critical)"' : (x[1] === D ? ' class="is-pending-val"' : '')) + '>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
   }
 
   /* ---------- map ---------- */
@@ -323,9 +370,51 @@
     k = k < 0 ? (dir > 0 ? 0 : l.length - 1) : Math.max(0, Math.min(l.length - 1, k + dir));
     select(l[k].id);
   }
+  function rowInScope(i) {
+    if (!i || isHist(i)) return false;
+    var f = S.filters;
+    if (f.fleet && i.fleetId !== f.fleet) return false;
+    if (f.vendor && i.provider !== f.vendor) return false;
+    if (f.sev && i.severity !== f.sev) return false;
+    if (f.cat && i.category !== f.cat) return false;
+    if (f.q.trim()) {
+      var v = i.vehicle || {}, d = i.driver || {};
+      var hay = [i.id, i.fleetName, i.eventType, v.plate, v.vin, v.make, v.model, v.unit, d.name, (i.location || {}).address].join(' ').toLowerCase();
+      if (hay.indexOf(f.q.trim().toLowerCase()) < 0) return false;
+    }
+    return true;
+  }
+  function statusInView(st) {
+    var f = S.filters.status;
+    if (!f || f === 'all') return true;
+    if (f === 'open') return !CLOSED[st];
+    return f === st;
+  }
+  function applyTotalDelta(i, dir) {
+    var t = S.totals; if (!t || !t.byStatus || !i) return;
+    var st = i.status;
+    t.byStatus[st] = Math.max(0, (t.byStatus[st] || 0) + dir);
+    t.all = Math.max(0, (t.all || 0) + dir);
+    if (!isClosed(i)) {
+      t.open = Math.max(0, (t.open || 0) + dir);
+      if (i.severity === 'critical') t.openCritical = Math.max(0, (t.openCritical || 0) + dir);
+      if (st === 'pending' || st === 'validating') {
+        t.openUnassigned = Math.max(0, (t.openUnassigned || 0) + dir);
+        if (i.severity === 'critical') t.openCriticalUnacked = Math.max(0, (t.openCriticalUnacked || 0) + dir);
+      } else t.openInProgress = Math.max(0, (t.openInProgress || 0) + dir);
+    } else if (dir > 0) t.closedLast24h = (t.closedLast24h || 0) + dir;
+    if (statusInView(st)) t.matched = Math.max(0, (t.matched || 0) + dir);
+  }
+  function adjustTotals(prev, next) {
+    if (!S.totals) return;
+    var prevIn = prev && rowInScope(prev), nextIn = rowInScope(next);
+    if (prevIn && (!nextIn || prev.status !== next.status || prev.severity !== next.severity)) applyTotalDelta(prev, -1);
+    if (nextIn && (!prevIn || !prev || prev.status !== next.status || prev.severity !== next.severity)) applyTotalDelta(next, 1);
+  }
   function upsert(i, fromStream) {
     if (!i || !i.id || isHist(i)) return;
     var prev = S.inc.get(i.id);
+    adjustTotals(prev, i);
     S.inc.set(i.id, i);
     if (fromStream) {
       var isNew = !prev;
@@ -375,18 +464,33 @@
     } });
   }
 
-  function load() {
-    S.loading = true; S.error = null; renderQueue(); renderHud(); paintConn();
-    return api('/api/incidents', { query: { limit: 300 } }).then(function (d) {
-      S.inc.clear(); listFrom(d, 'incidents').forEach(function (i) { if (!isHist(i)) S.inc.set(i.id, i); });
-      S.loading = false; S.loaded = true; S.error = null; paintConn(); if (!S.sel) renderDetail();
+  function load(opts) {
+    opts = opts || {};
+    var append = !!opts.append;
+    if (append && (S.loading || S.loadingMore)) return Promise.resolve();
+    if (append) S.loadingMore = true;
+    else { S.loading = true; S.error = null; }
+    renderQueue(); renderHud(); paintConn();
+    var offset = append ? S.nextOffset || 0 : 0;
+    return api('/api/incidents', { query: listQuery(offset) }).then(function (d) {
+      var list = listFrom(d, 'incidents').filter(function (i) { return !isHist(i); });
+      var keep = !append && S.sel ? S.inc.get(S.sel) : null;
+      if (!append) S.inc.clear();
+      list.forEach(function (i) { S.inc.set(i.id, i); });
+      if (keep && !S.inc.has(keep.id)) S.inc.set(keep.id, keep);
+      S.totals = d.totals || S.totals;
+      S.pageInfo = d.page || null;
+      S.nextOffset = ((d.page && d.page.offset) || offset) + list.length;
+      S.serverRows = append ? S.serverRows + list.length : list.length;
+      S.loading = false; S.loadingMore = false; S.loaded = true; S.error = null; paintConn(); if (!S.sel) renderDetail();
       paintFleetSelect(); renderQueue(); renderHud(); syncMarkers();
+      if (append) return;
       var h = decodeURIComponent((location.hash || '').slice(1));
       if (h && !S.sel) select(h, { noHash: true, view: 'detail' });
       else if (!S.sel && !h) { if (!S._fitted) { S._fitted = true; fitAll(); } }
       else if (S.sel) renderDetail();
       if (!S._fitted && !h) { S._fitted = true; fitAll(); }
-    }).catch(function (e) { S.loading = false; S.error = e.message; renderQueue(); renderHud(); paintConn(); if (!S.sel) renderDetail(); });
+    }).catch(function (e) { S.loading = false; S.loadingMore = false; S.error = e.message; renderQueue(); renderHud(); paintConn(); if (!S.sel) renderDetail(); });
   }
 
   /* ---------- actions ---------- */
@@ -426,7 +530,7 @@
     m = NX.modal('Dismiss ' + i.id, NX.el('div.nx-stack', NX.el('p.nx-dim', 'Removes it from the active queue. The record is retained.'), ta), { footer: [NX.el('button.nx-btn.nx-btn--ghost', { onclick: function () { m.close(); } }, 'Cancel'), ok] });
     setTimeout(function () { ta.focus(); ta.select(); }, 30);
   }
-  var SCEN = [['collision_camera', 'Collision, camera verified', 'Headline scenario'], ['reefer_collision', 'Reefer collision after food distributor', 'Load estimate, perishable, spoilage clock'], ['flatbed_steel_collision', 'Flatbed steel collision', 'Camera sees coils, shifting-load risk'], ['hazmat_tanker_rollover', 'Hazmat tanker rollover', 'Critical, spill risk'], ['warranty_dealer_breakdown', 'In-warranty breakdown', 'Nearest OEM dealer and tow destination'], ['dtc_breakdown', 'Breakdown with trouble codes', 'Roadside pre-staging'], ['warranty_failure', 'Warranty failure', 'OEM claim packet'], ['false_positive', 'Camera false positive', 'AI rules it out'], ['random', 'Random event', '']];
+  var SCEN = [['collision_camera', 'Collision, vendor verdict', 'Headline scenario'], ['reefer_collision', 'Reefer collision after food distributor', 'Load estimate, perishable, spoilage clock'], ['flatbed_steel_collision', 'Flatbed steel collision', 'Vendor payload shows coils, shifting-load risk'], ['hazmat_tanker_rollover', 'Hazmat tanker rollover', 'Critical, spill risk'], ['warranty_dealer_breakdown', 'In-warranty breakdown', 'Nearest OEM dealer and tow destination'], ['dtc_breakdown', 'Breakdown with trouble codes', 'Roadside pre-staging'], ['warranty_failure', 'Warranty failure', 'OEM claim packet'], ['false_positive', 'Camera false positive', 'Vendor verdict rules it out'], ['random', 'Random event', '']];
   function showDemo() {
     var m, box = NX.el('div.demo-menu', SCEN.map(function (s) {
       return NX.el('button.nx-btn', { onclick: function (e) {
@@ -471,14 +575,14 @@
     var dur = (clips[0] || {}).durationSec;
     var hud = '<div class="cam-hud top"><span class="' + (clip ? 'rec' : '') + '">' + (clip || snap ? 'CLIP' : 'NO MEDIA ATTACHED') + ' &middot; ' + esc(String(S.camTab).toUpperCase()) + ' CAM</span><span>' + esc((c.provider || i.provider || '').toUpperCase()) + '</span></div>' +
       '<div class="cam-hud bot"><span>' + esc(fmt.dateTime(i.timestamp)) + '</span><span>' + (dur ? dur + 's' : '') + '</span></div>';
-    var stamp = fp ? '<div class="stamp bad">False positive</div>' : c.verified ? '<div class="stamp">Verified</div>' : '<div class="stamp warn">Unverified</div>';
+    var stamp = fp ? '<div class="stamp bad">False positive</div>' : c.verified ? '<div class="stamp">From vendor</div>' : '<div class="stamp warn">Unverified</div>';
     var hasDriver = clips.concat(snaps).some(function (x) { return x.type === 'driver'; });
     var tabs = hasDriver || clips.length > 1 ? '<div class="cam-tabs"><button class="nx-chip' + (S.camTab === 'road' ? ' is-active' : '') + '" data-cam="road">Road facing</button><button class="nx-chip' + (S.camTab === 'driver' ? ' is-active' : '') + '" data-cam="driver">Driver facing</button></div>' : '';
     var col = fp ? 'var(--nx-danger)' : conf >= 85 ? 'var(--nx-ok)' : conf >= 60 ? 'var(--nx-warn)' : 'var(--nx-sev-high)';
-    var banner = fp ? '<div class="fp-banner"><div><b>Likely false positive</b><span>Camera AI does not support this event' + (conf != null ? ' (' + conf + '% confidence)' : '') + '. Dispatch is not recommended.</span></div>' + btn('Dismiss <kbd>x</kbd>', 'nx-btn--danger nx-btn--sm', 'fpdismiss', '', 'dismiss') + '</div>' : '';
-    return panel('Camera verification', NX.badgeHTML(c.verified ? 'Verified' : fp ? 'False positive' : 'Unverified', c.verified ? 'ok' : fp ? 'danger' : 'warn'),
-      banner + tabs + '<div class="cam">' + media + hud + stamp + '</div>' +
-      '<div class="conf"><div class="conf-row"><span class="nx-eyebrow">AI verdict</span><b>' + esc(fmt.label(v || 'pending')) + '</b></div>' +
+    var banner = fp ? '<div class="fp-banner"><div><b>Likely false positive</b><span>The vendor verdict does not support this event' + (conf != null ? ' (' + conf + '% confidence)' : '') + '. Nexus does not analyze the video. Dispatch is not recommended.</span></div>' + btn('Dismiss <kbd>x</kbd>', 'nx-btn--danger nx-btn--sm', 'fpdismiss', '', 'dismiss') + '</div>' : '';
+    return panel('Camera evidence', NX.badgeHTML(c.verified ? 'Vendor verdict' : fp ? 'False positive' : 'Unverified', c.verified ? 'ok' : fp ? 'danger' : 'warn'),
+      banner + '<p class="nx-dim" style="margin:0 0 8px">The verdict arrived with the vendor event. Nexus does not watch or analyze the video. Frames in this demo are placeholders.</p>' + tabs + '<div class="cam">' + media + hud + stamp + '</div>' +
+      '<div class="conf"><div class="conf-row"><span class="nx-eyebrow">Vendor verdict</span><b>' + esc(fmt.label(v || 'pending')) + '</b></div>' +
       '<div class="conf-row"><span class="nx-eyebrow">Confidence</span><b style="color:' + col + '">' + (conf != null ? conf + '%' : '--') + '</b></div>' +
       '<div class="nx-meter"><i style="width:' + (conf || 0) + '%;--c:' + col + '"></i></div></div>' +
       ((c.signals || []).length ? '<div class="sigs">' + c.signals.map(function (s) { return '<span class="sig">' + esc(s) + '</span>'; }).join('') + '</div>' : ''), 'cam');
@@ -573,7 +677,7 @@
   }
   function riskHTML(i) {
     if (!i.risk) return '';
-    return '<div class="nx-row" style="gap:8px;flex-wrap:wrap"><span class="nx-eyebrow">Risk score</span><b class="nx-mono">' + i.risk.eventScore + '</b>' + (i.risk.tags || []).map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') + '</div>';
+    return '<div class="nx-row" style="gap:8px;flex-wrap:wrap"><span class="nx-eyebrow">Risk score</span><b class="nx-mono">' + i.risk.eventScore + '</b>' + (i.risk.tags || []).map(function (t) { var k = String(t).toLowerCase(); var label = (k === 'camera_verified' || k === 'camera-verified') ? 'Vendor camera flag' : String(t).replace(/_/g, ' '); return '<span class="tag" title="Demo tag from the event. Not a Nexus video review.">' + esc(label) + '</span>'; }).join('') + '</div>';
   }
   function renderDetail(fromPro) {
     if (S.mode === 'proactive') { if (fromPro) return; return NXPro.renderDetail(); }
@@ -615,7 +719,7 @@
     var a = b.dataset.act, i = S.inc.get(S.sel); if (!i) return;
     if (a === 'dispatch') doDispatch();
     else if (a === 'dismissopen') doDismiss();
-    else if (a === 'fpdismiss') doDismiss('False positive - camera AI verdict ' + fmt.label(verdict(i)) + (pct(i.camera.confidence) != null ? ' (' + pct(i.camera.confidence) + '%)' : ''));
+    else if (a === 'fpdismiss') doDismiss('False positive - vendor verdict ' + fmt.label(verdict(i)) + (pct(i.camera.confidence) != null ? ' (' + pct(i.camera.confidence) + '%)' : '') + '. Nexus did not analyze video.');
     else if (a === 'center') { focusSelection(); if (window.innerWidth <= 1100) setView('map'); else setTab('map'); }
     else if (a === 'scenesave') { var g = function (id) { var x = detailEl.querySelector('#' + id); return x ? x.value : ''; }; var dist = g('sc-dist'); if (dist === '' && !g('sc-ter') && !g('sc-drop') && !g('sc-note')) return NX.toast('Enter at least one detail from the driver', 'warn'); act('scene', '/scene', { offRoadDistance: dist, unit: g('sc-unit') || 'yd', terrain: g('sc-ter') || undefined, dropFt: g('sc-drop'), notes: g('sc-note'), actor: 'dispatcher' }, 'Scene position saved. The tow provider will see it.'); }
     else if (a === 'status') setStatus(b.dataset.st);
@@ -636,9 +740,11 @@
 
   /* ---------- wiring ---------- */
   fillSelects();
-  $('#status-chips').addEventListener('click', function (e) { var b = e.target.closest('[data-st]'); if (!b) return; S.filters.status = b.dataset.st; renderQueue(); syncMarkers(); });
-  ['sev', 'cat', 'fleet', 'vendor'].forEach(function (k) { $('#f-' + k).addEventListener('change', function (e) { S.filters[k] = e.target.value; renderQueue(); syncMarkers(); }); });
-  $('#f-q').addEventListener('input', function (e) { S.filters.q = e.target.value; renderQueue(); syncMarkers(); });
+  function reloadFilters() { load(); }
+  $('#status-chips').addEventListener('click', function (e) { var b = e.target.closest('[data-st]'); if (!b || b.dataset.st === S.filters.status) return; S.filters.status = b.dataset.st; reloadFilters(); });
+  ['sev', 'cat', 'fleet', 'vendor'].forEach(function (k) { $('#f-' + k).addEventListener('change', function (e) { S.filters[k] = e.target.value; reloadFilters(); }); });
+  var qTimer;
+  $('#f-q').addEventListener('input', function (e) { S.filters.q = e.target.value; clearTimeout(qTimer); qTimer = setTimeout(reloadFilters, 250); });
   $('#q-list').addEventListener('click', function (e) { var r = e.target.closest('[data-id]'); if (r) select(r.dataset.id, { view: 'detail' }); });
   $('#btn-refresh').addEventListener('click', load);
   $('#btn-fit').addEventListener('click', fitAll);

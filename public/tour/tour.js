@@ -83,7 +83,7 @@
       media.append(el('figcaption', snap.placeholder ? 'Placeholder frame. Real Mantis media is not connected.' : 'Camera frame'));
     } else media.append(el('div.t-media__none', 'No frame in this payload'));
     var facts = el('div.t-facts',
-      el('div.t-fact', el('span.nx-eyebrow', 'AI verdict'), el('b', cam.aiVerdict ? NX.fmt.label(cam.aiVerdict) : 'None')),
+      el('div.t-fact', el('span.nx-eyebrow', 'Vendor verdict'), el('b', cam.aiVerdict ? NX.fmt.label(cam.aiVerdict) : 'None')),
       el('div.t-fact', el('span.nx-eyebrow', 'Confidence'), el('b.nx-mono', cam.confidence != null ? Math.round(cam.confidence * 100) + '%' : 'n/a')),
       el('div.t-fact', el('span.nx-eyebrow', 'Verified by camera'), el('b', cam.verified ? 'Yes' : 'No')),
       el('div.t-fact', el('span.nx-eyebrow', 'Source'), el('b', NX.fmt.label(inc.provider || ''))));
