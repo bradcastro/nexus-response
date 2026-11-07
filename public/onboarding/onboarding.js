@@ -35,7 +35,7 @@
     ['timestamp', 'Date and time', true], ['eventType', 'Event type', true], ['vin', 'VIN'], ['unit', 'Vehicle / unit name'], ['driver', 'Driver'],
     ['lat', 'Latitude'], ['lng', 'Longitude'], ['speed', 'Speed'], ['severity', 'Severity'], ['externalId', 'Event ID'], ['video', 'Video link'], ['address', 'Location'],
     ['dtc', 'Fault codes', false, true], ['plate', 'License plate', false, true], ['odometer', 'Odometer', false, true], ['followingDistance', 'Following distance (s)', false, true], ['drowsiness', 'Drowsiness score', false, true],
-    ['phoneUse', 'Phone use', false, true], ['seatbelt', 'Seatbelt on', false, true], ['aiClassification', 'Camera AI verdict', false, true], ['aiConfidence', 'Camera AI confidence', false, true], ['weight', 'Load weight', false, true],
+    ['phoneUse', 'Phone use', false, true], ['seatbelt', 'Seatbelt on', false, true], ['aiClassification', 'Vendor camera verdict', false, true], ['aiConfidence', 'Vendor camera confidence', false, true], ['weight', 'Load weight', false, true],
     ['date', 'Trip date (mileage rows)', false, true], ['miles', 'Miles (mileage rows)', false, true], ['hours', 'Hours (mileage rows)', false, true]
   ];
 

@@ -18,7 +18,14 @@
     set: function (t, persist) {
       document.documentElement.setAttribute('data-theme', t);
       if (persist !== false) lsSet(KEY, t);
-      document.querySelectorAll('[data-nx-theme-toggle]').forEach(function (b) { b.textContent = t === 'dark' ? '☀' : '☾'; b.title = 'Switch to ' + (t === 'dark' ? 'light' : 'dark') + ' theme'; });
+      document.querySelectorAll('[data-nx-theme-toggle]').forEach(function (b) {
+        var icon = b.querySelector('.nx-theme-btn__icon');
+        var next = t === 'dark' ? 'light' : 'dark';
+        if (icon) icon.textContent = t === 'dark' ? '☀' : '☾';
+        else b.textContent = t === 'dark' ? '☀' : '☾';
+        b.title = 'Color theme. Switch to ' + next + '. This does not show whether the server is connected.';
+        b.setAttribute('aria-label', 'Color theme, currently ' + t + '. Switch to ' + next + '.');
+      });
       document.dispatchEvent(new CustomEvent('nx:theme', { detail: t }));
     },
     toggle: function () { theme.set(theme.get() === 'dark' ? 'light' : 'dark'); },
@@ -191,12 +198,17 @@
   };
 
   /* ---------------- live indicator ---------------- */
-  // state: 'live' | 'reconnecting' | 'off'
+  // state: 'checking' | 'live' | 'reconnecting' | 'off'
+  // Connection to this server. Not a data-quality flag and not the theme control.
+  var LIVE_LABEL = { checking: 'Checking', live: 'Live', reconnecting: 'Reconnecting', off: 'Offline' };
   NX.setLive = function (state) {
     document.querySelectorAll('[data-nx-live]').forEach(function (n) {
       var dot = n.querySelector('.nx-live-dot'), txt = n.querySelector('.nx-live__text');
-      dot.className = 'nx-live-dot' + (state === 'live' ? '' : state === 'reconnecting' ? ' nx-live-dot--warn' : ' nx-live-dot--off');
-      txt.textContent = state === 'live' ? 'Live' : state === 'reconnecting' ? 'Reconnecting' : 'Offline';
+      if (!dot || !txt) return;
+      var kind = state === 'live' ? '' : state === 'reconnecting' ? ' nx-live-dot--warn' : state === 'checking' ? ' nx-live-dot--wait' : ' nx-live-dot--off';
+      dot.className = 'nx-live-dot' + kind;
+      txt.textContent = LIVE_LABEL[state] || 'Offline';
+      n.setAttribute('aria-label', 'Connection: ' + (LIVE_LABEL[state] || 'Offline'));
     });
   };
 
@@ -216,8 +228,8 @@
       })),
       el('div.nx-topbar__right',
         opts.right,
-        opts.live !== false && el('span.nx-live', { 'data-nx-live': '' }, el('span.nx-live-dot.nx-live-dot--off'), el('span.nx-live__text', 'Offline')),
-        el('button.nx-icon-btn', { 'data-nx-theme-toggle': '', 'aria-label': 'Toggle theme', onclick: theme.toggle }, '☾'))
+        opts.live !== false && el('span.nx-live', { 'data-nx-live': '', role: 'status', title: 'Connection to this server' }, el('span.nx-live-dot.nx-live-dot--wait', { 'aria-hidden': 'true' }), el('span.nx-live__text', 'Checking')),
+        el('button.nx-theme-btn', { type: 'button', 'data-nx-theme-toggle': '', 'aria-label': 'Color theme', title: 'Color theme', onclick: theme.toggle }, el('span.nx-theme-btn__icon', { 'aria-hidden': 'true' }, '☾'), el('span.nx-theme-btn__label', 'Theme')))
     );
     var mount = typeof opts.mount === 'string' ? document.querySelector(opts.mount) : opts.mount;
     mount = mount || document.getElementById('nx-topbar');

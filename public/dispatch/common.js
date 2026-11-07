@@ -37,7 +37,7 @@
   // Outbound = would have reached a person, tow company, insurer, agency or OEM. In the demo none of it is real.
   var OUTBOUND = /dispatch|notified_|^notify|eta_shared|eta_updated|fnol|job_link|tow_destination|warranty_(submitted|under_review|approved|denied|more_info|paid)|^submitted|authority|provider_declined/i;
   var TITLES = {
-    received: 'Event received', normalized: 'Event normalized', vin_decoded: 'VIN decoded', camera_verified: 'Camera verdict', roadside_recommended: 'Roadside recommended',
+    received: 'Event received', normalized: 'Event normalized', vin_decoded: 'VIN decoded', camera_verified: 'Vendor camera verdict', roadside_recommended: 'Roadside recommended',
     context_inferred: 'Trip and load context inferred', job_link_sent: 'Job ticket link sent', eta_shared: 'ETA shared', fnol_sent: 'First notice of loss sent',
     notified_fleet_manager: 'Fleet manager notified', notified_driver: 'Driver notified', notified_tow: 'Tow provider notified', notified_insurer: 'Insurer notified',
     notified_authority: 'Authorities contacted', notified_cargo_owner: 'Cargo owner notified', notified_oem: 'OEM notified', sop_step: 'Checklist step',

@@ -98,7 +98,7 @@
     var fp = !!(i.camera && i.camera.aiVerdict === 'false_positive'), w = i.warranty, r = i.roadside || {}, rec = r.assignedProvider || r.recommendedProvider || null;
     var dx = i.diagnostics || {}, haz = !!(i.load && i.load.contents && i.load.contents.hazmat), coll = i.category === 'collision';
     var what = fmt.label(i.severity) + ' ' + fmt.label(i.eventType).toLowerCase();
-    var camTxt = fp ? 'camera AI says false positive' + (conf != null ? ' (' + conf + '%)' : '') : cam ? (cam.verified ? 'camera verified' : 'camera not yet verified') + (conf != null ? ' (' + conf + '%)' : '') : 'no camera evidence';
+    var camTxt = fp ? 'vendor verdict is false positive' + (conf != null ? ' (' + conf + '%)' : '') : cam ? (cam.verified ? 'vendor supplied a verdict' : 'vendor has not marked this verified') + (conf != null ? ' (' + conf + '%)' : '') : 'no camera evidence';
     var age = fmt.ago(i.receivedAt || i.timestamp), out = [];
     var X = function (k, title, why, btn, kbd, sim) { return { key: k, title: title, why: why, btn: btn, kbd: kbd, sim: sim || null, attr: 'data-xact="' + k + '"' }; };
     if (closed) {
@@ -350,17 +350,24 @@
     var oldest = unack.sort(function (a, b) { return new Date(a.receivedAt || a.timestamp) - new Date(b.receivedAt || b.timestamp); })[0];
     var age = oldest ? minutes(oldest.receivedAt || oldest.timestamp, Date.now()) : null, breach = age != null && age > 5;
     var notes = notesGet(), last = notes[notes.length - 1], L = !!S.loaded, N = function (v) { return L ? v : '\u2014'; };
+    var t = S.totals;
+    var openN = t ? t.open : open.length;
+    var unassignedN = t && t.byStatus ? (t.byStatus.pending || 0) : open.filter(function (i) { return i.status === 'pending'; }).length;
+    var critN = t && t.openCriticalUnacked != null ? t.openCriticalUnacked : unack.length;
+    var closedN = t && t.closedLast24h != null ? t.closedLast24h : resolved;
     if (!L) { oldest = null; unack = []; }
-    bar.innerHTML = '<span class="sb-i"><b>' + N(open.length) + '</b> open</span><span class="sb-i"><b>' + N(open.filter(function (i) { return i.status === 'pending'; }).length) + '</b> unassigned</span><span class="sb-i"><b>' + N(resolved) + '</b> closed 24h</span>' +
-      '<span class="sb-i' + (unack.length ? ' is-bad' : '') + '" title="Critical incidents not yet validated or dispatched"><b>' + N(unack.length) + '</b> critical unacked' + (oldest ? ' <em class="' + (breach ? 'late' : '') + '">oldest ' + dur(age) + '</em>' : '') + '</span>' +
-      '<span class="sb-sep"></span><span class="sb-i" title="Average time from receipt to validation (24h)">Validate <b>' + (L ? dur(avg(ttv)) : '\u2014') + '</b><small>SLA 2m</small></span><span class="sb-i" title="Average time from receipt to dispatch (24h)">Dispatch <b>' + (L ? dur(avg(ttd)) : '\u2014') + '</b><small>SLA 5m</small></span>' +
+    bar.innerHTML = '<span class="sb-i" title="Open incidents in this scope, from the server total"><b>' + N(openN) + '</b> open</span><span class="sb-i"><b>' + N(unassignedN) + '</b> unassigned</span><span class="sb-i" title="Resolved or dismissed in the last 24 hours"><b>' + N(closedN) + '</b> closed 24h</span>' +
+      '<span class="sb-i' + (critN ? ' is-bad' : '') + '" title="Critical incidents still pending or validating"><b>' + N(critN) + '</b> critical unacked' + (oldest && !t ? ' <em class="' + (breach ? 'late' : '') + '">oldest ' + dur(age) + '</em>' : '') + '</span>' +
+      '<span class="sb-sep"></span><span class="sb-i" title="Average time from receipt to validation, using incidents loaded in this queue">Validate <b>' + (L ? dur(avg(ttv)) : '\u2014') + '</b><small>SLA 2m</small></span><span class="sb-i" title="Average time from receipt to dispatch, using incidents loaded in this queue">Dispatch <b>' + (L ? dur(avg(ttd)) : '\u2014') + '</b><small>SLA 5m</small></span>' +
       '<span class="nx-grow"></span><button class="nx-btn nx-btn--sm" id="sb-handoff" title="Shift handoff notes (H)">Handoff' + (notes.length ? ' (' + notes.length + ')' : '') + (last ? '' : '') + '</button>';
   }
   function handoff() {
     var notes = notesGet(), ta = NX.el('textarea.nx-textarea', { placeholder: 'What should the next dispatcher know? Open incidents, promised callbacks, watch items.', rows: 4 }), m;
     var listEl = NX.el('div.nx-stack', notes.slice().reverse().map(function (n) { return NX.el('div.hn', NX.el('div.nx-faint.nx-mono', { style: { fontSize: '11px' } }, fmt.dateTime(n.t)), NX.el('div', n.text)); }));
     var open = []; S.inc.forEach(function (i) { if (['resolved', 'dismissed'].indexOf(i.status) < 0 && i.source !== 'historical_import') open.push(i); });
-    var sum = NX.el('div.verif.warn', NX.el('b', open.length + ' open incidents to hand over'), NX.el('span', open.slice(0, 5).map(function (i) { return i.id + ' ' + fmt.label(i.eventType) + ' (' + i.status + ')'; }).join('; ') || 'None'));
+    var openN = S.totals && S.totals.open != null ? S.totals.open : open.length;
+    var listed = open.slice(0, 5).map(function (i) { return i.id + ' ' + fmt.label(i.eventType) + ' (' + i.status + ')'; }).join('; ');
+    var sum = NX.el('div.verif.warn', NX.el('b', openN + ' open incidents to hand over'), NX.el('span', listed || (openN ? 'Open the Open queue to list them. The count is the full queue.' : 'None')));
     m = NX.modal('Shift handoff', NX.el('div.nx-stack', sum, ta, notes.length ? NX.el('div.nx-eyebrow', 'Previous notes') : null, listEl), { footer: [NX.el('span.sim-note.nx-faint', 'Saved on this device only'), NX.el('button.nx-btn.nx-btn--ghost', { onclick: function () { m.close(); } }, 'Close'), NX.el('button.nx-btn.nx-btn--primary', { onclick: function () { if (!ta.value.trim()) return ta.focus(); var a = notesGet(); a.push({ t: new Date().toISOString(), text: ta.value.trim() }); notesSet(a); m.close(); shift(); NX.toast('Handoff note saved', 'success'); } }, 'Save note')] });
     setTimeout(function () { ta.focus(); }, 40);
   }

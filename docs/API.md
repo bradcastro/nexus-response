@@ -61,7 +61,7 @@ curl -s -XPOST $BASE/webhook/samsara -H 'content-type: application/json' -d @/tm
 **GET /api/demo/sample/:provider?kind=collision|dtc** -> the vendor-shaped sample payload.
 
 ## Incidents
-**GET /api/incidents?fleetId=&status=&category=&provider=&since=&limit=** (status may be comma list; default limit 100, max 1000; newest first by event timestamp) -> `{incidents:[Incident]}`
+**GET /api/incidents?fleetId=&status=&category=&provider=&severity=&q=&since=&limit=&offset=** (status may be comma list; default limit 100, max 1000; offset default 0; newest first by event timestamp, then id) -> `{incidents:[Incident], page:{limit,offset,returned,truncated}, totals:{all,open,openCritical,openUnassigned,openInProgress,openCriticalUnacked,closedLast24h,byStatus,matched,excludes}}`. `totals` uses every filter except `status`, so status chips stay true while a page is narrowed. `totals.matched` is the count after the status filter (`all` when status is omitted). `closedLast24h` counts resolved or dismissed events whose resolved time (or event time) is within 24 hours. `q` matches id, fleet, event type, unit, plate, VIN, driver, and address. `page.truncated` is true when this response is not the end of `matched`. The array is still a page, not the population.
 `curl "$BASE/api/incidents?fleetId=fleet_piedmont&status=pending,dispatched&limit=20"`
 
 **GET /api/incidents/:id** -> Incident (404 `{error}`). **GET /api/incidents/:id/context** -> `{trip, equipment, load, warrantyDealer}` (same objects embedded in the incident; fields null when absent).

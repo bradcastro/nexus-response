@@ -128,41 +128,127 @@ async function findByProviderEvent(provider, eventId) {
   return id ? JSON.parse(JSON.stringify(mem.incidents.get(id))) : null;
 }
 
-// opts.clone=false returns shared references (read-only use, much faster for analytics)
-async function listIncidents({ fleetId, status, category, limit = 100, since, until, provider, source, notSource, importJobId, clone = true } = {}) {
+const INCIDENT_STATUSES = ['pending', 'validating', 'dispatched', 'en_route', 'on_scene', 'resolved', 'dismissed'];
+const OPEN_STATUSES = new Set(['pending', 'validating', 'dispatched', 'en_route', 'on_scene']);
+
+function normIncidentFilter(o = {}) {
+  const statuses = o.status ? String(o.status).split(',').map((s) => s.trim()).filter(Boolean) : null;
+  const q = o.q != null && String(o.q).trim() ? String(o.q).trim().toLowerCase().slice(0, 200) : '';
+  return {
+    fleetId: o.fleetId || null,
+    statuses: statuses && statuses.length ? statuses : null,
+    category: o.category || null,
+    provider: o.provider || null,
+    severity: o.severity || null,
+    source: o.source || null,
+    notSource: o.notSource || null,
+    importJobId: o.importJobId || null,
+    q,
+    sinceT: o.since ? +new Date(o.since) : null,
+    untilT: o.until ? +new Date(o.until) : null,
+  };
+}
+function incidentHay(i) {
+  const v = i.vehicle || {}, d = i.driver || {}, l = i.location || {};
+  return [i.id, i.fleetName, i.eventType, i.provider, v.plate, v.vin, v.unit, v.make, v.model, d.name, l.address].filter((x) => x != null && x !== '').join(' ').toLowerCase();
+}
+function memMatchIncident(i, f, ignoreStatus) {
+  if (f.fleetId && i.fleetId !== f.fleetId) return false;
+  if (!ignoreStatus && f.statuses && !f.statuses.includes(i.status)) return false;
+  if (f.category && i.category !== f.category) return false;
+  if (f.provider && i.provider !== f.provider) return false;
+  if (f.severity && i.severity !== f.severity) return false;
+  if (f.source && i.source !== f.source) return false;
+  if (f.notSource && i.source === f.notSource) return false;
+  if (f.importJobId && !(i.import && i.import.jobId === f.importJobId)) return false;
+  if (f.sinceT != null || f.untilT != null) {
+    const t = +new Date(i.timestamp);
+    if ((f.sinceT != null && t < f.sinceT) || (f.untilT != null && t > f.untilT)) return false;
+  }
+  if (f.q && !incidentHay(i).includes(f.q)) return false;
+  return true;
+}
+function pgIncidentWhere(f, ignoreStatus) {
+  const w = [], args = [];
+  const add = (sql, val) => { args.push(val); w.push(sql.replace('$?', `$${args.length}`)); };
+  if (f.fleetId) add('fleet_id=$?', f.fleetId);
+  if (!ignoreStatus && f.statuses) add('status = ANY($?)', f.statuses);
+  if (f.category) add('category=$?', f.category);
+  if (f.provider) add('provider=$?', f.provider);
+  if (f.severity) add('severity=$?', f.severity);
+  if (f.sinceT != null) add('ts >= $?', new Date(f.sinceT).toISOString());
+  if (f.untilT != null) add('ts <= $?', new Date(f.untilT).toISOString());
+  if (f.source) add('source=$?', f.source);
+  if (f.notSource) add('(source IS NULL OR source<>$?)', f.notSource);
+  if (f.importJobId) add('import_job_id=$?', f.importJobId);
+  if (f.q) {
+    const pat = `%${f.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    args.push(pat);
+    const n = `$${args.length}`;
+    w.push(`(id ILIKE ${n} ESCAPE '\\' OR COALESCE(data->>'fleetName','') ILIKE ${n} ESCAPE '\\' OR COALESCE(data->>'eventType','') ILIKE ${n} ESCAPE '\\' OR COALESCE(data#>>'{vehicle,plate}','') ILIKE ${n} ESCAPE '\\' OR COALESCE(data#>>'{vehicle,vin}','') ILIKE ${n} ESCAPE '\\' OR COALESCE(data#>>'{vehicle,unit}','') ILIKE ${n} ESCAPE '\\' OR COALESCE(data#>>'{vehicle,make}','') ILIKE ${n} ESCAPE '\\' OR COALESCE(data#>>'{vehicle,model}','') ILIKE ${n} ESCAPE '\\' OR COALESCE(data#>>'{driver,name}','') ILIKE ${n} ESCAPE '\\' OR COALESCE(data#>>'{location,address}','') ILIKE ${n} ESCAPE '\\')`);
+  }
+  return { where: w.length ? `WHERE ${w.join(' AND ')}` : '', args };
+}
+function foldStatusCounts(rows) {
+  const byStatus = Object.fromEntries(INCIDENT_STATUSES.map((s) => [s, 0]));
+  let all = 0, open = 0, openCritical = 0, openUnassigned = 0, openInProgress = 0, openCriticalUnacked = 0, closedLast24h = 0;
+  for (const row of rows) {
+    const n = row.n, st = row.status || 'pending';
+    byStatus[st] = (byStatus[st] || 0) + n;
+    all += n;
+    if (row.recent) closedLast24h += row.recent;
+    if (OPEN_STATUSES.has(st)) {
+      open += n;
+      if (row.severity === 'critical') openCritical += n;
+      if (st === 'pending' || st === 'validating') {
+        openUnassigned += n;
+        if (row.severity === 'critical') openCriticalUnacked += n;
+      } else openInProgress += n;
+    }
+  }
+  return { all, open, openCritical, openUnassigned, openInProgress, openCriticalUnacked, closedLast24h, byStatus };
+}
+
+// Counts ignore `status` so a filtered page can still show every status chip.
+// `matched` is the count after the status filter (equal to `all` when status is omitted).
+async function summarizeIncidents(filter = {}) {
+  const f = normIncidentFilter(filter);
   const p = await ready();
-  const statuses = status ? String(status).split(',') : null;
+  let folded;
   if (p) {
-    const w = [], args = [];
-    if (fleetId) { args.push(fleetId); w.push(`fleet_id=$${args.length}`); }
-    if (statuses) { args.push(statuses); w.push(`status = ANY($${args.length})`); }
-    if (category) { args.push(category); w.push(`category=$${args.length}`); }
-    if (since) { args.push(since); w.push(`ts >= $${args.length}`); }
-    if (until) { args.push(until); w.push(`ts <= $${args.length}`); }
-    if (provider) { args.push(provider); w.push(`provider=$${args.length}`); }
-    if (source) { args.push(source); w.push(`source=$${args.length}`); }
-    if (notSource) { args.push(notSource); w.push(`(source IS NULL OR source<>$${args.length})`); }
-    if (importJobId) { args.push(importJobId); w.push(`import_job_id=$${args.length}`); }
-    args.push(limit);
-    const r = await p.query(`SELECT data FROM incidents_v2 ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY ts DESC LIMIT $${args.length}`, args);
+    const { where, args } = pgIncidentWhere(f, true);
+    const r = await p.query(`SELECT status, severity, COUNT(*)::int AS n, COUNT(*) FILTER (WHERE status IN ('resolved','dismissed') AND COALESCE((data->>'resolvedAt')::timestamptz, ts) > NOW() - INTERVAL '24 hours')::int AS recent FROM incidents_v2 ${where} GROUP BY status, severity`, args);
+    folded = foldStatusCounts(r.rows);
+  } else {
+    const rows = [];
+    const dayAgo = Date.now() - 86400000;
+    for (const i of mem.incidents.values()) {
+      if (!memMatchIncident(i, f, true)) continue;
+      const recent = (i.status === 'resolved' || i.status === 'dismissed') && +new Date(i.resolvedAt || i.timestamp) > dayAgo ? 1 : 0;
+      rows.push({ status: i.status, severity: i.severity, n: 1, recent });
+    }
+    folded = foldStatusCounts(rows);
+  }
+  const matched = f.statuses ? f.statuses.reduce((s, st) => s + (folded.byStatus[st] || 0), 0) : folded.all;
+  return { ...folded, matched };
+}
+
+// opts.clone=false returns shared references (read-only use, much faster for analytics)
+async function listIncidents({ fleetId, status, category, limit = 100, offset = 0, since, until, provider, source, notSource, importJobId, severity, q, clone = true } = {}) {
+  const f = normIncidentFilter({ fleetId, status, category, since, until, provider, source, notSource, importJobId, severity, q });
+  const off = Math.max(0, offset || 0);
+  const p = await ready();
+  if (p) {
+    const { where, args } = pgIncidentWhere(f, false);
+    args.push(limit, off);
+    const r = await p.query(`SELECT data FROM incidents_v2 ${where} ORDER BY ts DESC, id DESC LIMIT $${args.length - 1} OFFSET $${args.length}`, args);
     return r.rows.map((x) => x.data);
   }
-  const sinceT = since ? +new Date(since) : null, untilT = until ? +new Date(until) : null;
-  let rows = [];
-  for (const i of mem.incidents.values()) {
-    if (fleetId && i.fleetId !== fleetId) continue;
-    if (statuses && !statuses.includes(i.status)) continue;
-    if (category && i.category !== category) continue;
-    if (provider && i.provider !== provider) continue;
-    if (source && i.source !== source) continue;
-    if (notSource && i.source === notSource) continue;
-    if (importJobId && !(i.import && i.import.jobId === importJobId)) continue;
-    if (sinceT != null || untilT != null) { const t = +new Date(i.timestamp); if ((sinceT != null && t < sinceT) || (untilT != null && t > untilT)) continue; }
-    rows.push(i);
-  }
-  rows.sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : 0));
-  rows = rows.slice(0, limit);
-  return clone ? rows.map((i) => JSON.parse(JSON.stringify(i))) : rows;
+  const rows = [];
+  for (const i of mem.incidents.values()) if (memMatchIncident(i, f, false)) rows.push(i);
+  rows.sort((a, b) => (a.timestamp < b.timestamp ? 1 : a.timestamp > b.timestamp ? -1 : (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)));
+  const page = rows.slice(off, off + limit);
+  return clone ? page.map((i) => JSON.parse(JSON.stringify(i))) : page;
 }
 
 async function updateIncident(id, mutator) {
@@ -267,6 +353,6 @@ async function updateIncidentStatus(id, status) { await updateIncident(id, (i) =
 const usingPostgres = () => !!process.env.DATABASE_URL;
 
 module.exports = {
-  saveIncident, saveIncidentsBulk, getIncident, findByProviderEvent, listIncidents, updateIncident, addTimeline, countIncidents, clearIncidents, deleteIncidentsByJob, deleteIncidentsByFleet,
+  saveIncident, saveIncidentsBulk, getIncident, findByProviderEvent, listIncidents, summarizeIncidents, updateIncident, addTimeline, countIncidents, clearIncidents, deleteIncidentsByJob, deleteIncidentsByFleet,
   put, get, list, del, findByKey, clearKind, saveFleet, listFleets, saveProvider, listProviders, getIncidents, updateIncidentStatus, usingPostgres, KINDS,
 };

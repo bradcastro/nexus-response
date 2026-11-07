@@ -88,9 +88,33 @@ async function mutate(req, res, fn, extra) {
 app.get('/api/incidents', wrap(async (req, res) => {
   const { fleetId, status, category, provider, since, source } = req.query;
   const limit = Math.min(parseInt(req.query.limit, 10) || 100, 1000);
+  let offset = 0;
+  if (req.query.offset != null && req.query.offset !== '') {
+    offset = Number(req.query.offset);
+    if (!Number.isInteger(offset) || offset < 0 || offset > 1e7) return res.status(400).json({ error: 'invalid_request', field: 'offset', message: 'offset must be an integer between 0 and 10000000' });
+  }
+  const q = req.query.q != null && String(req.query.q).trim() ? String(req.query.q).trim().slice(0, 200) : undefined;
+  const severity = req.query.severity || undefined;
   // historical imports are hidden from global lists unless a fleet/source is requested explicitly
   const notSource = !fleetId && !source && req.query.includeImported !== '1' ? 'historical_import' : undefined;
-  res.json({ incidents: await db.listIncidents({ fleetId, status, category, provider, since, limit, source, notSource }) });
+  const filter = { fleetId, status, category, provider, since, limit, offset, source, notSource, severity, q };
+  const [incidents, totals] = await Promise.all([db.listIncidents(filter), db.summarizeIncidents(filter)]);
+  res.json({
+    incidents,
+    page: { limit, offset, returned: incidents.length, truncated: offset + incidents.length < totals.matched },
+    totals: {
+      all: totals.all,
+      open: totals.open,
+      openCritical: totals.openCritical,
+      openUnassigned: totals.openUnassigned,
+      openInProgress: totals.openInProgress,
+      openCriticalUnacked: totals.openCriticalUnacked,
+      closedLast24h: totals.closedLast24h,
+      byStatus: totals.byStatus,
+      matched: totals.matched,
+      excludes: notSource || null,
+    },
+  });
 }));
 
 app.get('/api/incidents/:id', wrap(async (req, res) => {

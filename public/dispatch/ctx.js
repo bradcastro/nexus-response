@@ -19,7 +19,7 @@
     if (c && c.temperatureSensitive) out.push(['perishable', 'warn']);
     else if (c && c.category && c.category !== 'unknown') out.push([CAT_LABEL(c.category).toLowerCase(), '']);
     if (T && T.attached !== false && T.type && T.type !== 'none') out.push([T.type.replace(/_/g, ' '), '']);
-    if (T && T.attached !== false && T.type !== 'none') out.push([T.cameraVerified ? 'camera-verified' : 'inferred', T.cameraVerified ? 'ok' : 'warn']);
+    if (T && T.attached !== false && T.type !== 'none') out.push([T.cameraVerified ? 'trailer on camera' : 'trailer inferred', T.cameraVerified ? 'ok' : 'warn']);
     if (L && L.overweightRisk) out.push(['overweight risk', 'bad']);
     if (c && c.estimatedValueUsd) out.push([usd(c.estimatedValueUsd) + ' cargo', '']);
     if (i.warrantyDealer && i.warrantyDealer.nearest) out.push(['OEM dealer ' + num(i.warrantyDealer.nearest.distanceMi, 0) + ' mi', 'ok']);
@@ -87,11 +87,11 @@
     var badge = '';
     if (!tr || tr.attached === false || tr.type === 'none') body += '<div class="eq-row"><div class="eq-k">Trailer</div><div class="nx-grow"><b>Bobtail / no trailer</b></div></div>';
     else {
-      badge = tr.cameraVerified ? '<div class="verif ok"><b>Camera-verified</b><span>' + esc(tr.cameraBasis || 'Visually confirmed by camera') + '</span></div>' : '<div class="verif warn"><b>Inferred</b><span>Not seen by camera. Detected by ' + esc(fmt.label(tr.detectedBy || 'inference').toLowerCase()) + (tr.cameraBasis ? '. ' + esc(tr.cameraBasis) : '') + '</span></div>';
+      badge = tr.cameraVerified ? '<div class="verif ok"><b>On vendor camera</b><span>' + esc(tr.cameraBasis || 'Reported with the vendor event. Nexus does not analyze the image.') + '</span></div>' : '<div class="verif warn"><b>Inferred</b><span>Not seen by a camera. Detected by ' + esc(fmt.label(tr.detectedBy || 'inference').toLowerCase()) + (tr.cameraBasis ? '. ' + esc(tr.cameraBasis) : '') + '</span></div>';
       body += '<div class="eq-row"><div class="eq-k">Trailer</div><div class="nx-grow"><b>' + esc(fmt.label(tr.type)) + (tr.lengthFt ? ' &middot; ' + tr.lengthFt + ' ft' : '') + '</b><div class="nx-dim" style="font-size:12px">' + (tr.unitId ? esc(tr.unitId) + ' &middot; ' : '') + 'Tare ' + lbs(tr.tareLb) + ' &middot; Max payload ' + lbs(tr.maxPayloadLb) + '</div></div></div>' + badge;
       if (tr.reefer) body += '<div class="stat-row"><div><b>' + num(tr.reefer.setpointF, 0) + '&deg;F</b><span>Setpoint</span></div><div><b>' + num(tr.reefer.returnAirF, 0) + '&deg;F</b><span>Return air</span></div><div><b style="color:' + (tr.reefer.unitRunning ? 'var(--nx-ok)' : 'var(--nx-danger)') + '">' + (tr.reefer.unitRunning ? 'RUN' : 'OFF') + '</b><span>Reefer unit</span></div><div><b>' + num(tr.reefer.fuelPct, 0) + '%</b><span>Reefer fuel</span></div></div>';
     }
-    var right = tr && tr.attached !== false && tr.type !== 'none' ? NX.badgeHTML(tr.cameraVerified ? 'Camera-verified' : 'Inferred', tr.cameraVerified ? 'ok' : 'warn') : '';
+    var right = tr && tr.attached !== false && tr.type !== 'none' ? NX.badgeHTML(tr.cameraVerified ? 'On vendor camera' : 'Inferred', tr.cameraVerified ? 'ok' : 'warn') : '';
     return panel('Equipment', right, body, 'equipment');
   }
 

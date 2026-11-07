@@ -28,6 +28,33 @@ async function start() {
   await start();
   console.log('Target ' + BASE);
 
+  console.log('\n[0] incident list scope');
+  const recAll = (await J('/api/records/search?type=incident&limit=1')).body;
+  const page = await J('/api/incidents?limit=80&offset=0');
+  const page2 = await J('/api/incidents?limit=80&offset=80');
+  const badOff = await J('/api/incidents?offset=-1');
+  const openQ = await J('/api/incidents?status=pending,validating,dispatched,en_route,on_scene&limit=1000');
+  const resolvedQ = await J('/api/incidents?status=resolved&limit=50');
+  const t = page.body.totals || {}, by = t.byStatus || {};
+  const openNames = ['pending', 'validating', 'dispatched', 'en_route', 'on_scene'];
+  const openSum = openNames.reduce((s, k) => s + (by[k] || 0), 0);
+  const statusSum = Object.values(by).reduce((s, n) => s + n, 0);
+  ok(page.status === 200 && t.all === recAll.total && t.all > 80, 'totals.all matches the records incident total and is larger than one page', [t.all, recAll.total]);
+  ok(page.body.page && page.body.page.limit === 80 && page.body.page.returned === page.body.incidents.length && page.body.incidents.length === 80 && page.body.page.truncated === true, 'first page reports limit, returned count and truncated');
+  ok(statusSum === t.all && openSum === t.open && t.matched === t.all, 'status counts sum to all, open is the non-closed sum, matched equals all when status is omitted', [statusSum, t.open, t.matched]);
+  ok(page.body.incidents.every((i, n, a) => n === 0 || i.timestamp < a[n - 1].timestamp || (i.timestamp === a[n - 1].timestamp && i.id <= a[n - 1].id)), 'page is newest first');
+  const ids1 = new Set(page.body.incidents.map((i) => i.id));
+  ok(page2.status === 200 && page2.body.incidents.length > 0 && page2.body.incidents.every((i) => !ids1.has(i.id)) && page2.body.totals.all === t.all, 'offset page does not repeat the first page and keeps the same totals');
+  ok(badOff.status === 400 && badOff.body.field === 'offset', 'a negative offset is rejected');
+  ok(openQ.body.incidents.length === openQ.body.totals.open && openQ.body.incidents.every((i) => openNames.includes(i.status)) && openQ.body.totals.all === t.all && openQ.body.totals.matched === openQ.body.totals.open, 'open query returns every open incident while totals.all stays the full operational count');
+  ok(resolvedQ.body.totals.byStatus.resolved === (recAll.facets.status || {}).resolved && resolvedQ.body.totals.matched === resolvedQ.body.totals.byStatus.resolved && resolvedQ.body.incidents.every((i) => i.status === 'resolved') && resolvedQ.body.incidents.length === Math.min(50, resolvedQ.body.totals.matched) && resolvedQ.body.totals.byStatus.resolved > resolvedQ.body.incidents.length, 'resolved page is a slice; its chip count matches records and is not the page length');
+  const needle = page.body.incidents[page.body.incidents.length - 1];
+  const found = await J('/api/incidents?q=' + encodeURIComponent(needle.id) + '&limit=20');
+  ok(found.body.incidents.some((i) => i.id === needle.id) && found.body.totals.matched >= 1 && (found.body.incidents.length === found.body.totals.matched || found.body.page.truncated), 'q finds an incident by id and does not pretend the page is the whole match', [needle.id, found.body.totals && found.body.totals.matched]);
+  const fleet = await J('/api/incidents?fleetId=fleet_elite&limit=5');
+  const fleetRec = (await J('/api/records/search?type=incident&fleetId=fleet_elite&limit=1')).body;
+  ok(fleet.body.totals.all === fleetRec.total && fleet.body.incidents.every((i) => i.fleetId === 'fleet_elite') && fleet.body.page.truncated === (fleet.body.totals.matched > fleet.body.incidents.length), 'fleet filter totals match records and the page stays inside that fleet');
+
   console.log('\n[1] vendor-comparison consistency');
   const pf = (await J('/api/predict/portfolio')).body;
   const bt = (await J('/api/predict/backtest')).body;

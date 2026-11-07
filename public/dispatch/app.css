@@ -180,7 +180,9 @@ kbd { background: var(--nx-surface-3); border: 1px solid var(--nx-border-strong)
   .view-tabs button.is-active { color: var(--nx-text); border-top-color: var(--nx-accent); }
   .tb-hide-tablet { display: none; }
 }
-@media (max-width: 640px) { .two { grid-template-columns: 1fr; } .nx-switcher { display: none; } }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.q-more { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px; border-top: 1px solid var(--nx-border); }
+.q-more .nx-faint { font-size: 12px; }
 @media (max-width: 640px) { .nx-main.nx-main--flush { padding: 0; } .q-filters { grid-template-columns: 1fr 1fr; } .q-filters #f-fleet { grid-column: 1 / -1; } }
 @media (max-width: 640px) { .dtc th:nth-child(3), .dtc td:nth-child(3) { display: none; } }
 

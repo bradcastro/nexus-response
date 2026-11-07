@@ -195,7 +195,7 @@
     // camera evidence
     if (B && B.camera && (B.camera.frames.length || B.camera.verified)) {
       var cam = B.camera, cc = el('div.jb-card', el('h2', 'Camera evidence'),
-        cam.verdict ? el('div.jb-sub', 'AI verdict: ' + plain(cam.verdict) + (cam.confidence != null ? ' (' + cam.confidence + '% confidence)' : '')) : null,
+        cam.verdict ? el('div.jb-sub', 'Vendor verdict: ' + plain(cam.verdict) + (cam.confidence != null ? ' (' + cam.confidence + '% confidence)' : '') + '. Nexus does not analyze video.') : null,
         cam.frames.length ? el('div.jb-frames', cam.frames.map(function (f) { return el('a', { href: f.url, target: '_blank', rel: 'noopener', class: 'jb-frame' }, el('img', { src: f.url, alt: f.label, loading: 'lazy' }), el('span', f.label)); })) : el('div.jb-note', 'No frames available.'),
         cam.clips.length ? el('div.jb-row', { style: { marginTop: '10px' } }, cam.clips.map(function (c, i) { return /^https?:/.test(c.url || '') ? el('a.jb-btn.jb-btn--sm', { href: c.url, target: '_blank', rel: 'noopener' }, 'Open ' + (c.type || 'road') + ' clip' + (c.durationSec ? ' (' + c.durationSec + 's)' : '')) : null; })) : null,
         el('div.jb-note', { style: { marginTop: '8px' } }, cam.note));
